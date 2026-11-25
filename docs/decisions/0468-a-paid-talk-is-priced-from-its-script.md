@@ -31,8 +31,11 @@ botrun's `unpaid` learns a Talk is unpaid only after one fails (#766's root-caus
   E_19a/b a UnitDefinition before `EventScr_089F82FC`, neither of which CALLs it.
 - **A live Sight answers `s.talkPrice(u, t)`** (`M.pairPrice` over every entry of the
   chapter's talk table, available now or not, read once per Sight; the dearest when a pair has
-  two) **and `s.gold()`**: the api's own, harness.lua `INSPECT.spendableGold`, the one owner of
-  the game's `GetPartyGoldAmount` (what `CHECK_MONEY` and the shop read: 0 in Ch5x).
+  two) **and `s.gold()`**. `Sight.spendableGold(call, S)` is the one owner of the game's
+  `GetPartyGoldAmount` read (what `CHECK_MONEY` and the shop read: 0 in Ch5x). `s.gold` runs it
+  on the Sight's own sandbox and harness.lua's `api.gold` on `INSPECT.gameCalls`. Run through
+  `INSPECT.gameCalls` from inside a `sight.batch`, the call never returned: replay `r766h`
+  crashed on turn 2.
 - **A talk whose script is the paid one itself raises**: it sets no price before it.
 - **A forced Talk** rebuilt from its key in a diagnostic replay gets its hire from
   `Bot.hirePrice`, so the planner charges it the same way.

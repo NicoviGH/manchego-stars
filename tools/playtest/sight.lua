@@ -1646,6 +1646,12 @@ function M.talkPrice(mem, script, paid)
     return price
 end
 
+-- What the party may spend, the game's answer on the machine `call` runs (the shop's, and the
+-- paid-recruit script's CHECK_MONEY), not the PlaySt field: GetPartyGoldAmount is 0 in Ch5x
+-- (bmgold.c), where the shop refuses every purchase. The one owner: s.gold and harness.lua's
+-- api.gold (INSPECT.spendableGold) each run it on their own machine.
+function M.spendableGold(call, S) return call(S.GetPartyGoldAmount, {}) end
+
 -- The gold talker `a`'s Talk to `b` hires `b` for: of `talks` (M.talks' entries, available or
 -- not), those naming the pair (a = 0 is anyone), priced by M.talkPrice; the dearest when more
 -- than one names it, 0 for free or none. An entry's flag only says whether it runs now; its
@@ -4898,9 +4904,12 @@ function M.new(outer)
         end
         return prices[k]
     end
-    -- the party's gold as the paid-recruit script's CHECK_MONEY reads it: the api's own
-    -- (harness.lua INSPECT.spendableGold, the campaign's api.gold too); nil without one
-    s.gold = api.gold
+    -- the party's gold as the paid-recruit script's CHECK_MONEY reads it (M.spendableGold), on
+    -- this Sight's own sandbox: the bot asks it inside a sight.batch, where a call on another
+    -- machine (harness.lua's INSPECT.gameCalls) did not return (#770's review fix, `r766h`)
+    function s.gold()
+        return sandbox(function(call) return M.spendableGold(call, S) end)
+    end
 
     local function asActive(u, x, y) M.asActive(api, u, x, y) end
 

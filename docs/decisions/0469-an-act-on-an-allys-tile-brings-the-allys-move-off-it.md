@@ -53,5 +53,12 @@ replay (`r766f`) settled it:
     for 0 gold, Innes opened the door from (17,1) on turn 8, and Eirika seized on turn 19.
   - Before: `r765c` won both attempts and missed Rennac each time; `r766e` won attempt 1 and was
     stuck in attempt 2.
+- Replay `r766i`, after #770's review fixes, Ch14 s4003, two attempts:
+  - Attempt 1 won in 22 turns with 0 deaths.
+  - Attempt 2 won in 21 turns. L'Arachel talked Rennac over on turn 5, and there was no stall.
+  - Rennac died on turn 13 in a plan that read him at 0.59 to die, over the 0.05 cap. The run
+    first parts from `r766g` on turn 11: both runs played a `spare` plan that was not admitted
+    (0.835 for some unit) over admitted beam plans, and Rennac's wait tile differs, (15,7)
+    against (15,6). That death is #743's (over-cap deaths), not this record's.
 - Lua tests, three laps each, back to back: base user 2.11 s and 2.13 s, branch 2.25 s and
   2.12 s.

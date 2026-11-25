@@ -3205,18 +3205,17 @@ INSPECT.loadSight = function()
     return INSPECT.Sight
 end
 
--- What the party may spend, the game's answer (the shop's, and the paid-recruit script's
--- CHECK_MONEY), not the PlaySt field: GetPartyGoldAmount is 0 in Ch5x (bmgold.c), where the shop
--- refuses every purchase. The campaign's api.gold and the Sight's api.gold (sight.gold) both.
+-- What the party may spend (Sight.spendableGold), for the campaign's api.gold: the shop and
+-- botrun's unpaid Talks. The Sight's own s.gold runs the same read on its sandbox.
 INSPECT.spendableGold = function()
-    return INSPECT.gameCalls(function(call) return call(SYM.GetPartyGoldAmount, {}) end)
+    local Sight = INSPECT.loadSight()
+    return INSPECT.gameCalls(function(call) return Sight.spendableGold(call, SYM) end)
 end
 
 INSPECT.sightApi = function()
     local raw = PROCS.raw
     INSPECT.loadSight()
     return {
-        gold = INSPECT.spendableGold,
         mem = { u8 = ru8, s8 = rs8, u16 = ru16, s16 = rs16, u32 = ru32 },
         write8 = function(a, v) emu:write8(a, v) end,
         write16 = function(a, v) emu:write16(a, v) end,
