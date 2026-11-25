@@ -81,12 +81,18 @@ the forecast's phases outrank the memory. Fix 2, memory over forecast, was not n
   L'Arachel (not committed).** From every tile he stood on, the forecast's path now matched his
   real walk tile for tile: (22,9) → (22,5) → (22,3) → (18,1) → (12,1) → (6,1) → (1,2) → (1,8).
   L'Arachel's meetings were priced along row 1. On `h766e` they were priced only on his current
-  tile. One read is still unexplained (untested): in attempt 2, on the turn he stood at (22,3),
-  20 reads sent him south along row 13. No plan that turn opened a door, which rules out that
-  cause.
+  tile. One read is still unexplained: in attempt 2, on the turn he stood at
+  (22,3), 20 reads sent him south. It is on #766 (comment 7176696969) with the test that would
+  settle it.
 - **Outcome on that replay:** both attempts won with 0 deaths (`h766e`: a1 lost Innes, charId
   11). Rennac was still not recruited, and his two chests closed (taken by him). Pricing the
   meetings on his real walk did not make L'Arachel get there. That is the per-turn play's gap
   (R3, #767), not the forecast's.
+- **PR #777 review.** A meeting past the end of his walk (no removal) is met when the talker
+  arrives, never in an earlier phase. Before, a talker 8 turns away read a negative wait and a
+  chance near 1 (`test_goals` `test_meetings_price_each_meeting_on_its_wait` fails without the
+  fix). The trip's clock (`trip`) is one helper, read by `meetEach`, `arrive`, `Goals.meetings`
+  and `Goals.chance`. The forecast reads chest items from the memo alone, never in a sandbox
+  nested in its replay.
 - **Planning cost.** A pick is one more branch on a decision the replay already reads. The chest
   items are read once per game. No new search or simulated phase, so no timing (ADR 0430).

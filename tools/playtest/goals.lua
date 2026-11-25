@@ -480,6 +480,13 @@ end
 -- Second and third answers: the tile he is met on and its phase.
 -- `each(t, tile, f)` for each phase in turn whose meeting the taker makes, until it answers
 -- true: meet's first, M.meetings' every one.
+-- A trip of `t` turns (turnsTo's) begun `late` turns from now: the player phase it arrives in
+-- (1: this one) and its chance, a gamma per turn on the way. The one clock every Talk and goal
+-- price reads (meetEach, arrive, M.meetings, M.chance).
+local function trip(t, late, gamma)
+    return math.max(math.ceil(t), 1) + late, gamma and gamma ^ (math.max(t, 1) - 1 + late)
+end
+
 local function meetEach(goal, u, p, late, turnsTo, beside, each)
     local path = goal.path
     for f = 1, goal.closes or math.huge do
@@ -487,7 +494,7 @@ local function meetEach(goal, u, p, late, turnsTo, beside, each)
         if beyond and goal.closes then return end
         local tile = f == 1 and goal.tile or path[math.min(f - 1, #path)] or goal.tile
         local t = turnsTo(u, tile, p, beside)
-        if t and (beyond or math.max(math.ceil(t), 1) + late <= f) and each(t, tile, f) then return end
+        if t and (beyond or trip(t, late) <= f) and each(t, tile, f) then return end
         if beyond then return end
     end
 end
@@ -510,7 +517,7 @@ local function arrive(goal, u, p, late, turnsTo)
     -- the deadline is in the meeting's phase (meet), so no closes test after it
     if goal.path and #goal.path > 0 then return meet(goal, u, p, late, turnsTo, beside) end
     local t = turnsTo(u, goal.tile, p, beside)
-    local f = t and math.max(math.ceil(t), 1) + late
+    local f = t and trip(t, late)
     if not f or goal.closes and goal.closes < f then return nil end
     return t, goal.tile, f
 end
@@ -526,10 +533,14 @@ function M.meetings(goal, u, p, gamma, turnsTo)
     local out = {}
     -- every turn until the Talk costs a gamma: the trip's (as M.chance), then the wait there
     -- for him, so a later meeting is never worth more for being nearer
+    -- A meeting past the walk's end (meetEach's `beyond`, no removal) is made whenever the taker
+    -- arrives, later than that phase too: it is met on its arrival, and no wait is negative (PR
+    -- #777 review: a talker 8 turns off read a meeting at phase 4 at gamma^-4, above every
+    -- nearer one)
     local function add(t, tile, f)
-        local turns = math.max(math.ceil(t), 1) + late
-        out[#out + 1] = { tile = tile, f = f, turns = turns,
-                          c = gamma ^ (math.max(t, 1) - 1 + late + (f - turns)) }
+        local turns, c = trip(t, late, gamma)
+        f = math.max(f, turns)
+        out[#out + 1] = { tile = tile, f = f, turns = turns, c = c * gamma ^ (f - turns) }
     end
     if goal.path and #goal.path > 0 then
         meetEach(goal, u, p, late, turnsTo, M.beside(goal.kind), function(t, tile, f) add(t, tile, f) end)
@@ -554,8 +565,8 @@ function M.chance(goal, pos, gamma, turnsTo)
             local late = (p.late or 0) + (p.acted and 1 or 0)
             local t = arrive(goal, u, p, late, turnsTo)
             if t then
-                options[#options + 1] = { c = gamma ^ (math.max(t, 1) - 1 + late),
-                                          alive = alive, turns = math.max(math.ceil(t), 1) + late }
+                local turns, c = trip(t, late, gamma)
+                options[#options + 1] = { c = c, alive = alive, turns = turns }
             end
         end
     end

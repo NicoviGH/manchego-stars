@@ -4839,7 +4839,10 @@ function M.new(outer)
                                     -- a Rogue's door or chest opens (both looks: a shut door
                                     -- held Rennac still); a chest it takes closes in the first
                                     -- (playPick has emptied it: no sackedTerrain over it)
-                                    local px, py, chest = M.playPick(api, call, S, Board, e, s.chestItem)
+                                    -- the items closings read before its sandbox (a chest it
+                                    -- did not list is no full chest, so puts nothing in)
+                                    local px, py, chest = M.playPick(api, call, S, Board, e,
+                                        function(cx, cy) return s.chestItem(cx, cy, true) end)
                                     if chest and onPillage then close(px, py, phase) end
                                 end
                             end
@@ -5065,11 +5068,12 @@ function M.new(outer)
     -- pays the party instead; a givenItem of 0 rolls one from the table at its script, whose
     -- first entry stands for the roll: what the AI reads of it is a bag one item fuller). The
     -- forecast's Rogue fills his bag with them (M.playPick). Read once: a chest's entry never
-    -- changes.
+    -- changes. `known` reads the memo alone (nil when it was never read), for a caller inside a
+    -- sandbox whose scratch a nested one must not borrow (closings' replay: the AI's proc).
     local chestItems = {}
-    function s.chestItem(x, y)
+    function s.chestItem(x, y, known)
         local k = x .. "," .. y
-        if chestItems[k] == nil then
+        if chestItems[k] == nil and not known then
             chestItems[k] = sandbox(function(call, info)
                 if not locationAt(call, info, x, y) then return false end
                 local item = mem.u32(info + EVENT_ITEM) & 0xFFFF

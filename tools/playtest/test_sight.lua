@@ -34,6 +34,14 @@ local function zeroMem()
     return { u8 = zero, u16 = zero, u32 = zero, s8 = zero }
 end
 
+-- Memory over a sparse `bytes` table ({ [address] = value }, 0 elsewhere) at every width: the
+-- one stub for a test that lays out the few addresses a game read walks. A test that also reads
+-- signed bytes or writes keeps its own.
+local function bytesMem(bytes)
+    local read = function(a) return bytes[a] or 0 end
+    return { u8 = read, u16 = read, u32 = read }
+end
+
 -- The game's own map layout (bmmap.c BmMapInit) over `m` for the three maps a refresh rebuilds
 -- (gBmMapUnit, gBmMapHidden, gBmMapFog), W x H tiles (3 x 2 unless given): gBmMapSize, then per
 -- pool the h + 4 row pointers and the (w + 2)-wide rows, the handle on the third pointer. -> the
@@ -246,9 +254,7 @@ end
 do
     local cpu, seen = fakeCpu(1)
     local bytes = { [0x100] = 7 }
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
+    local outer = { cpu = cpu, mem = bytesMem(bytes),
                     write8 = function(a, v) bytes[a] = v end,
                     write16 = function(a, v) bytes[a] = v end,
                     write32 = function(a, v) bytes[a] = v end }
@@ -298,9 +304,7 @@ end
 do
     local cpu = fakeCpu(1)
     local bytes = {}
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
+    local outer = { cpu = cpu, mem = bytesMem(bytes),
                     write8 = function(a, v) bytes[a] = v end,
                     write16 = function(a, v) bytes[a] = v end,
                     write32 = function(a, v) bytes[a] = v end }
@@ -347,8 +351,7 @@ end
 -- changes nothing.
 do
     local bytes = {}
-    local mem = { u8 = function(a) return bytes[a] or 0 end, u16 = function(a) return bytes[a] or 0 end,
-                  u32 = function(a) return bytes[a] or 0 end }
+    local mem = bytesMem(bytes)
     local kept
     local api = { mem = mem, write8 = function(a, v) bytes[a] = v end,
                   write16 = function(a, v) bytes[a] = v end,
@@ -404,9 +407,7 @@ do
     local at = sightSrc:find("local function replay(who, at, into, gone, onPillage, tileOnly)", 1, true)
     local body = at and sightSrc:sub(at, sightSrc:find("M.carryPaths(", at, true)) or ""
     check(body:find("M.playPick(", 1, true) ~= nil, true, "playPick: the forecast's replay plays a pick")
-    local boardSrc = assert(io.open(here .. "board.lua")):read("a")
-    check(boardSrc:find("AI_ACTION_PICK = Board.AI_ACTION_PICK", 1, true) ~= nil, true,
-          "playPick: the board API carries AI_ACTION_PICK")
+    check(Board.bind(mem, {}).AI_ACTION_PICK, 13, "playPick: the board API carries AI_ACTION_PICK")
 end
 
 -- test_map_change_tiles_are_the_rectangles_drawn_tiles: the change at (2,1) is 2x2 at (2,1);
@@ -414,9 +415,7 @@ end
 -- A tile with no change has none (nil).
 do
     local bytes = {}
-    local mem = { u8 = function(a) return bytes[a] or 0 end,
-                  u16 = function(a) return bytes[a] or 0 end,
-                  u32 = function(a) return bytes[a] or 0 end }
+    local mem = bytesMem(bytes)
     local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10 }
     local mc = 0x500
     bytes[mc + 1], bytes[mc + 2], bytes[mc + 3], bytes[mc + 4], bytes[mc + 8] = 2, 1, 2, 2, 0x600
@@ -471,9 +470,7 @@ end
 do
     local cpu = fakeCpu(1)
     local bytes = {}
-    local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                       u16 = function(a) return bytes[a] or 0 end,
-                                       u32 = function(a) return bytes[a] or 0 end },
+    local outer = { cpu = cpu, mem = bytesMem(bytes),
                     write8 = function(a, v) bytes[a] = v end,
                     write16 = function(a, v) bytes[a] = v end,
                     write32 = function(a, v) bytes[a] = v end, Board = Board }
@@ -2222,9 +2219,7 @@ do
     local function run(nested)
         local cpu = fakeCpu(1)
         local bytes = { [0x100] = 7 }
-        local outer = { cpu = cpu, mem = { u8 = function(a) return bytes[a] or 0 end,
-                                           u16 = function(a) return bytes[a] or 0 end,
-                                           u32 = function(a) return bytes[a] or 0 end },
+        local outer = { cpu = cpu, mem = bytesMem(bytes),
                         write8 = function(a, v) bytes[a] = v end,
                         write16 = function(a, v) bytes[a] = v end,
                         write32 = function(a, v) bytes[a] = v end }

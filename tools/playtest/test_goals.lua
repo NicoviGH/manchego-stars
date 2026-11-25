@@ -280,6 +280,35 @@ do
     check(Goals.chance(g, pos, G, sight.turnsTo), 0, "no memory: past the forecast he is never met")
 end
 
+-- test_meetings_price_each_meeting_on_its_wait (PR #777 review): Goals.meetings' chance is a gamma
+-- per turn until the Talk, the trip's and the wait's. His walk is (4,0), then (8,0), and he stays
+-- there (no removal). A (at (0,0), 4 tiles a turn) meets him on (4,0) in phase 2 after one turn
+-- there and a wait of one, on (8,0) in phase 3 on arrival; past the walk's end it meets him
+-- whenever it arrives, waiting from that phase. B, 8 turns from his last tile, meets him only past the walk's end, on its
+-- arrival: never at a phase before it gets there (the wait was -4 and the chance above 1). A
+-- goal with no path is met where it stands.
+do
+    local goal = { tile = { x = 0, y = 4 }, path = { { x = 4, y = 0 }, { x = 8, y = 0 } } }
+    local A, B = { id = 1 }, { id = 2 }
+    local function turnsTo(u, tile)
+        if u.id == 2 then return (tile.x == 8 and tile.y == 0) and 8 or nil end
+        return (math.abs(tile.x) + math.abs(tile.y)) / 4
+    end
+    local function list(u, g)
+        local parts = {}
+        for _, m in ipairs(Goals.meetings(g or goal, u, { x = 0, y = 0 }, G, turnsTo)) do
+            parts[#parts + 1] = m.tile.x .. "," .. m.tile.y .. "@" .. m.f .. "/" .. m.turns
+                .. "=" .. string.format("%.4f", m.c)
+        end
+        return table.concat(parts, " ")
+    end
+    check(list(A), "0,4@1/1=1.0000 4,0@2/1=0.8500 8,0@3/2=0.7225 8,0@4/2=0.6141",
+          "meetings: a gamma per turn until the Talk, the trip's and the wait's")
+    check(list(B), "8,0@8/8=" .. string.format("%.4f", G ^ 7),
+          "meetings: past the walk's end, met on arrival, never before it")
+    check(list(A, { tile = { x = 8, y = 0 } }), "8,0@2/2=0.8500", "meetings: no path, met where it stands")
+end
+
 -- TestRecruitOnALockedTileIsMet (#710, vanilla Ch14's Rennac): his path runs over a chest the
 -- taker holds no key for. A Talk is beside the recruit, so his tile's lock is no way's cost: the
 -- goal asks turnsTo to leave it out (`beside`), for the path and for the stationary price. A
