@@ -3071,7 +3071,8 @@ end
 -- strikers 4-8 tiles back. Each: { x, y, key, need = the front's size, stake = { tiles, gone }
 -- (the open part of its losses), strikers = { { u, gap } } nearest first (strikeGap), ready =
 -- how many of them can strike its front this turn, less one when every unit that can open it
--- this turn is ready, staged = ready >= need }. Read once
+-- this turn is ready, full = ready >= need, staged = full, or every striker the stage job could
+-- send is ready (sendStagers settles it) }. Read once
 -- a decision, on the board before anyone acts: a striker that moves in this turn has acted.
 local function releasesOf(ctx)
     local out = {}
@@ -3135,7 +3136,7 @@ local function releasesOf(ctx)
                 table.sort(strikers, soonestThenSlot("gap", "u"))
                 out[#out + 1] = { x = r.x, y = r.y, key = key, need = #r.front, stake = stake,
                                   strikers = strikers, ready = ready,
-                                  staged = ready >= #r.front }
+                                  full = ready >= #r.front, staged = ready >= #r.front }
             end
         end
     end
@@ -3147,11 +3148,14 @@ M.releasesOf = releasesOf
 -- nearest strikers that have no job, sent to its door, so the turn it opens they strike what it
 -- brings. Never a unit whose loss ends the game (sendOpeners' reason: a lord pulled to a door
 -- leaves the objective). The door's own act waits on the planner's forfeit (Goals.forfeited's
--- `released`), not on this: this only brings the strikers.
+-- `released`), not on this: this brings the strikers, and says when no more can come. A door that
+-- brings more reds than the army can gather would otherwise never read staged, and with the
+-- objective behind it the chapter would stall: once every striker it sent is ready (none still
+-- on its way), the release is staged with what it has.
 local function sendStagers(ctx, barred)
     local lords = M.gameOver(ctx.sight)
     for _, r in ipairs(ctx.releases or {}) do
-        if not r.staged then
+        if not r.full then
             -- met beside the door, never on it (Goals.beside): a keyless striker marches up to
             -- it, not off to fetch a key for it
             local n = 0
@@ -3166,6 +3170,12 @@ local function sendStagers(ctx, barred)
                     n = n + 1
                 end
             end
+            local onWay = 0
+            for _, s in ipairs(r.strikers) do
+                local g = ctx.exploreGoal[s.u.id]
+                if s.gap > 0 and g and g.stage and g.x == r.x and g.y == r.y then onWay = onWay + 1 end
+            end
+            r.staged = onWay == 0
         end
     end
 end

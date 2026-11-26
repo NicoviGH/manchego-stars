@@ -2745,6 +2745,11 @@ do
         local door, door2 = { act = "door", x = 2, y = 0 }, { act = "door", x = 2, y = 4 }
         local st = style("careful")
         local arrivals = { { charId = 0x90, classId = 9, x = 3, y = 0, turn = 2, by = door, timed = false } }
+        if opt.bigFront then
+            -- two more Fighters the same turn: three to strike, and S is the one striker
+            arrivals[2] = { charId = 0x92, classId = 10, x = 3, y = 0, turn = 2, by = door, timed = false }
+            arrivals[3] = { charId = 0x93, classId = 11, x = 3, y = 0, turn = 2, by = door, timed = false }
+        end
         local closings = { { x = 3, y = 0, phase = 3, closerKey = "a:144:9:2" } }
         if opt.twoDoors then
             arrivals[2] = { charId = 0x91, classId = 9, x = 3, y = 4, turn = 2, by = door2, timed = false }
@@ -2830,6 +2835,13 @@ do
     r = ctx.releases and ctx.releases[1]
     check(r and tostring(r.staged) .. " " .. r.ready, "true 1",
           "release: a keyless striker beside the door is no opener")
+    -- three reds to strike and S the only striker: staged once S is ready (none still on its
+    -- way), so the door is not held for good
+    _, ctx = case(7, { bigFront = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.need, "false 3", "release: S still on its way, the door waits")
+    a = case(1, { bigFront = true })
+    check(a and a.act, "door", "release: every striker that can come is ready, the door opens")
     _, ctx = case(7, { lord = true })
     check(ctx.exploreGoal[0x02] == nil or not ctx.exploreGoal[0x02].stage, true,
           "release: a unit whose loss ends the game is never sent")

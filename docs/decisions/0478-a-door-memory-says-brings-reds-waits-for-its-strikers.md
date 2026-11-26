@@ -33,7 +33,10 @@ behind Rennac until he was gone. Memory already knew the door brought them (each
   read on the map the door's change leaves (a roofed room's tiles are unreached before it),
   units not blocking, against its MOV and the Weapon Select list's longest reach). Opening
   the door spends its opener's act, so when every unit that can open it this turn (lacks nothing
-  for it, `lockAt`, and stands about a move from it) is among the ready, one fewer counts. `staged` = ready >= need.
+  for it, `lockAt`, and stands about a move from it) is among the ready, one fewer counts.
+  `staged` = ready >= need, or every striker the stage job could send is ready (none still on its
+  way): a door that brings more reds than the army can gather is opened with what it has, never
+  held for good (with the objective behind it, the chapter would stall).
 - **The planner's forfeit** (`Goals.forfeited`'s `released`, `Goals.released`): a plan that
   opens a door whose release is not staged forfeits the stake: the recruit memory saw walk off
   (by character; recruit goals now carry `charId`) and the tiles its units closed. A ranking,
@@ -77,6 +80,6 @@ ordering repeats another. (5) No unit, chapter or tile is named in the code.
 ## Proof
 
 - `test_a_door_memory_says_brings_reds_waits_for_its_strikers` (bot) fails without the forfeit
-  and the stage job, and its armed-opener and beside-the-door checks fail without those parts;
+  and the stage job, and its armed-opener, beside-the-door and gathered-what-it-can checks fail without those parts;
   the `releases` case in `test_timeline`; the `released` case in `test_goals`.
 - Replays `s766r`, `s766s` and `s766t` above.
