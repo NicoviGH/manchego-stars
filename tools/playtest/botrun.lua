@@ -166,6 +166,8 @@
 -- Every number in it is read from the game; nothing is re-derived.
 
 local M = {}
+-- "a new low" in turns to a goal has one owner, shared with the planner's idle rule (#698)
+local Goals = dofile((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "goals.lua")
 
 -- The spoiling thefts (t.spoils, ADR 0379) whose item the army has not got back: a drop the game
 -- gave a player unit later (`drops`: { from = the dropper's charId, fromId = its unit id, item,
@@ -1082,8 +1084,8 @@ function M.run(api)
         local near, here = {}, {}
         for _, n in ipairs(plan.nearest) do
             local low = lows[n.id]
-            if low and n.turns < low - 1e-9 then near[#near + 1] = n.id end
-            lows[n.id] = low and math.min(low, n.turns) or n.turns
+            if Goals.nearer(n.turns, low) then near[#near + 1] = n.id end
+            lows[n.id] = Goals.lowest(low, n.turns)
         end
         -- whether the phase before this reading was a wait: no event in it and no new low
         -- anywhere. A goal's run grows only over waits: an army that is fighting has not given
@@ -1106,7 +1108,7 @@ function M.run(api)
                 local win = goalReads[n.id]
                 local neared = true   -- an empty window (the first reading) is run 0
                 for _, r in ipairs(win or {}) do
-                    if not (n.turns < r - 1e-9) then neared = false; break end
+                    if not Goals.nearer(n.turns, r) then neared = false; break end
                 end
                 if win == nil then win = {}; goalReads[n.id] = win end
                 win[#win + 1] = n.turns

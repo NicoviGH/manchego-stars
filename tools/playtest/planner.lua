@@ -306,11 +306,11 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
                    { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
 -- Whether readings `near` (goal id -> turns) set a new low against `best` (the army's best so
--- far, same ids): some goal strictly nearer than ever, past float dust. A goal with no best yet
--- is no low: its first reading only sets one, as botrun's own count of progress has it (#698).
+-- far, same ids; Goals.nearer, botrun's own test): some goal strictly nearer than ever. A goal
+-- `best` has no reading for (no way to it on the board the plan starts from) sets none (#698).
 function M.setsLow(near, best)
     for id, t in pairs(near) do
-        if best[id] and t < best[id] - M.DUST then return true end
+        if Goals.nearer(t, best[id]) then return true end
     end
     return false
 end
@@ -1092,11 +1092,11 @@ function M.plan(Bot, board, sight, style, opts)
     for id, t in pairs(nearNow) do nearest[#nearest + 1] = { id = id, turns = t } end
     table.sort(nearest, function(x, y) return x.id < y.id end)
     -- the army's best so far per goal: the least of botrun's lows (opts.lows, every earlier
-    -- phase's reading this attempt) and this board's. A plan marches only below it (#698)
+    -- phase's reading this attempt) and this board's; a goal no earlier phase read is measured
+    -- against this board alone. A plan marches only below it (#698)
     local bestNear = {}
     for id, t in pairs(nearNow) do
-        local low = opts and opts.lows and opts.lows[id]
-        bestNear[id] = low and math.min(low, t) or t
+        bestNear[id] = Goals.lowest(opts and opts.lows and opts.lows[id], t)
     end
     -- each unit's assigned goal as the decision starts (FR-016): the recruit, village or chest
     -- it was sent to, else its way to the objective, and its turns there now. Progress is what a
@@ -1113,6 +1113,9 @@ function M.plan(Bot, board, sight, style, opts)
             goalOf[u.id] = assigned[#assigned]
         end
     end
+    -- Not nearOn: progress sums what each unit cuts from its OWN assigned way (a unit's march
+    -- counts though another is nearer the same goal), nearOn takes each goal's least over its
+    -- takers. The rank scores the first, the idle rule's new low reads the second (#698)
     local function progress(st)
         local pos, out = positions(st), 0
         local read = turnsOn(st, pos)
@@ -1183,8 +1186,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- rescue), may end the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
     -- chapter, any red of a Rout). A kill, counter-kill or win chance counts only above
     -- M.ADVANCE_MIN (ADR 0458, #744). A march nearer a goal does not advance: nearing is what
-    -- the stall reading found idle (an under-cap march is still no idle plan: admit(), ADR
-    -- 0458), and a blow that deals nothing wounds nothing. `counters`: each red
+    -- the stall reading found idle (an under-cap march that sets a new low is still no idle
+    -- plan: admit(), ADRs 0458 and 0476), and a blow that deals nothing wounds nothing. `counters`: each red
     -- enemy's chance our counters kill it in the judged phase. A wound counts only as far as it
     -- outlasts the tile's heal (M.healed, #709): a boss on a fort regains it before it acts.
     -- -> advances, woundOnly: `woundOnly` when a wound that outlasts the heal is all it has. A

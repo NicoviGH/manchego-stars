@@ -24,9 +24,11 @@ on (Ch15 s4002, s4003, s4007; Ch21 s4003; #698).
 objective's nearest unit, or a feasible or stalled ledger row's best taker, in the turns
 `plan.nearest` reads) is nearer on the plan's end board than the army's best so far. The best so
 far is the least of botrun's `lows` (every earlier phase's reading this attempt, passed as
-`opts.lows`) and this board's reading. A goal with no reading yet sets no low, as botrun's own
-progress count has it. `M.setsLow` is the comparison; `rank.progress` is unchanged, so no plan's
-score moves.
+`opts.lows`) and this board's reading; a goal no earlier phase read is measured against this
+board alone, and one with no way to it on this board sets no low. "Nearer than the low" has one
+owner, `Goals.nearer` (with `Goals.lowest`, the merge), which botrun's progress count now takes
+too, so the stall reading and the idle rule cannot drift. `M.setsLow` applies it to a plan;
+`rank.progress` is unchanged, so no plan's score moves.
 
 **What it changes.** The idle rule now bites on a stationary boss: once the stall reading fired,
 a shuffle is idle, and an under-cap wound on the boss (an advance) is admitted over it. Where no
