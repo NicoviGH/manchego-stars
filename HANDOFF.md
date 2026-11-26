@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-25, night; main is 1f9d7068 + HANDOFF commits)
+## Next session starts here (2026-11-26; main is cf4cf3ed + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -33,20 +33,17 @@ vanilla Ch2 cleared on tries 1, 1, 2; Manchego Stars ch02 had no clean clear in 
 **R4 #768 is done (closed): 8 of 34 clean within 3 tries, m740c 7 of 34.** Every blocker's
 root cause is on the issue that owns it, and **the work order is #764's body, "After R4"**
 (Nicolas, 2026-11-26: fix them all, one PR each, back to back, then one R4 set over the batch).
-**Item 1 is built, not yet a PR:** branch `feat/730-forfeit-what-clean-loses`, commit fcf18766
-(ADR 0475): the planner forfeits what the record's clean clear loses (a theft the game's
-`AiGetItemStealRank` ranks as spoiling; an owed recruit's death whatever its Talk row). Unit
-tests green; the 5 new checks fail on the old code. To finish it:
-1. **Proof replays read (2026-11-26), half a result:**
-   - `f475a10` (Ch10 s4003): **Amelia no longer killed** (R4: `killed_before_talk`; now
-     `left_map`, the turn-12 script). Still not recruited: every Talk plan is over the cap.
-   - `f475a16` (Ch16 s4005): **the Knight Crest (0x65) is still stolen from Colm** on turn 13.
-     No plan in the trace forfeited `stolen:`, so the forecast never predicted that steal: Colm
-     moved (19,6) -> (17,10) and the thief (129, seen in the plans) stepped (20,8) -> (18,10)
-     and stole. **Root-cause that first:** why the judged enemy phase has no theft there (one
-     instrumented replay of `f475a16` turn 13). The fix may belong in this PR.
-2. Open the PR (Part of #730, #711; not Closes: #711's key items and #730's Marisa stay),
-   `/code-review <PR> medium`, fix every finding, merge on CI for the head sha.
+**Item 1 is merged: PR #779 (cf4cf3ed, ADR 0475).** The planner forfeits what the clean clear
+loses (a spoiling theft, an owed recruit's death whatever its Talk row). **A clean clear is the
+chapter's end state** (Nicolas, 2026-11-26): the record counts a theft only if no later drop from
+that same thief gave the item back, and the planner forfeits only a theft by a thief that keeps its
+loot (no `US_DROP_ITEM`). The mend tries a robbed unit's way out first (its acts, every unit's
+strike on its thief). Results: Ch10 s4003 Amelia no longer killed (still not recruited: every Talk
+plan over the cap). **Ch16 s4005's Knight Crest is not saved:** thief 129 keeps its loot and Colm's
+only escape is a dead-end corner; it needs a hand-off before turn 14 (Trade, or a mid-map convoy
+give: #688, item 4; findings on #711 and #688). A move-list gate that kept Colm out of reach was
+tried and dropped (ADR 0475). Not built: a job that sends the army after a thief that will drop
+a spoiling item (the record judges it at the end).
 
 **Item 2 (next, #698):** the idle rule's march exemption (`planner.lua` ~1995, `marches`)
 must count only a new low. botrun already keeps each goal's best (`lows`, `readNearest`,
@@ -58,8 +55,8 @@ low. Change only the exemption, not `rank.progress` (that would rescore every pl
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
-Today's tags: `h774a` (door-hold probe), `h766a`-`h766e` (Ch14 five starts and two logged
-replays), `h775a`-`h775c` (Ch14 s4005 replays of the forecast fix). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
+Recent tags: `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
+`i730b`-`i730j` (Ch16 s4005 theft replays, ADR 0475). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
 b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
 **Holds to revisit:** #569 waited on R1 (read its hold comment: does it reopen?). #727 waits on
