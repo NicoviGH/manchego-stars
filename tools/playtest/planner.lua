@@ -93,14 +93,14 @@
 -- chances) },
 -- rank = what plans are compared by (M.outranks): { admitted, idle (opts.idle only: 1 for a plan
 -- that does not advance the level, 0 for one that does; ADR 0439),
--- forfeits (how many ledger goals it closes for good, and owed recruits no one may Talk yet it
--- risks: Goals.forfeited), complete (its chance to end the
+-- forfeits (how many ledger goals it closes for good, every owed recruit with no feasible row it
+-- risks, and every spoiling theft: Goals.forfeited, ADR 0475), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
 -- chance), value (the judged score), game_over (the chance a unit whose death ends the game
 -- dies), max_exceed, sum_exceed, max_die, sum_die, hp_left, fog (the fog read's summed
 -- chance to kill, where the chapter goes on), key }, forfeited = the ids it
--- closes (a row's, or "owed:<unit id>"), ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
+-- closes (a row's, "owed:<unit id>" or "stolen:<unit id>"), ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
 -- seizeJudged / seizeAdmitted = whether any plan judged took the Seize, and one within the
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
@@ -2363,12 +2363,15 @@ function M.plan(Bot, board, sight, style, opts)
         -- game's own AI decided the theft, sight's pilfer; a plan that moves the holder out of
         -- reach, or kills the thief, reads none). A chest it would have opened is worth that
         -- much of what it was, and a way where the thief also kills the holder counts once.
-        local robbed, keeps = {}, {}
+        -- A theft of an item the game ranks above the stat boosters (th.spoils) costs the clean
+        -- clear whatever else it takes: a forfeit of its own (`spoiled`, ADR 0475).
+        local robbed, keeps, spoiled = {}, {}, {}
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             local robbedHere = {}
             for _, th in ipairs(o.strikes.thefts or {}) do
                 if th.lock then robbedHere[th.target], robbed[th.target] = true, true end
+                if th.spoils and o.p > M.DUST then spoiled[th.target] = true end
             end
             for _, u in ipairs(hitOf[o.way]) do
                 local id, r = u.id, res[u.id]
@@ -2519,13 +2522,18 @@ function M.plan(Bot, board, sight, style, opts)
         for _, g in ipairs(greens) do
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
-        local looseHeld = {}   -- the loose recruits whose death is not the win
-        for id in pairs(st.loose) do
-            if not winByDeath(st, id) then looseHeld[id] = true end
+        -- every owed recruit on the field whose death is not the win: a loose one, or one a
+        -- blue may Talk (its feasible row counts it once; without one, its death still costs
+        -- the clean clear, ADR 0475)
+        local owed = {}
+        for _, set in ipairs({ st.loose, st.recruits }) do
+            for id in pairs(set) do
+                if byId[id] and not winByDeath(st, id) then owed[id] = true end
+            end
         end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost, loose = looseHeld,
-                                                       reach = reached(st),
+                                                       lost = lost, owed = owed,
+                                                       stolen = spoiled, reach = reached(st),
                                                        gone = M.GONE })
         local gain = progress(st)
         local greenDie = 0

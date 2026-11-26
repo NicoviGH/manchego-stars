@@ -72,12 +72,14 @@
 -- it would close with every win and so forbid the win for good. A reward needing one of those
 -- can never be had, and is no row either.
 -- Goals.forfeited(ledger, goals, closes) -> the sorted ids of the feasible rows a plan loses
--- for good (FR-011's forfeits), and "owed:<unit id>" for each owed recruit no one may Talk yet
--- whose death it risks. `closes` is what the plan does in the judged phase, each a chance
--- over its judged branches: { win (the chapter ends), took = { [goal id] = true }, lost =
--- { [recruit unit id] = chance it dies }, loose = { [unit id] = true } (owed recruits no one may
--- Talk yet and whose death is not the win, no row: their death alone forfeits "owed:<id>"), reach =
--- { [goal id] = { before, after } }, gone }.
+-- for good (FR-011's forfeits), "owed:<unit id>" for each owed recruit with no feasible row
+-- whose death it risks, and "stolen:<unit id>" for each unit a spoiling theft robs: what the
+-- record's clean clear loses (ADR 0475). `closes` is what the plan does in the judged phase,
+-- each a chance over its judged branches: { win (the chapter ends), took = { [goal id] = true },
+-- lost = { [recruit unit id] = chance it dies }, owed = { [unit id] = true } (every owed recruit
+-- on the field whose death is not the win), stolen = { [unit id] = true } (robbed of an item the
+-- game ranks above the stat boosters in some branch), reach = { [goal id] = { before, after } },
+-- gone }.
 -- Counted conservatively (FR-014): a goal is lost when it is lost in any branch with p > 0, so
 -- any chance at all is the whole goal. A win
 -- closes every goal the plan does not take; a recruit's death closes its Talk; a looter's
@@ -442,15 +444,25 @@ function M.forfeited(ledger, goals, closes)
         for _, id in ipairs(r.needs or {}) do gone = gone or shut[id] end
         if r.status == "feasible" and gone then out[#out + 1] = r.id end
     end
-    -- an owed recruit no player unit may Talk yet (closes.loose, a set of unit ids: the planner's
-    -- looseRecruits, less the ones whose death is the win itself: the Defeat-boss boss, a Rout's
-    -- last red, which the planner leaves out) has no row, so its death is a forfeit of its own,
-    -- "owed:<unit id>": the same consequence as a recruit with a talker (#730 fix 2, ADR 0452).
-    -- Its death only: a win does not close it (an unrelated one, a Seize, does not release it
-    -- either), or a row nobody can take would hold the Seize for good
-    for id in pairs(closes.loose or {}) do
-        if (lost[id] or 0) > M.DUST then out[#out + 1] = "owed:" .. id end
+    -- What the record's clean clear loses whatever the ledger says (ADR 0475, #730, #711): an
+    -- owed recruit's death (closes.owed, a set of unit ids: every owed recruit on the field, one
+    -- no player unit may Talk yet included, less the ones whose death is the win itself: the
+    -- Defeat-boss boss, a Rout's last red, which the planner leaves out). Its feasible row counts
+    -- it above, once; one with no feasible row (none may Talk it yet, ADR 0452; its Talk has no
+    -- chance this turn; its row stalled) is "owed:<unit id>". Its death only: a win does not
+    -- close it (an unrelated one, a Seize, does not release it either), or a row nobody can take
+    -- would hold the Seize for good. And a theft the game ranks as spoiling (closes.stolen, a
+    -- set of the robbed units' ids: sight.pilfer's `spoils`) is "stolen:<unit id>".
+    local counted = {}
+    for _, r in ipairs(ledger) do
+        if r.kind == "recruit" and r.status == "feasible" then counted[r.id] = true end
     end
+    for id in pairs(closes.owed or {}) do
+        if not counted["recruit:" .. id] and (lost[id] or 0) > M.DUST then
+            out[#out + 1] = "owed:" .. id
+        end
+    end
+    for id in pairs(closes.stolen or {}) do out[#out + 1] = "stolen:" .. id end
     table.sort(out)
     return out
 end

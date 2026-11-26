@@ -3736,7 +3736,10 @@ do
     -- or a Lockpick (0x6B) and returns its slot, else -1 (as the game's unsigned word)
     local thief, mark = 0x02030200, 0x02030300
     local SY = { UnitRemoveItem = 1, UnitAddItem = 2, GetUnitKeyItemSlotForTerrain = 3,
-                 gUnitLookup = 0x02024000 }
+                 AiGetItemStealRank = 4, gUnitLookup = 0x02024000 }
+    -- the game's steal list, in its order (cp_data.c gAiStealPriorityItemList): the Lockpick
+    -- (0x6B) above the Skl booster (0x5D), the Chest Key (0x69) below it
+    local STEAL_RANK = { [0x6B] = 4, [0x5D] = 20, [0x69] = 32 }
     local IT = Board.UNIT_ITEMS
     local function bagOf(a)
         local out = {}
@@ -3753,6 +3756,8 @@ do
         if fn == SY.UnitRemoveItem then
             for i = args[2], 3 do m.w16(a + IT + i * 2, m.u16(a + IT + (i + 1) * 2)) end
             m.w16(a + IT + 8, 0)
+        elseif fn == SY.AiGetItemStealRank then
+            return STEAL_RANK[a] or 0xFF
         elseif fn == SY.UnitAddItem then
             for i = 0, 4 do
                 if m.u16(a + IT + i * 2) == 0 then m.w16(a + IT + i * 2, args[2]) break end
@@ -3800,6 +3805,7 @@ do
     check(table.concat({ th.thief, th.target, th.item, tostring(th.lock),
                          table.concat(stoodOn, "/") }, ","), "129,5,107,true,129/2/3",
           "pilfer: the Lockpick's theft costs its holder the chests")
+    check(th.spoils, true, "pilfer: a Lockpick ranks above the boosters, so its theft spoils")
     setBag(mark, 0x0114, 0x016B, 0x0169); setBag(thief, 0)
     th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
     check(th.lock, false, "pilfer: a holder with a Chest Key left still opens chests")
@@ -3808,6 +3814,8 @@ do
                       { steal = true, target = 5, slot = 1, tile = { x = 2, y = 3 } })
     check(th.item == 0x69 and th.lock, true,
           "pilfer: a stolen Chest Key costs its holder the chests")
+    -- spoils: the game's rank against the Skl booster's (ADR 0379's line, M.stealSpoils)
+    check(th.spoils, false, "pilfer: a Chest Key ranks below the boosters and spoils nothing")
     setBag(mark, 0x0114, 0x2D6C); setBag(thief, 0)
     th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
     check(th.lock, false, "pilfer: an item that opens nothing costs no chest")

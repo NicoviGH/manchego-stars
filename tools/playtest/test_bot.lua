@@ -5714,6 +5714,34 @@ do
     local robs = { thefts = { { thief = 0x81, target = 0x01, item = 0x6B, lock = true } } }
     check(after({ { p = 0.5, strikes = robs }, { p = 0.5, strikes = { kill } } }), 0,
           "theft: robbed in one way and dead in the other, the chest is kept in none")
+
+    -- A theft the game ranks above the stat boosters (sight.pilfer's `spoils`, the record's own
+    -- line, ADR 0379) costs the clean clear whatever it opens (ADR 0475; vanilla Ch16: a Knight
+    -- Crest stolen from Colm, 0x09, was the only spoiler of 4 R4 tries, and cost the plan nothing
+    -- on main). With no chest to keep, A steps off the tile the thief steals from, and the plan
+    -- that stays forfeits "stolen:1"; a theft that does not spoil costs nothing (A stays)
+    local function off(spoils)
+        local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+                    enemyPhase = function(plan)
+                        for _, b in ipairs(plan.blues) do
+                            if b.x == 0 and b.y == 1 then
+                                return { thefts = { { thief = 0x81, target = b.unit.id,
+                                                      item = 0x6D, lock = false,
+                                                      spoils = spoils } } }
+                            end
+                        end
+                        return {}
+                    end }
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))
+        return at(a), plan
+    end
+    local base = off(false)
+    check(base, "0,1", "theft: a theft that does not spoil leaves A where it stands")
+    local moved, plan = off(true)
+    check(moved ~= "0,1" and #(plan and plan.forfeited or { 1 }) == 0, true,
+          "theft: a spoiling theft moves A off the thief's tile, forfeiting nothing")
+    check(Goals.forfeited({}, {}, { stolen = { [0x01] = true } })[1], "stolen:1",
+          "theft: a spoiling theft is forfeit by the robbed unit's id")
 end
 
 -- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with
@@ -11223,6 +11251,16 @@ do
     a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000), owed)
     check(plan and table.concat(plan.forfeited or {}, ","), "recruit:129",
           "owed: with a talker the recruit's row is the forfeit, not a second one")
+    -- the record's clean clear still loses the recruit when its row is not feasible (ADR 0475;
+    -- vanilla Ch10's Amelia, 0x12: every Talk plan over the cap, the row gone, and Seth's or
+    -- Franz's counter killed her as an ordinary red in 7 of 15 R4 tries). A stalled row (no unit
+    -- neared it) forfeited nothing on main: now the death is "owed:129", the row's id is not
+    board, o = counterKillsRecruit(true)
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000),
+                           { owedRecruits = { [0x81] = true },
+                             quietGoals = { ["recruit:129"] = true } })
+    check(plan and table.concat(plan.forfeited or {}, ","), "owed:129",
+          "owed: a recruit whose Talk row stalled is still forfeit by its death")
 end
 
 -- the same price on our own blow (the player phase): A, next to R and Y (the Rout's other enemy),
