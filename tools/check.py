@@ -92,6 +92,10 @@ DOC_GLOBS = ['docs/**/*.md', 'AGENTS.md', 'CLAUDE.md', 'README.md', 'HANDOFF.md'
 # an ADR) happened because this scan covered docs only and the growth patterns were
 # too narrow to match the comment's phrasing -- both fixed below.
 DEAD_CONCEPTS = [
+    # retired by ADR 0474 (#742): a cell is judged on tries to a clean clear, on the share of
+    # pairs where each arm needed more; the attempt-1 death endpoint's vanilla bar and the
+    # pilot's paired-or-marginal choice are gone
+    r'\bVANILLA_DEATH_MAX\b', r'\bvanilla_deaths\b', r'--analysis\b', r'\bmarginal analysis\b',
     # retired by ADR 0473 (#766): the Talk job is worth its best meeting (Goals.meetings), not
     # its first
     r'\bGoals\.meeting\b',

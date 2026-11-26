@@ -14,6 +14,11 @@ FR-033), which an advisory panel drafted (research record 0023): spec #510 comme
 bar, research record 0022's reading). **Built in PR-H** (points 1 to 3, see "Built (PR-H)" at
 the end); point 4's validity bar and point 5 are PR-I's.
 
+**Amended by ADR 0474 (Nicolas, 2026-11-25, #742): the endpoint is now tries to the first
+clean clear within the cap, compared pair by pair.** Points 1 and 4's vanilla bar and the
+paired-or-marginal choice in point 3 are replaced; the bounds, the looks, N, the margin and the
+labels stand. A protected death on attempt 1 is a reported column.
+
 **Amended 2026-11-09 (Nicolas): point 5, human calibration, is retired.** There will be no
 human playtests. The whole point of the bot is that vanilla stands in for playtesters, so
 Manchego Stars can be designed against vanilla without manual sessions; the anecdotal record of

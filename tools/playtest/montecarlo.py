@@ -26,21 +26,24 @@ BOTRUN record is recorded as `crashed` with its run dir, or as `no_style` when i
 says the chapter start has fewer styles than the attempt asked for.
 
 `paired_verdict` says where one chapter-and-mode cell stands from its Manchego Stars/twin pairs,
-on one endpoint: did a protected unit die anywhere in attempt 1 (ADR 0385). It is read at 50, 100
-and 200 pairs with exact Clopper-Pearson bounds split over the bounds, the looks and the frozen
-cell count, and labelled EQUIVALENT (inside +-10 points), HARDER, EASIER or INCONCLUSIVE.
-`pilot` plays one chapter cell on the 50 pilot seeds first and chooses paired or marginal
-analysis; `cell` then plays the confirmatory seeds with that choice.
+on one endpoint: the tries each replicate needed to clear the chapter clean, every attempt
+played with memory up to the cap, no clean clear within it worse than any (ADR 0474, amending
+0385). It bounds the share of pairs where Manchego Stars needed more tries minus the share
+where the twin did, at 50, 100 and 200 pairs with exact Clopper-Pearson bounds split over the
+bounds, the looks and the frozen cell count, and labels it EQUIVALENT (inside +-10 points),
+HARDER, EASIER or INCONCLUSIVE. `pilot` plays one chapter cell on the 50 pilot seeds first and
+reports the discordance a cell would face; `cell` then plays the confirmatory seeds.
 
     python3 tools/playtest/montecarlo.py starts --game ours|vanilla [--count 10] [--jobs 8]
     python3 tools/playtest/montecarlo.py resume --game vanilla --tag <tag> \
         [--campaigns cs-s4001,...] [--chapter <i>] [--last <i>] [--attempts <n>] [--jobs 8]
     python3 tools/playtest/montecarlo.py pilot --chapter 3 [--starts 10]
-    python3 tools/playtest/montecarlo.py cell --analysis paired \
+    python3 tools/playtest/montecarlo.py cell \
         (--chapter <n> [--starts 10] | --ours <env .json> --vanilla <env .json> \
          --ours-chapter <i> --vanilla-chapter <i> [--mode normal]) [--jobs 4]
 
-A chapter cell (Manchego Stars chapter n and its twin) plays attempt 1 from pinned chapter starts, each
+A chapter cell (Manchego Stars chapter n and its twin) plays every attempt to the first clean
+clear or the cap from pinned chapter starts, each
 from its own New Game campaign with its own seed, so each start carries its own dice and party
 (T100e): seed s plays the ((s - the set's first seed) mod K)-th of an arm's K starts, the
 first K pinned (by seed) that reached the chapter. `starts` plays and pins those campaigns
@@ -50,11 +53,12 @@ runs.jsonl): the store is the ROM's, so a Manchego Stars ROM change means
 new id `<tag>-<campaign>` (its states copied first, so the pinned starts stay as pinned), every
 chapter retried with memory up to the cap (ADR 0399); its records go to resume-runs.jsonl.
 
-Before a cell or pilot is read, both arms' first attempts pass FR-029's invariants
+Before a cell or pilot is read, every attempt both arms played passes FR-029's invariants
 (`validity`): environment-clean at 90% or more, no sandbox-fault death, blindspot and
 unclassified attempts under 10%, no unlabelled over-cap death, no unjustified seize skip, and
-the twin losing someone under 85% of the time. A cell that fails one is NOT READABLE, naming
-it, and stops there. Each `pilot` and `cell` appends its record to references/sim/cells.jsonl.
+the twin with no clean clear within the cap under 85% of the time. A cell that fails one is NOT
+READABLE, naming it, and stops there. Each `pilot` and `cell` appends its record to
+references/sim/cells.jsonl.
 
     python3 tools/playtest/montecarlo.py report [cells.jsonl] [--decision party|enemy|chapter \
         [--components a,b]] [--post]
@@ -269,10 +273,12 @@ def prune_runs(root=None, keep=KEEP_FAILED, stale_s=STALE_S, now=None, dirs=None
 PASSED_BOT = ('won', 'lost')          # a BOTRUN record's game results
 # ends with no game result: the harness crashed, or a decision ran past its budget (ADR 0411)
 NO_RESULT = ('crashed', 'timeout')
-# a campaign's ends that are its own answer: `bot_fault`/`infeasible` are verdicts and `capped`
-# a cut made on purpose (campaign.lua noClean), and kept as FAILED they would crowd real crashes
-# out of KEEP_FAILED
-PASSED_CAMPAIGN = ('done', 'played', 'bot_fault', 'infeasible', 'capped')
+# a chapter used its attempts with no clean clear (campaign.lua noClean): `bot_fault`/`infeasible`
+# are verdicts and `capped` a cut made on purpose
+NO_CLEAN = ('bot_fault', 'infeasible', 'capped')
+# a campaign's ends that are its own answer: kept as FAILED they would crowd real crashes out of
+# KEEP_FAILED
+PASSED_CAMPAIGN = ('done', 'played') + NO_CLEAN
 
 
 def passing(recs):
@@ -448,6 +454,9 @@ def records_of(task, text, where, log_path):
         played = next((r.get('instrument') for r in recs if r.get('instrument')), None)
         c['start_bots'] = chapters[0].get('start_bots') if chapters else None
         c['stale'] = stale_start(c['start_bots'], played)
+        # the instrument the task ran under, as its attempts' records say theirs: a chapter
+        # cell keeps its end beside them (suite_run_of's `ends`, ADR 0474)
+        c['instrument'] = task_instrument(task)
         # an attempt whose prep failed never played, so no BOTRUN took its acts: the campaign's
         # end (crashed, with why) keeps them
         if prep:
@@ -811,17 +820,20 @@ def first_clean(records):
     return min(clean) if clean else None
 
 
-# ---- the verdict (#510 step 9 PR-H; ADR 0385, spec FR-023 to FR-028) ----
-# One endpoint, a protected unit's death anywhere in attempt 1, compared at planned looks with
-# exact one-sided Clopper-Pearson bounds. Each bound takes an equal share of a familywise 0.05:
-# four bounds a look, three looks, the frozen number of cells. That split is what lets every
-# look be read without an early-stop bar, and the exact bounds need no rule for zero
-# discordance: 0 of 50 is simply too wide to call equivalent, 0 of 200 is not.
+# ---- the verdict (#510 step 9 PR-H; ADR 0385, amended by ADR 0474, #742) ----
+# One endpoint, the attempt of a replicate's first clean clear (its tries), compared pair by
+# pair: Manchego Stars needed more tries, the twin did, or both the same. No clean clear within
+# the cap is one value, worse than every attempt, so the cap needs no assumption. The share of
+# pairs each way is bounded with exact one-sided Clopper-Pearson bounds, each taking an equal
+# share of a familywise 0.05: four bounds a look, three looks, the frozen number of cells. That
+# split is what lets every look be read without an early-stop bar, and the exact bounds need no
+# rule for zero discordance: 0 of 50 is simply too wide to call equivalent, 0 of 200 is not.
 
 LOOKS = (50, 100, 200)      # pairs (FR-026)
 ALPHA = 0.05                # familywise, over every bound of every look of every cell
 MARGIN = 0.10               # the equivalence margin, +-10 points (FR-028)
 DECISIVE = ('EQUIVALENT', 'HARDER', 'EASIER')
+NEVER = math.inf            # the tries of a replicate with no clean clear within the cap
 
 
 def _binom_le(k, n, p):
@@ -865,50 +877,46 @@ def bound_level(cells, alpha=ALPHA):
     return alpha / (4 * len(LOOKS) * cells)
 
 
-def table_of(pairs):
-    """The paired 2x2 table (a, b, c, d) of resolved pairs (ours_died, twin_died): a both
-    lost someone, b only Manchego Stars did, c only the twin did, d neither did."""
-    a = sum(1 for x, y in pairs if x and y)
-    b = sum(1 for x, y in pairs if x and not y)
-    c = sum(1 for x, y in pairs if y and not x)
-    return a, b, c, len(pairs) - a - b - c
+def resolved(pair):
+    """Whether both arms of `pair` (two spans, pair_of's) know their tries."""
+    return all(lo == hi for lo, hi in pair)
 
 
-def confirmatory_interval(table, cells, analysis, alpha=ALPHA):
-    """(lo, hi) for ours' death rate minus the twin's, from table (a, b, c, d) (FR-026).
-    Paired analysis bounds the two discordant proportions, b/n and c/n; marginal analysis
-    bounds the two arms' rates, (a + b)/n and (a + c)/n. Both differences are the same point;
-    the paired interval is the narrower one when the arms covary, which is what the pilot
-    decides."""
-    a, b, c, d = table
-    n = a + b + c + d
-    if analysis == 'paired':
-        x, y = b, c
-    elif analysis == 'marginal':
-        x, y = a + b, a + c
-    else:
-        raise ValueError('montecarlo: analysis %r is neither paired nor marginal' % (analysis,))
+def table_of(points):
+    """(b, c, ties) of `points`, each (ours' tries, the twin's), NEVER for no clean clear: b
+    pairs where Manchego Stars needed more tries, c where the twin did, ties the rest (both
+    with none within the cap included)."""
+    b = sum(1 for x, y in points if x > y)
+    c = sum(1 for x, y in points if y > x)
+    return b, c, len(points) - b - c
+
+
+def confirmatory_interval(table, cells, alpha=ALPHA):
+    """(lo, hi) for the share of pairs where Manchego Stars needed more tries minus the share
+    where the twin did, from table (b, c, ties) (FR-026): each share bounded on its own (the
+    pairing is by seed, so b and c are each a binomial count whatever the arms share)."""
+    b, c, ties = table
+    n = b + c + ties
     level = bound_level(cells, alpha)
-    lx, ux = clopper_pearson(x, n, level)
-    ly, uy = clopper_pearson(y, n, level)
-    return lx - uy, ux - ly
+    lb, ub = clopper_pearson(b, n, level)
+    lc, uc = clopper_pearson(c, n, level)
+    return lb - uc, ub - lc
 
 
 def bound_unresolved(pairs):
-    """The two worst-case tables (low, high) of `pairs` (ours_died, twin_died), None where an
-    attempt has no game result even after its same-seed retry (FR-027): `low` reads each
-    unresolved Manchego Stars run as everyone surviving and each unresolved twin as a death, `high`
-    the reverse. The low table's lower bound and the high table's upper bound hold whatever the
-    unresolved attempts would have done, so those attempts stay in the denominators."""
-    def fill(ours, twin):
-        return table_of([(ours if x is None else bool(x), twin if y is None else bool(y))
-                         for x, y in pairs])
-    return fill(False, True), fill(True, False)
+    """The two worst-case tables (low, high) of `pairs`, each arm a span (lo, hi) of the tries
+    it could have needed (FR-027): `low` reads each Manchego Stars span at its fewest and each
+    twin's at its most, `high` the reverse. A resolved arm's span is one value. The low
+    table's lower bound and the high table's upper bound hold whatever the unresolved
+    replicates would have done, so they stay in the denominators."""
+    return (table_of([(o[0], v[1]) for o, v in pairs]),
+            table_of([(o[1], v[0]) for o, v in pairs]))
 
 
 def label(lo, hi, margin=MARGIN):
     """FR-028, in order: EQUIVALENT inside the margin, else HARDER or EASIER when the interval
-    excludes zero (ours' deaths minus the twin's: above zero is harder), else INCONCLUSIVE."""
+    excludes zero (Manchego Stars needing more tries is above zero: harder), else
+    INCONCLUSIVE."""
     if -margin <= lo and hi <= margin:
         return 'EQUIVALENT'
     if lo > 0:
@@ -918,11 +926,11 @@ def label(lo, hi, margin=MARGIN):
     return 'INCONCLUSIVE'
 
 
-def paired_verdict(pairs, cells, analysis, looks=LOOKS, look=None):
-    """Where a cell stands, from its pairs (ours_died, twin_died) in seed order: each True when
-    a protected unit died anywhere in that arm's attempt 1, None when the attempt has no game
-    result after its same-seed retry (ADR 0385). `cells` is the frozen cell count N and
-    `analysis` the pilot's choice, 'paired' or 'marginal'.
+def paired_verdict(pairs, cells, looks=LOOKS, look=None):
+    """Where a cell stands, from its pairs in seed order, each (Manchego Stars, twin) a span
+    (lo, hi) of the tries that replicate needed to clear clean (pair_of's): one value when it
+    is known, NEVER when the cap passed with no clean clear (ADR 0474). `cells` is the frozen
+    cell count N.
 
     It is judged at the largest planned look its pairs reach, on that many pairs only: a pair
     past the look waits for the next one. `look`, one of `looks`, judges every pair given at
@@ -948,21 +956,20 @@ def paired_verdict(pairs, cells, analysis, looks=LOOKS, look=None):
                 'reason': 'withheld at %d replicates: no replicate reached the chapter in '
                 'both arms' % look}
     low, high = bound_unresolved(used)
-    lo = confirmatory_interval(low, cells, analysis)[0]
-    hi = confirmatory_interval(high, cells, analysis)[1]
-    unresolved = sum(1 for x, y in used if x is None or y is None)
+    lo = confirmatory_interval(low, cells)[0]
+    hi = confirmatory_interval(high, cells)[1]
+    known = [(o[0], v[0]) for o, v in used if resolved((o, v))]
+    unresolved = len(used) - len(known)
     verdict = label(lo, hi)
     if verdict == 'INCONCLUSIVE' and unresolved:
         verdict = 'WITHHELD'
     final = look == looks[-1]
-    resolved = [(x, y) for x, y in used if x is not None and y is not None]
-    a, b, c, d = table_of(resolved)
-    m = len(resolved)
+    b, c, ties = table_of(known)
+    m = len(known)
     out = {'n': len(pairs), 'look': look, 'verdict': verdict, 'lo': lo, 'hi': hi,
-           'settled': final or verdict in DECISIVE, 'analysis': analysis, 'cells': cells,
-           'table': (a, b, c, d), 'discordant': b + c, 'unresolved': unresolved,
-           'diff': (b - c) / m if m else None,
-           'ours': (a + b) / m if m else None, 'vanilla': (a + c) / m if m else None}
+           'settled': final or verdict in DECISIVE, 'cells': cells,
+           'table': (b, c, ties), 'discordant': b + c, 'unresolved': unresolved,
+           'diff': (b - c) / m if m else None}
     held = ' (%d unresolved, bounded both ways)' % unresolved if unresolved else ''
     out['reason'] = '%s at %d %s: %+.1f to %+.1f points%s' % (
         verdict, look, 'pairs' if len(used) == look else 'replicates, %d pairs' % len(used),
@@ -972,35 +979,43 @@ def paired_verdict(pairs, cells, analysis, looks=LOOKS, look=None):
     return out
 
 
+def tries_summary(values):
+    """One arm's tries, `values` each an attempt number or NEVER: how many, how many cleared
+    within the cap, and the median (NEVER when half or more never did)."""
+    got = sorted(values)
+    return {'n': len(got), 'cleared': sum(1 for t in got if t != NEVER),
+            'median': got[(len(got) - 1) // 2] if got else None}
+
+
+def tries_words(s):
+    """tries_summary's in words: 'median 2, 9 of 10 cleared clean within the cap'."""
+    if not s['n']:
+        return 'no replicate'
+    med = 'none within the cap' if s['median'] == NEVER else '%d' % s['median']
+    return 'median %s, %d of %d cleared clean within the cap' % (med, s['cleared'], s['n'])
+
+
 def pilot_summary(pairs, cells, cpu_s=0.0, reach=None, looks=LOOKS):
     """The one-cell pilot's report (FR-025, AS 1), from its pairs as paired_verdict reads them:
-    the 2x2 table, the discordant counts each way, the difference, the correlation, the
-    analysis it chooses (paired when the arms' outcomes covary positively, marginal
-    otherwise), the reachability and the CPU. `half_width` is the interval the last look
-    would give at this discordance (paired) or these death rates (marginal) with no
-    difference, for the frozen N; `reachable` says whether it fits inside the margin. Pilot
-    pairs are never confirmatory: this returns no verdict."""
-    resolved = [(x, y) for x, y in pairs if x is not None and y is not None]
-    a, b, c, d = table_of(resolved)
-    n = len(resolved)
+    the table (who needed more tries), the discordance, the difference, each arm's tries
+    (tries_summary), the reachability and the CPU. `half_width` is the interval the last look
+    would give at this discordance with no difference, for the frozen N; `reachable` says
+    whether it fits inside the margin. Pilot pairs are never confirmatory: this returns no
+    verdict."""
+    known = [(o[0], v[0]) for o, v in pairs if resolved((o, v))]
+    b, c, ties = table_of(known)
+    n = len(known)
     if not n:
         raise ValueError('montecarlo: a pilot with no resolved pair has nothing to report')
-    cov = (a * d - b * c) / n ** 2
-    den = math.sqrt((a + b) * (c + d) * (a + c) * (b + d))
-    analysis = 'paired' if cov > 0 else 'marginal'
     last = looks[-1]
-    if analysis == 'paired':   # the measured discordance, split evenly: no difference
-        m = round(last * (b + c) / n)
-        table = (0, m // 2, m - m // 2, last - m)
-    else:                      # both arms at the pooled death rate
-        k = round(last * (2 * a + b + c) / (2 * n))
-        table = (k, 0, 0, last - k)
-    lo, hi = confirmatory_interval(table, cells, analysis)
+    m = round(last * (b + c) / n)   # the measured discordance, split evenly: no difference
+    lo, hi = confirmatory_interval((m // 2, m - m // 2, last - m), cells)
     half = max(hi, -lo)
-    return {'n': n, 'unresolved': len(pairs) - n, 'table': (a, b, c, d),
-            'ours_only': b, 'twin_only': c, 'discordance': (b + c) / n,
-            'diff': (b - c) / n, 'ours': (a + b) / n, 'vanilla': (a + c) / n,
-            'cov': cov, 'corr': (a * d - b * c) / den if den else None, 'analysis': analysis,
+    return {'n': n, 'unresolved': len(pairs) - n, 'table': (b, c, ties),
+            'ours_slower': b, 'twin_slower': c, 'discordance': (b + c) / n,
+            'diff': (b - c) / n,
+            'tries': {'ours': tries_summary([x for x, _ in known]),
+                      'vanilla': tries_summary([y for _, y in known])},
             'half_width': half, 'reachable': label(-half, half) == 'EQUIVALENT',
             'cells': cells, 'reach': reach or {}, 'cpu_s': cpu_s}
 
@@ -1094,34 +1109,85 @@ def protected_deaths(rec):
     return [d for d in rec.get('deaths') or [] if d.get('escort', d.get('faction') != 'green')]
 
 
+def plays(recs):
+    """A replicate's records split into its plays, oldest first: a play ends at its campaign's
+    end record, or at a worker's record with no chapter (it died before its campaign said
+    anything); records after the last end are one more play."""
+    out, cur = [], []
+    for r in recs:
+        cur.append(r)
+        if not is_bot(r) or r.get('chapter') is None:
+            out.append(cur)
+            cur = []
+    if cur:
+        out.append(cur)
+    return out
+
+
+def play_result(play, chapter, pinned=False):
+    """What one play (plays') says of `chapter`, or None when it never got there:
+    - 'played': its tries are known. `clean_at` is the attempt of its first clean clear
+      (first_clean), or None when its campaign ended on NO_CLEAN with every attempt played to
+      a game result: no clean clear within the cap. `died` (a protected death on attempt 1)
+      and `clean` (attempt 1 clean) are reported, never the endpoint;
+    - 'unresolved': it stopped before its tries were known, `lo` the fewest it could need: the
+      attempt with no game result, or the one after the last played (a play cut short).
+    `rec` is attempt 1's record when it has a game result (traces, start ids, the report's
+    descriptive data), else the record it stopped on; `recs` every attempt it made here."""
+    here = sorted((r for r in play if is_bot(r) and (
+        r.get('chapter') == chapter or (pinned and r.get('chapter') is None))),
+        key=lambda r: r.get('attempt') or 0)
+    if not here:
+        return None
+    end = next((r for r in play if not is_bot(r)), None)
+    broken = next((r for r in here if r.get('outcome') in UNUSABLE), None)
+    first = here[0] if here[0].get('attempt') == 1 and broken is not here[0] else None
+    clean_at = first_clean(here)
+    if first is not None and (clean_at is not None or (
+            broken is None and end is not None and end.get('outcome') in NO_CLEAN)):
+        return {'status': 'played', 'clean_at': clean_at, 'died': bool(protected_deaths(first)),
+                'clean': first.get('clean') is True, 'rec': first, 'recs': here}
+    if broken is not None:
+        return dict(broken, status='unresolved', lo=broken.get('attempt') or 1, rec=broken,
+                    recs=here)
+    last = here[-1]
+    return dict(last, status='unresolved', lo=(last.get('attempt') or 0) + 1, rec=last,
+                recs=here, outcome=(end or {}).get('outcome') or last.get('outcome'),
+                why='the play stopped after attempt %s with no clean clear and no end saying '
+                'its attempts ran out (%s)' % (last.get('attempt'),
+                                               (end or {}).get('why') or 'no end record'))
+
+
 def chapter_result(recs, chapter, pinned=False):
-    """What one replicate's records say of its FIRST attempt at `chapter`, as a dict whose
-    `status` is:
-    - 'played': `died` (the endpoint: a protected unit died anywhere in it, ADR 0385) and
-      `clean` (reported, never the endpoint), from the first attempt-1 record there with a
-      game result: a same-seed retry of a crashed attempt is still attempt 1;
-    - 'unresolved': attempt 1 was reached and has no game result;
+    """What one replicate's records say of its tries at `chapter` (ADR 0474), as a dict
+    whose `status` is:
+    - 'played': its first play whose tries are known (play_result's `clean_at`, `died`,
+      `clean`, `rec`, `recs`);
+    - 'unresolved': every play that reached the chapter stopped before its tries were known
+      (the newest one's play_result, with its `lo`);
     - 'unreached': the campaign ended with a game result before the chapter (a campaign cell
       compares only the replicates both arms reach);
     - 'reach_unresolved': it crashed before the chapter, so whether it would have reached it
       is unknown (FR-027: that withholds the comparison);
     - 'unplayed': no record of it.
     `pinned` is a chapter cell's replicate: it starts at the chapter, so every play with no
-    game result is attempt 1 unresolved (a worker that died before writing a chapter
+    game result is unresolved at the chapter (a worker that died before writing a record
     included), never 'reach_unresolved'. Every status but 'played' carries the run's own
     words for why (`why`), and `tries` counts the plays that stopped with no game result
     where this status says they stopped: at the chapter for 'unresolved', before it for
-    'reach_unresolved'."""
+    'reach_unresolved'. A same-seed retry replays the whole play, so its attempt 1 is
+    the replicate's attempt 1."""
+    stopped = []
+    for play in plays(recs):
+        got = play_result(play, chapter, pinned)
+        if got is None:
+            continue
+        if got['status'] == 'played':
+            return dict(got, tries=len(stopped))
+        stopped.append(got)
+    if stopped:
+        return dict(stopped[-1], tries=len(stopped))
     bots = bot_records(recs)
-    here = [r for r in bots if (r.get('chapter') == chapter and r.get('attempt') == 1)
-            or (pinned and r.get('chapter') is None)]
-    for r in here:
-        if r.get('outcome') not in UNUSABLE:
-            return {'status': 'played', 'died': bool(protected_deaths(r)),
-                    'clean': r.get('clean') is True, 'rec': r,
-                    'tries': sum(1 for x in here if x.get('outcome') in UNUSABLE)}
-    if here:
-        return dict(here[-1], status='unresolved', tries=len(here), rec=here[-1])
     # an earlier attempt's crash, in its own words, before the campaign's summary of it
     crashed = [r for r in bots if r.get('outcome') in UNUSABLE]
     summaries = [r for r in recs if not is_bot(r)]
@@ -1155,15 +1221,23 @@ def again(recs, chapter, pinned=False):
     return r['status'] in ('unresolved', 'reach_unresolved') and r['tries'] <= RETRIES
 
 
+def span(r):
+    """The tries a chapter_result could stand for, (lo, hi): one value when played (NEVER for
+    no clean clear within the cap), from its `lo` up to NEVER when unresolved, and anything
+    when whether it reaches the chapter is unknown (a withheld comparison's)."""
+    if r['status'] == 'played':
+        t = NEVER if r['clean_at'] is None else r['clean_at']
+        return t, t
+    return r.get('lo', 1), NEVER
+
+
 def pair_of(got):
-    """A seed's pair from its {arm: chapter_result}: (ours_died, twin_died), None in an arm
-    whose attempt is unresolved."""
-    return tuple(got[n]['died'] if got[n]['status'] == 'played' else None
-                 for n in ('ours', 'vanilla'))
+    """A seed's pair from its {arm: chapter_result}: (Manchego Stars, twin), each arm's span."""
+    return tuple(span(got[n]) for n in ('ours', 'vanilla'))
 
 
 def cell_pairs(sides, play, seeds, have=None):
-    """Play `seeds` on both arms of a cell and pair their attempt-1 endpoints (seed order).
+    """Play `seeds` on both arms of a cell and pair their tries (seed order).
     `sides` = {'ours': side, 'vanilla': side}, each side a dict with `tasks(seeds) -> tasks`,
     `kept() -> {seed: [record]}` (its runs already played) and `chapter`; `play(side, tasks)
     -> records`. A seed whose attempt has no game result is played again on the same seed
@@ -1171,7 +1245,7 @@ def cell_pairs(sides, play, seeds, have=None):
     played records between looks.
 
     Returns {'pairs', 'reach', 'problems', 'played', 'withheld', 'have', 'cpu_s',
-    'results'}: a pair is (ours_died, twin_died), None where unresolved; a seed one arm did
+    'results'}: a pair is pair_of's, an unresolved arm a span; a seed one arm did
     not reach is left out and counted in `reach`; `withheld` is set when an arm's
     reachability is unresolved; `results` is {seed: {arm: chapter_result}}. A side with
     `pinned` set is a chapter cell's (chapter_result's `pinned`)."""
@@ -1201,7 +1275,7 @@ def cell_pairs(sides, play, seeds, have=None):
             reach[n]['reached' if st in ('played', 'unresolved') else
                      'unreached' if st == 'unreached' else 'unresolved'] += 1
             if st == 'played':
-                cpu += (r['rec'].get('costs') or {}).get('cpu_s') or 0.0
+                cpu += sum((x.get('costs') or {}).get('cpu_s') or 0.0 for x in r['recs'])
             else:
                 problems.append({'side': n, 'seed': s, 'status': st, 'why': r.get('why'),
                                  'outcome': r.get('outcome'), 'run_dir': r.get('run_dir'),
@@ -1216,8 +1290,8 @@ def cell_pairs(sides, play, seeds, have=None):
             'paired': paired}
 
 
-def run_cell(sides, play, cells, analysis, seeds=None, looks=LOOKS):
-    """Play a cell to its verdict (ADR 0385): the confirmatory seeds (`seeds`, 1..the last
+def run_cell(sides, play, cells, seeds=None, looks=LOOKS):
+    """Play a cell to its verdict (ADR 0385, 0474): the confirmatory seeds (`seeds`, 1..the last
     look by default) look by look, cell_pairs' pairs judged by paired_verdict at each look,
     then by validity (FR-029: NOT READABLE or an outcome-dependent fault settles it),
     stopping at the first settled one. An arm's unresolved reachability (a campaign that
@@ -1240,8 +1314,8 @@ def run_cell(sides, play, cells, analysis, seeds=None, looks=LOOKS):
                        'so whether it reaches it is unknown' % look}
             verdict = judged(verdict, validity(cell_results(got['results'], seeds[:look])))
             break
-        verdict = paired_verdict(got['pairs'], cells, analysis, looks, look=look)
-        # FR-029: both arms' first attempts at this look pass every invariant, or the cell is
+        verdict = paired_verdict(got['pairs'], cells, looks, look=look)
+        # FR-029: both arms' attempts at this look pass every invariant, or the cell is
         # NOT READABLE and stops: more pairs from an instrument that failed one read nothing
         verdict = judged(verdict, validity(cell_results(got['results'], seeds[:look])))
         if verdict['settled']:
@@ -1266,7 +1340,8 @@ def bench_instrument(instrument, bench):
 
 
 def chapter_side(suite, envs, instrument, starts, kind, store, rom_hash, bench=None):
-    """One arm of a chapter cell: attempt 1 under each seed of seed set `kind`, seed s on
+    """One arm of a chapter cell: each seed of seed set `kind` played to its first clean clear
+    or the cap (chapter_tasks' `tries`, ADR 0474), seed s on
     start `starts[(s - the set's first seed) % len(starts)]` (chapter_tasks), so a cell's
     pairs are spread over its starts the same way whichever seeds a look plays (T100e). Its
     records go to `store` (the game's runs file); a kept run counts when this instrument
@@ -1274,7 +1349,7 @@ def chapter_side(suite, envs, instrument, starts, kind, store, rom_hash, bench=N
     (charIds, an experiment's): each only waits where it stands, under bench_instrument's."""
     game = starts[0]['game']
     instrument = bench_instrument(instrument, bench)
-    mine = suite_run_of(instrument, {game: rom_hash})
+    mine = suite_run_of(instrument, {game: rom_hash}, ends=True)
     first = suite['seed_sets'][kind][0]
 
     def dealt(seed):
@@ -1285,7 +1360,8 @@ def chapter_side(suite, envs, instrument, starts, kind, store, rom_hash, bench=N
         for st in starts:
             here = [seed for seed in seeds if dealt(seed) is st]
             if here:
-                out += chapter_tasks(suite, envs, instrument, {game: store}, st, kind, here)
+                out += chapter_tasks(suite, envs, instrument, {game: store}, st, kind, here,
+                                     tries=True)
         for t in out:
             if bench:
                 t['bench'] = list(bench)
@@ -1357,10 +1433,24 @@ def chapter_sides(suite, simdirs, envs, inst, starts, kind, bench=None):
     return sides
 
 
+def tries_lines(results, seeds, cells):
+    """A cell's tries and its first tries in sentences, over `seeds` (the pairs'), each arm's
+    replicates whose tries are known: tries_summary's, then attempt 1's protected deaths, a
+    column the verdict does not read (ADR 0474)."""
+    known = {n: [results[x][n] for x in seeds if results[x][n]['status'] == 'played']
+             for n in ('ours', 'vanilla')}
+    tries = {n: tries_summary([span(r)[0] for r in known[n]]) for n in known}
+    return ['tries to a clean clear: Manchego Stars %s; the twin %s (N = %d)' % (
+                tries_words(tries['ours']), tries_words(tries['vanilla']), cells),
+            'a protected unit died on attempt 1: Manchego Stars %d of %d, the twin %d of %d' % (
+                sum(r['died'] for r in known['ours']), len(known['ours']),
+                sum(r['died'] for r in known['vanilla']), len(known['vanilla']))]
+
+
 def cell_main(args):
     """`cell`: one cell to its verdict, a chapter cell over K pinned starts an arm
-    (cell_setup) or a campaign cell from two campaign envs, judged with the pilot's analysis
-    and the frozen N."""
+    (cell_setup) or a campaign cell from two campaign envs, judged on tries to a clean clear
+    with the frozen N (ADR 0474)."""
     chapter_cell = args.chapter is not None
     if chapter_cell:
         setup = cell_setup(args.chapter, args.starts)
@@ -1404,18 +1494,14 @@ def cell_main(args):
             sides[name] = campaign_side(env, chapter, args.mode,
                                         os.path.join(simdir(vanilla), 'runs.jsonl'),
                                         cell_stamp(env, args.mode, bot), vanilla)
-    v = run_cell(sides, pool_play(args.jobs), cells, args.analysis, seeds)
+    v = run_cell(sides, pool_play(args.jobs), cells, seeds)
     stores = {n: sides[n]['store'] for n in ('ours', 'vanilla')}
     print(v['reason'] + (' (%d pairs %s)' % (v['n'], games_line(sides, v['paired']))
                          if chapter_cell else ''))
     for line in problem_lines(v['problems']):
         print(line)
-    if v.get('ours') is not None:   # some pair resolved in both arms
-        a, b, c, d = v['table']
-        print('a protected unit died: Manchego Stars %.0f%%, vanilla %.0f%%; only Manchego Stars '
-              '%d, only the '
-              'twin %d, both %d, neither %d (%s analysis, N = %d)' % (
-                  100 * v['ours'], 100 * v['vanilla'], b, c, a, d, v['analysis'], cells))
+    for line in tries_lines(v['results'], v['paired'], cells):
+        print(line)
     for n in ('ours', 'vanilla'):
         print('%s: %d replicates reached the chapter, %d did not, %d unknown' % (
             GAME_NAMES[n], v['reach'][n]['reached'], v['reach'][n]['unreached'],
@@ -1437,19 +1523,15 @@ def cell_main(args):
 def pilot_lines(s, chapter, games):
     """pilot_summary's report in sentences (FR-025, AS 1); `games` says over how many games
     each arm's pairs were played (games_line)."""
-    a, b, c, d = s['table']
+    b, c, ties = s['table']
     out = ['pilot: Manchego Stars ch%02d vs its twin, %d pairs %s%s' % (
                chapter, s['n'], games,
                ' (%d unresolved, left out)' % s['unresolved'] if s['unresolved'] else ''),
-           '  a protected unit died: Manchego Stars %d of %d (%.0f%%), the twin %d of %d '
-           '(%.0f%%)' % (
-               a + b, s['n'], 100 * s['ours'], a + c, s['n'], 100 * s['vanilla']),
-           '  both %d, only Manchego Stars %d, only the twin %d, neither %d: %d discordant '
-           '(%.0f%%)' % (
-               a, b, c, d, b + c, 100 * s['discordance']),
-           '  difference %+.1f points; correlation %s; covariance %+.4f, so %s analysis' % (
-               100 * s['diff'], '%.2f' % s['corr'] if s['corr'] is not None else 'undefined',
-               s['cov'], s['analysis']),
+           '  tries to a clean clear: Manchego Stars %s; the twin %s' % (
+               tries_words(s['tries']['ours']), tries_words(s['tries']['vanilla'])),
+           '  Manchego Stars needed more tries in %d, the twin in %d, the same in %d: %d '
+           'discordant (%.0f%%)' % (b, c, ties, b + c, 100 * s['discordance']),
+           '  difference %+.1f points' % (100 * s['diff']),
            '  at 200 pairs and N = %d, no difference would read +-%.1f points: the +-%d margin '
            '%s' % (s['cells'], 100 * s['half_width'], round(100 * MARGIN),
                    'can be reached' if s['reachable'] else 'cannot be reached')]
@@ -1488,31 +1570,39 @@ def pilot_main(args):
         have = side['kept']()
         todo += side['tasks']([s for s in seeds
                                if again(have.get(s), side['chapter'], side['pinned'])])
+    walls = kept_walls(outs, inst, hashes)
     hours = suite_estimate(dict(suite, starts=starts['ours'] + starts['vanilla']), todo,
-                           kept_walls(outs, inst, hashes), args.jobs)
+                           walls, args.jobs)
     print('%d runs to play on %d workers: about %.2f wall-hours' % (len(todo), args.jobs, hours))
+    floor = sum(1 for t in todo if not walls.get(t['stamp']['suite']['start_id']))
+    if floor:
+        # ADR 0474: a run plays up to the cap's tries, and a start no run of this instrument
+        # has measured is estimated at the manifest's one attempt
+        print('  %d of them on starts with no kept run, estimated at one attempt: up to %d '
+              'attempts each, so the estimate is a floor' % (floor, max_attempts()))
     if hours > MAX_WALL_H:
         print('refused: the estimate is over the %g wall-hours one job may take (SC-007); '
               'split it' % MAX_WALL_H)
         return 1
     got = cell_pairs(sides, pool_play(args.jobs), seeds)
-    if not any(None not in p for p in got['pairs']):
+    if not any(resolved(p) for p in got['pairs']):
         print('refused: no pilot pair has a game result in both arms; each run says why:')
         print('\n'.join(problem_lines(got['problems'])))
         return 1
     s = pilot_summary(got['pairs'], cells, got['cpu_s'], got['reach'])
     games = games_line(sides, got['paired'])
     # FR-029 on the pilot too: a pilot whose attempts fail an invariant is NOT READABLE, and
-    # the analysis it chose must not be handed to `cell`, so it says so first and fails
+    # its reading of the discordance must not plan a cell, so it says so first and fails
     v = judged({'verdict': None, 'n': s['n'], 'diff': s['diff'], 'table': s['table'],
-                'analysis': s['analysis'], 'cpu_s': s['cpu_s']},
+                'cpu_s': s['cpu_s']},
                validity(cell_results(got['results'], seeds)))
     unreadable = v['verdict'] == NOT_READABLE
     if unreadable:
-        print('NOT READABLE (%s): this pilot\'s analysis choice cannot be used for a cell'
+        print('NOT READABLE (%s): this pilot cannot plan a cell'
               % ', '.join(v['failed_invariants']))
-    for line in pilot_lines(s, args.chapter, games) + validity_lines(v['validity']) + \
-            problem_lines(got['problems']):
+    for line in pilot_lines(s, args.chapter, games) + \
+            tries_lines(got['results'], got['paired'], cells)[1:] + \
+            validity_lines(v['validity']) + problem_lines(got['problems']):
         print(line)
     if args.bench_vanilla:
         # an experiment's runs are filed under their own instrument (bench_instrument); its
@@ -1524,22 +1614,25 @@ def pilot_main(args):
                                               {n: sides[n]['store'] for n in sides}, inst,
                                               games))
         print('cell record: %s (`montecarlo.py report` reads it)' % CELLS_FILE)
-    print('discordant pairs (story <trace> reads each):')
+    print('discordant pairs (story <trace> reads each arm\'s attempt 1):')
     for seed in seeds:
         res = got['results'][seed]
         pair = pair_of(res)
-        if None not in pair and pair[0] != pair[1]:
-            print('  seed %d (%s), only %s lost someone: Manchego Stars %s, vanilla %s' % (
-                seed, ', '.join(res[n]['rec']['suite']['start_id'] for n in ('ours', 'vanilla')),
-                'Manchego Stars' if pair[0] else 'the twin',
-                *(os.path.join(simdirs[n], res[n]['rec'].get('trace') or '?')
-                  for n in ('ours', 'vanilla'))))
+        if resolved(pair) and pair[0] != pair[1]:
+            print('  seed %d (%s), %s needed more tries (Manchego Stars %s, the twin %s): '
+                  'Manchego Stars %s, vanilla %s' % (
+                      seed, ', '.join(res[n]['rec']['suite']['start_id']
+                                      for n in ('ours', 'vanilla')),
+                      'Manchego Stars' if pair[0] > pair[1] else 'the twin',
+                      *('none' if p[0] == NEVER else p[0] for p in pair),
+                      *(os.path.join(simdirs[n], res[n]['rec'].get('trace') or '?')
+                        for n in ('ours', 'vanilla'))))
     return 1 if unreadable else 0
 
 
 # ---- read validity and the report (#510 step 9 PR-I; FR-029, FR-031, FR-032) ----
-# A verdict is only as good as the attempts behind it. Before a cell gets one, both arms'
-# first attempts pass FR-029's invariants, or the cell is NOT READABLE with each failed one
+# A verdict is only as good as the attempts behind it. Before a cell gets one, every attempt
+# both arms played passes FR-029's invariants, or the cell is NOT READABLE with each failed one
 # named. There are no human playtests: vanilla is the proxy for playtesters, so the bot is
 # checked against vanilla alone, by playing both arms and passing the validity bars. Nothing
 # orders vanilla's chapters by how often players lose units, so there is no canary either (ADR
@@ -1547,11 +1640,13 @@ def pilot_main(args):
 # `report` says it all in sentences, one per cell (FR-031), and reads a decision's own
 # components only (FR-032).
 
-ENV_CLEAN_MIN = 0.90       # FR-029: an arm's environment-clean share of its first attempts
+ENV_CLEAN_MIN = 0.90       # FR-029: an arm's environment-clean share of its attempts
 BLIND_MAX = 0.10           # FR-029: blindspot plus unclassified attempts, under this
-VANILLA_DEATH_MAX = 0.85   # FR-029: the twin losing someone this often reads nothing
+# ADR 0474: a twin with no clean clear within the cap this often leaves Manchego Stars no room
+# to need more tries, so it reads nothing
+VANILLA_UNCLEARED_MAX = 0.85
 VALIDITY = ('environment_clean', 'sandbox_fault', 'blindspot', 'unlabelled_over_cap',
-            'unjustified_seize_skip', 'vanilla_deaths')
+            'unjustified_seize_skip', 'vanilla_uncleared')
 NOT_READABLE = 'NOT_READABLE'
 
 
@@ -1582,7 +1677,8 @@ def blind_or_unclassified(d):
 
 
 def validity(results):
-    """FR-029 on a cell's first attempts, `results` {arm: [chapter_result]} (the seeds of the
+    """FR-029 on every attempt a cell's replicates made at the chapter (each chapter_result's
+    `recs`), `results` {arm: [chapter_result]} (the seeds of the
     look; a seed an arm never reached is left out). Returns {'failed': [(invariant, sentence)],
     'withheld': [sentence]}: a failed invariant makes the cell NOT READABLE, each named
     (VALIDITY); a played attempt whose environment did not hold, with play begun (an
@@ -1596,21 +1692,23 @@ def validity(results):
       - blindspot: BLIND_MAX or more of the attempts with a blindspot or unclassified death;
       - unlabelled_over_cap: any death over the cap no fallback names (run_outcome's);
       - unjustified_seize_skip: any win put off with nothing left it would close;
-      - vanilla_deaths: the twin lost someone in VANILLA_DEATH_MAX or more of its attempts."""
+      - vanilla_uncleared: the twin had no clean clear within the cap in VANILLA_UNCLEARED_MAX
+        or more of its replicates whose tries are known (ADR 0474)."""
     failed, withheld, unread = [], [], []
     for arm in ('ours', 'vanilla'):
         name = GAME_NAMES[arm]
-        got = [r for r in results.get(arm) or [] if r['status'] in ('played', 'unresolved')]
-        if not got:
+        reps = [r for r in results.get(arm) or [] if r['status'] in ('played', 'unresolved')]
+        if not reps:
             unread.append(arm)
             continue
-        clean = sum(1 for r in got if r['rec'].get('env_status') == 'clean')
+        got = [x for r in reps for x in r.get('recs') or [r['rec']]]
+        clean = sum(1 for x in got if x.get('env_status') == 'clean')
         if clean < ENV_CLEAN_MIN * len(got):
             failed.append(('environment_clean', '%s: %d of %d attempts environment-clean '
                            '(%.0f%%), the bar is %.0f%%' % (name, clean, len(got),
                                                              100.0 * clean / len(got),
                                                              100 * ENV_CLEAN_MIN)))
-        played = [r['rec'] for r in got if r['status'] == 'played']
+        played = [x for x in got if x.get('outcome') not in UNUSABLE]
         dep = [x for x in played if isinstance(x.get('env_status'), dict)
                and x['env_status'].get('outcome_dependent')]
         if dep:
@@ -1642,13 +1740,14 @@ def validity(results):
         if skips:
             failed.append(('unjustified_seize_skip', '%s: %s put off with nothing left to '
                            'close' % (name, plural(skips, 'win'))))
-        if arm == 'vanilla':
-            died = death_rate(played)[0]
-            if died >= VANILLA_DEATH_MAX * len(played):
-                failed.append(('vanilla_deaths', 'vanilla: lost someone in %d of %d attempts '
-                               '(%.0f%%), the bar is under %.0f%%' % (
-                                   died, len(played), 100.0 * died / len(played),
-                                   100 * VANILLA_DEATH_MAX)))
+        known = [r for r in reps if r['status'] == 'played']
+        if arm == 'vanilla' and known:
+            never = sum(1 for r in known if r['clean_at'] is None)
+            if never >= VANILLA_UNCLEARED_MAX * len(known):
+                failed.append(('vanilla_uncleared', 'vanilla: no clean clear within the cap in '
+                               '%d of %d replicates (%.0f%%), the bar is under %.0f%%' % (
+                                   never, len(known), 100.0 * never / len(known),
+                                   100 * VANILLA_UNCLEARED_MAX)))
     return {'failed': failed, 'withheld': withheld, 'unread': unread}
 
 
@@ -1830,8 +1929,9 @@ def twin_name(index):
 
 def cell_sentence(cell, arms):
     """A cell in one plain sentence (FR-031): which chapters, how many pairs over how many
-    games, its verdict with its uncertainty or NOT READABLE with the failed invariants, the two
-    arms' death rates and what drives the difference."""
+    games, its verdict on tries to a clean clear (ADR 0474) with its uncertainty or NOT
+    READABLE with the failed invariants, each arm's tries, the attempt-1 death rates and what
+    drives the difference."""
     o, v = arms['ours'], arms['vanilla']
     head = '%s ch%02d vs %s, %d pairs%s: ' % (
         GAME_NAMES['ours'], cell['chapter'], twin_name(cell['twin_index']), cell['pairs'],
@@ -1846,10 +1946,14 @@ def cell_sentence(cell, arms):
     else:
         what = '%s, %+.1f to %+.1f points' % (VERDICT_WORDS[verdict], 100 * cell['lo'],
                                              100 * cell['hi'])
-    rates = 'a protected unit died in Manchego Stars %d of %d, the twin %d of %d' % (
+    tries = {n: tries_summary([NEVER if t is None else t for t in cell['tries'][n]])
+             for n in ('ours', 'vanilla')}
+    said = 'tries to a clean clear: Manchego Stars %s, the twin %s' % (
+        tries_words(tries['ours']), tries_words(tries['vanilla']))
+    rates = 'a protected unit died on attempt 1 in Manchego Stars %d of %d, the twin %d of %d' % (
         o['died'], o['n'], v['died'], v['n'])
     why = drivers(arms, cell.get('diff'))
-    return head + what + ' on any protected death; ' + rates + (
+    return head + what + ' on tries to a clean clear; ' + said + '; ' + rates + (
         ', driven by ' + ' and '.join(why) if why else '')
 
 
@@ -1861,16 +1965,19 @@ CELLS_FILE = os.path.join(REPO, 'references', 'sim', 'cells.jsonl')
 def cell_record(kind, chapter, twin_index, verdict, results, seeds, stores, instrument,
                 games=None):
     """The `kind: cell` record of one pilot or cell run: its verdict fields (None for a
-    pilot), validity, its pairs, and each arm's played attempt-1 runs (run_ref) with the
-    store's runs file, so `report` reads the very records judged. `seeds` are the seeds that
-    made a pair (cell_pairs' `paired`), so the descriptive data counts what the verdict does."""
+    pilot), validity, its pairs, each arm's tries (a played replicate's `clean_at`, None for
+    no clean clear within the cap) and its played attempt-1 runs (run_ref) with the store's
+    runs file, so `report` reads the very records judged. `seeds` are the seeds that made a
+    pair (cell_pairs' `paired`), so the descriptive data counts what the verdict does."""
     runs = {arm: [run_ref(results[s][arm]['rec']) for s in seeds
                   if results[s][arm]['status'] == 'played'] for arm in ('ours', 'vanilla')}
+    tries = {arm: [results[s][arm]['clean_at'] for s in seeds
+                   if results[s][arm]['status'] == 'played'] for arm in ('ours', 'vanilla')}
     return {'kind': 'cell', 'cell_kind': kind, 'chapter': chapter, 'twin_index': twin_index,
             'instrument': instrument, 'verdict': verdict.get('verdict'),
             'reason': verdict.get('reason'), 'lo': verdict.get('lo'), 'hi': verdict.get('hi'),
-            'look': verdict.get('look'), 'analysis': verdict.get('analysis'),
-            'table': verdict.get('table'), 'diff': verdict.get('diff'),
+            'look': verdict.get('look'), 'endpoint': 'tries_to_clean',
+            'table': verdict.get('table'), 'diff': verdict.get('diff'), 'tries': tries,
             'pairs': verdict.get('n', len(seeds)), 'games': games,
             'failed_invariants': verdict.get('failed_invariants') or [],
             'validity': verdict.get('validity'), 'cpu_s': verdict.get('cpu_s') or 0.0,
@@ -1885,7 +1992,8 @@ def cell_results(results, seeds):
 
 def report_cells(path, instrument=None):
     """The cell records in `path` of `instrument` (the newest in the file when None): one job's
-    cells, the last record of each (kind, chapter) kept."""
+    cells, the last record of each (kind, chapter) kept. ValueError when one was judged on
+    the attempt-1 death endpoint ADR 0474 replaced: its sentence would read as tries."""
     if not os.path.exists(path):
         return []
     with open(path) as fh:
@@ -1898,6 +2006,11 @@ def report_cells(path, instrument=None):
     for r in recs:
         if r['instrument'] == instrument:
             last[(r['cell_kind'], r['chapter'])] = r
+    old = [r for r in last.values() if r.get('endpoint') != 'tries_to_clean']
+    if old:
+        raise ValueError('the ch%02d %s record of %s was judged on a death in attempt 1, '
+                         'before ADR 0474: play the cell again to read it on tries' % (
+                             old[0]['chapter'], old[0]['cell_kind'], instrument))
     return [last[k] for k in sorted(last, key=lambda k: (k[1], k[0]))]
 
 
@@ -1992,7 +2105,11 @@ def report(cells, arms_of, decision=None, components=None, who=None):
 def report_main(args):
     """`report`: FR-031's report of one instrument's cells, printed; with --post, written to a
     file and the `gh issue comment` that would post it printed, never run (T107)."""
-    cells = report_cells(args.cells, args.instrument)
+    try:
+        cells = report_cells(args.cells, args.instrument)
+    except ValueError as err:
+        print('refused: %s' % err)
+        return 1
     if not cells:
         print('refused: no cell records in %s%s; `pilot` and `cell` write them' % (
             args.cells, ' for %s' % args.instrument if args.instrument else ''))
@@ -2256,15 +2373,16 @@ def only_tasks(tasks, only, held_out):
     return picked, bad
 
 
-def chapter_tasks(suite, envs, instrument, outs, st, kind, seeds=None):
+def chapter_tasks(suite, envs, instrument, outs, st, kind, seeds=None, tries=False):
     """Attempt 1 of pinned start `st` (a suite start, or a cell start: cell_starts'), one
     task a seed: the game's campaign env
     (`envs[game]`) resumed at the start's chapter from the state its campaign saved, and
     ended there (campaign_env.pinned_env). The seeds are the start's own for a suite set
     (`tuning`, `held_out`), the manifest's range for a cell's (`pilot`, `confirmatory`),
     each an independent replicate on the same pinned start in both arms (FR-024); `seeds`
-    picks some of them. An attempt-mode run saves no state, so the pinned file is never
-    rewritten (campaign.lua)."""
+    picks some of them. `tries` (a cell's, ADR 0474) plays every attempt, with memory, to
+    the first clean clear or the cap in place of attempt 1. Neither run writes the pinned
+    file the workers share (campaign.lua, harness.lua's shared_start)."""
     import campaign_env
     if kind in SEED_SETS:
         allowed = list(st['seeds'][kind])
@@ -2279,18 +2397,22 @@ def chapter_tasks(suite, envs, instrument, outs, st, kind, seeds=None):
             raise ValueError('montecarlo: seeds %s are not %s seeds (FR-025)' % (stray, kind))
         allowed = [s for s in allowed if s in set(seeds)]
     camp = campaign_env.pinned_env(envs[st['game']], st['provenance']['campaign'],
-                                   st['chapter'])
+                                   st['chapter'], tries)
+    stamp = {'suite': {'start_id': st['start_id'], 'set': kind, 'version': suite['version']}}
+    if not tries:
+        stamp['task_attempt'] = 1
     return [{'campaign': camp, 'seed': seed, 'vanilla': st['game'] == 'vanilla',
-             'instrument': instrument, 'out': outs.get(st['game']),
-             'stamp': {'task_attempt': 1, 'suite': {'start_id': st['start_id'], 'set': kind,
-                                                    'version': suite['version']}}}
+             'instrument': instrument, 'out': outs.get(st['game']), 'stamp': dict(stamp)}
             for seed in allowed]
 
 
-def suite_run_of(instrument, rom_hashes):
+def suite_run_of(instrument, rom_hashes, ends=False):
     """Whether a kept record is a suite run this instrument played on these ROMs ({game:
-    hash}): what kept_walls and kept_play both read."""
-    return lambda r: (bool(r.get('suite')) and is_bot(r) and r.get('instrument') == instrument
+    hash}): what kept_walls and kept_play both read. `ends` takes each run's campaign end
+    too (records_of names its instrument): a chapter cell reads its tries from it (ADR
+    0474)."""
+    return lambda r: (bool(r.get('suite')) and (ends or is_bot(r))
+                      and r.get('instrument') == instrument
                       and r.get('rom_hash') == rom_hashes.get(r.get('game')))
 
 
@@ -2299,8 +2421,10 @@ def kept_walls(paths, instrument, rom_hashes):
     instrument played on these ROMs ({game: hash}) to a game result: a run of other code, or
     one that crashed at boot in seconds, says nothing about what the next will take."""
     mine = suite_run_of(instrument, rom_hashes)
+    # every attempt a cell's run made carries that run's one wall (ADR 0474), so a run is read
+    # once, by its attempt 1
     runs = kept(paths, lambda r: mine(r) and r.get('outcome') not in UNUSABLE
-                and r.get('wall_s') is not None,
+                and r.get('wall_s') is not None and r.get('attempt') == 1,
                 lambda r: r['suite']['start_id'])
     return {sid: [r['wall_s'] for r in recs] for sid, recs in runs.items()}
 
@@ -4131,9 +4255,8 @@ def main(argv=None):
     rp.add_argument('--ref', type=int, help='the decision to pin (default: the last that moved '
                     "the dead unit, else the death's plan_ref)")
     c = sub.add_parser('cell',
-                       help='one cell, Manchego Stars vs its twin, to its verdict (ADR 0385)')
-    c.add_argument('--analysis', required=True, choices=('paired', 'marginal'),
-                   help="the pilot's choice, frozen before any confirmatory seed plays")
+                       help='one cell, Manchego Stars vs its twin, to its verdict (ADR 0385, '
+                       '0474)')
     c.add_argument('--cells', type=int, help="the frozen cell count N (default: the manifest's)")
     c.add_argument('--chapter', type=int,
                    help='a chapter cell: the Manchego Stars chapter number (its twin is '

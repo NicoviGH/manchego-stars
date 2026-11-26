@@ -76,8 +76,10 @@ class Records(unittest.TestCase):
         self.assertEqual((v1, v2), (V1, V2))
         self.assertIn(mc.spoiled(v1), mc.spoiled(v2))
         self.assertIn('lost 0x42 (green, turn 4, to 0x81)', mc.attempt_line(v1, set()))
-        r1, r2 = mc.chapter_result([v1], 3), mc.chapter_result([v2], 3)
-        self.assertEqual((r1['died'], r1['clean']), (r2['died'], r2['clean']))
+        end = {'kind': 'campaign', 'outcome': 'capped'}
+        r1, r2 = mc.chapter_result([v1, end], 3), mc.chapter_result([v2, end], 3)
+        self.assertEqual((r1['died'], r1['clean'], r1['clean_at']),
+                         (r2['died'], r2['clean'], r2['clean_at']))
         self.assertEqual(mc.first_clean([v1]), mc.first_clean([v2]))
 
     def test_a_graded_line_names_causes_reasons_and_anomalies(self):
@@ -411,6 +413,11 @@ class Workers(unittest.TestCase):
         both = mc.records_of({}, 'BOTRUN {"outcome": "won", "env_status": "clean"}\n'
                              'CAMPAIGN {"outcome": "played"}', '/tmp/w', '/nonexistent.log')
         self.assertEqual([r.get('env_status') for r in both], ['clean', None])
+        # the end names the instrument its task ran under, as the attempts do: a chapter cell
+        # keeps it beside them (ADR 0474)
+        mine = mc.records_of({'instrument': 'i+v2'}, 'CAMPAIGN {"outcome": "bot_fault"}',
+                             '/tmp/w', '/nonexistent.log')
+        self.assertEqual(mine[0]['instrument'], 'i+v2')
 
     def test_a_campaign_run_sh_cut_short_ends_crashed_in_its_words(self):
         # #665: run.sh's wall net cut 19 of 20 laps mid-chapter; campaign.lua never wrote its
@@ -624,7 +631,7 @@ class Attempts(unittest.TestCase):
 
 
 class Verdict(unittest.TestCase):
-    """The verdict (ADR 0385, #510 step 9 PR-H): any protected death on attempt 1, exact
+    """The verdict (ADR 0385, 0474): who needed more tries to a clean clear, exact
     Clopper-Pearson bounds at alpha / (4 x 3 x N), the +-10-point margin, at every look."""
 
     N = 24   # ch00-ch07 in three modes, the frozen cell count ADR 0385's figures are for
@@ -653,28 +660,37 @@ class Verdict(unittest.TestCase):
             with self.assertRaises(ValueError):
                 mc.bound_level(bad)
 
-    def test_paired_bounds_the_discordant_proportions_marginal_the_arms(self):
-        # T089: a both-died b only-ours c only-twin d neither
-        table = (30, 6, 2, 62)
+    @staticmethod
+    def pair(ours, twin):
+        """A pair as pair_of makes one: each arm the attempt of its first clean clear, None for
+        none within the cap, ('u', lo) for unresolved from attempt lo on."""
+        def one(t):
+            if isinstance(t, tuple):
+                return t[1], mc.NEVER
+            t = mc.NEVER if t is None else t
+            return t, t
+        return one(ours), one(twin)
+
+    def test_the_table_counts_who_needed_more_tries(self):
+        # ADR 0474: none within the cap is worse than any attempt, and two of them tie
+        never = mc.NEVER
+        self.assertEqual(mc.table_of([(1, 2), (3, 1), (2, 2), (never, never), (never, 12)]),
+                         (2, 1, 2))
+
+    def test_the_interval_bounds_each_share_on_its_own(self):
+        # T089: b pairs where Manchego Stars needed more tries, c where the twin did
         level = mc.bound_level(self.N)
         lb, ub = mc.clopper_pearson(6, 100, level)
         lc, uc = mc.clopper_pearson(2, 100, level)
-        self.assertEqual(mc.confirmatory_interval(table, self.N, 'paired'), (lb - uc, ub - lc))
-        l1, u1 = mc.clopper_pearson(36, 100, level)
-        l2, u2 = mc.clopper_pearson(32, 100, level)
-        self.assertEqual(mc.confirmatory_interval(table, self.N, 'marginal'), (l1 - u2, u1 - l2))
-        p, m = (mc.confirmatory_interval(table, self.N, a) for a in ('paired', 'marginal'))
-        self.assertLess(p[1] - p[0], m[1] - m[0], 'pairs that covary narrow the interval')
-        with self.assertRaises(ValueError):
-            mc.confirmatory_interval(table, self.N, 'mcnemar')
+        self.assertEqual(mc.confirmatory_interval((6, 2, 92), self.N), (lb - uc, ub - lc))
 
     def test_zero_discordance_needs_no_rule_of_its_own(self):
         # T090: the bounds handle 0 of n; ADR 0385's figures at N = 24
-        v = mc.paired_verdict([(False, False)] * 50, self.N, 'paired')
+        v = mc.paired_verdict([self.pair(1, 1)] * 50, self.N)
         self.assertAlmostEqual(v['hi'], 0.159, places=3)
         self.assertEqual((v['look'], v['verdict'], v['settled']), (50, 'INCONCLUSIVE', False))
         self.assertIn('next look is at 100', v['reason'])
-        v = mc.paired_verdict([(True, True), (False, False)] * 100, self.N, 'paired')
+        v = mc.paired_verdict([self.pair(2, 2), self.pair(None, None)] * 100, self.N)
         self.assertAlmostEqual(v['hi'], 0.042, places=3)
         self.assertAlmostEqual(v['lo'], -0.042, places=3)
         self.assertEqual((v['look'], v['verdict'], v['settled']), (200, 'EQUIVALENT', True))
@@ -686,90 +702,95 @@ class Verdict(unittest.TestCase):
         self.assertEqual(mc.label(0.01, 0.30), 'HARDER')
         self.assertEqual(mc.label(-0.30, -0.01), 'EASIER')
         self.assertEqual(mc.label(-0.12, 0.12), 'INCONCLUSIVE')
-        # a large gap is called at the first look: Manchego Stars loses someone on 30 of 50, the
-        # twin never
-        v = mc.paired_verdict([(True, False)] * 30 + [(False, False)] * 20, self.N, 'paired')
+        # a large gap is called at the first look: Manchego Stars needs more tries on 30 of 50
+        v = mc.paired_verdict([self.pair(3, 1)] * 30 + [self.pair(1, 1)] * 20, self.N)
         self.assertEqual((v['look'], v['verdict'], v['settled']), (50, 'HARDER', True))
         self.assertAlmostEqual(v['diff'], 0.6)
-        v = mc.paired_verdict([(False, True)] * 30 + [(False, False)] * 20, self.N, 'paired')
+        v = mc.paired_verdict([self.pair(1, 3)] * 30 + [self.pair(1, 1)] * 20, self.N)
         self.assertEqual(v['verdict'], 'EASIER')
         # a small real gap never settles early, and the last look settles INCONCLUSIVE
-        block = [(True, False)] * 6 + [(False, True)] * 3 + [(False, False)] * 41
+        block = [self.pair(2, 1)] * 6 + [self.pair(1, 2)] * 3 + [self.pair(1, 1)] * 41
         for n in (50, 100):
-            self.assertFalse(mc.paired_verdict(block * (n // 50), self.N, 'paired')['settled'])
-        v = mc.paired_verdict(block * 4, self.N, 'paired')
+            self.assertFalse(mc.paired_verdict(block * (n // 50), self.N)['settled'])
+        v = mc.paired_verdict(block * 4, self.N)
         self.assertEqual((v['verdict'], v['settled'], v['discordant']), ('INCONCLUSIVE', True, 36))
 
+    def test_no_clean_clear_within_the_cap_reads_as_needing_more_tries(self):
+        # ADR 0474: the cap needs no assumption; 12 against none is "ours cleared sooner"
+        v = mc.paired_verdict([self.pair(None, 12)] * 30 + [self.pair(None, None)] * 20, self.N)
+        self.assertEqual((v['verdict'], v['table']), ('HARDER', (30, 0, 20)))
+
     def test_no_look_between_planned_ones(self):
-        # 70 pairs: the last 20 are a wall of ours-only deaths, but the look is at 50, on the
+        # 70 pairs: the last 20 are a wall of ours-slower pairs, but the look is at 50, on the
         # first 50 alone, and those are even
-        pairs = [(True, False), (False, True)] * 25 + [(True, False)] * 20
-        v = mc.paired_verdict(pairs, self.N, 'paired')
+        pairs = [self.pair(2, 1), self.pair(1, 2)] * 25 + [self.pair(2, 1)] * 20
+        v = mc.paired_verdict(pairs, self.N)
         self.assertEqual((v['look'], v['diff']), (50, 0))
         self.assertFalse(v['settled'])
-        self.assertIsNone(mc.paired_verdict(pairs[:49], self.N, 'paired')['look'])
+        self.assertIsNone(mc.paired_verdict(pairs[:49], self.N)['look'])
         with self.assertRaises(ValueError):
-            mc.paired_verdict(pairs, self.N, 'paired', look=70)
+            mc.paired_verdict(pairs, self.N, look=70)
 
-    def test_unresolved_attempts_stay_in_the_denominators_bounded_both_ways(self):
-        # T091, FR-027: each unresolved pair is read as the worst case each way
-        pairs = [(False, False)] * 196 + [(None, False), (False, None), (None, None),
-                                          (True, None)]
+    def test_unresolved_replicates_stay_in_the_denominators_bounded_both_ways(self):
+        # T091, FR-027: each unresolved arm is read at its fewest tries one way, NEVER the other
+        p = self.pair
+        pairs = [p(1, 1)] * 196 + [p(('u', 2), 1), p(1, ('u', 1)), p(('u', 1), ('u', 1)),
+                                   p(3, ('u', 2))]
         low, high = mc.bound_unresolved(pairs)
-        self.assertEqual(low, mc.table_of([(False, False)] * 196 + [
-            (False, False), (False, True), (False, True), (True, True)]))
-        self.assertEqual(high, mc.table_of([(False, False)] * 196 + [
-            (True, False), (False, False), (True, False), (True, False)]))
-        self.assertEqual(sum(low), 200, 'nothing is dropped')
-        v = mc.paired_verdict(pairs, self.N, 'paired')
+        self.assertEqual((low, high), ((1, 3, 196), (3, 0, 197)))
+        v = mc.paired_verdict(pairs, self.N)
         self.assertEqual(v['unresolved'], 4)
-        self.assertEqual(v['lo'], mc.confirmatory_interval(low, self.N, 'paired')[0])
-        self.assertEqual(v['hi'], mc.confirmatory_interval(high, self.N, 'paired')[1])
+        self.assertEqual(v['lo'], mc.confirmatory_interval(low, self.N)[0])
+        self.assertEqual(v['hi'], mc.confirmatory_interval(high, self.N)[1])
+        # what an unresolved play did tell is kept: Manchego Stars stopped at attempt 5, past
+        # the twin's 3
+        self.assertEqual(mc.bound_unresolved([p(('u', 5), 3)]), ((1, 0, 0), (1, 0, 0)))
 
     def test_a_verdict_the_bounded_interval_does_not_support_is_withheld(self):
         # T091: 200 even pairs are EQUIVALENT; 20 of them unresolved widen it past the margin,
         # and an interval that then decides nothing is withheld, not inconclusive
-        even = [(False, False)] * 200
-        self.assertEqual(mc.paired_verdict(even, self.N, 'paired')['verdict'], 'EQUIVALENT')
-        v = mc.paired_verdict([(None, None)] * 20 + even[20:], self.N, 'paired')
+        even = [self.pair(1, 1)] * 200
+        self.assertEqual(mc.paired_verdict(even, self.N)['verdict'], 'EQUIVALENT')
+        unknown = self.pair(('u', 1), ('u', 1))
+        v = mc.paired_verdict([unknown] * 20 + even[20:], self.N)
         self.assertEqual((v['verdict'], v['settled']), ('WITHHELD', True))
         self.assertIn('20 unresolved', v['reason'])
         # a gap clear even at the worst case is still called
-        v = mc.paired_verdict([(True, False)] * 40 + [(None, None)] * 2 + [(False, False)] * 8,
-                              self.N, 'paired')
+        v = mc.paired_verdict([self.pair(3, 1)] * 40 + [unknown] * 2 + [self.pair(1, 1)] * 8,
+                              self.N)
         self.assertEqual(v['verdict'], 'HARDER')
 
-    def test_the_pilot_reports_its_table_and_picks_its_analysis(self):
-        # T093, FR-025: 5 both, 3 only Manchego Stars, 2 only the twin, 40 neither
-        pairs = [(True, True)] * 5 + [(True, False)] * 3 + [(False, True)] * 2 + \
-            [(False, False)] * 40 + [(None, True)]
+    def test_the_pilot_reports_its_table_and_each_arms_tries(self):
+        # T093, FR-025: Manchego Stars needed more on 3, the twin on 2, the same on 45
+        p = self.pair
+        pairs = [p(2, 1)] * 3 + [p(1, 2)] * 2 + [p(1, 1)] * 44 + [p(None, None),
+                                                                  p(('u', 1), 1)]
         s = mc.pilot_summary(pairs, self.N, cpu_s=3600.0, reach={'ours': {'reached': 51}})
-        self.assertEqual((s['table'], s['ours_only'], s['twin_only'], s['unresolved']),
-                         ((5, 3, 2, 40), 3, 2, 1))
+        self.assertEqual((s['table'], s['ours_slower'], s['twin_slower'], s['unresolved']),
+                         ((3, 2, 45), 3, 2, 1))
         self.assertAlmostEqual(s['diff'], 0.02)
         self.assertAlmostEqual(s['discordance'], 0.1)
-        self.assertAlmostEqual(s['corr'], (5 * 40 - 6) / (8 * 42 * 7 * 43) ** 0.5)
-        self.assertEqual(s['analysis'], 'paired', 'the arms covary positively')
+        self.assertEqual(s['tries']['ours'], {'n': 50, 'cleared': 49, 'median': 1})
+        self.assertEqual(s['tries']['vanilla'], {'n': 50, 'cleared': 49, 'median': 1})
         # ADR 0385's reference at 200 pairs and N = 24: 10% discordance reads +-11.7
         self.assertAlmostEqual(s['half_width'], 0.117, places=3)
         self.assertFalse(s['reachable'])
         self.assertEqual((s['cpu_s'], s['reach']), (3600.0, {'ours': {'reached': 51}}))
         self.assertNotIn('verdict', s, 'pilot pairs are never confirmatory')
         # 5% discordance reads +-8.8, inside the margin
-        s = mc.pilot_summary([(True, False), (False, True)] + [(False, False)] * 38, self.N)
+        s = mc.pilot_summary([p(2, 1), p(1, 2)] + [p(1, 1)] * 38, self.N)
         self.assertAlmostEqual(s['half_width'], 0.088, places=3)
         self.assertTrue(s['reachable'])
-
-    def test_arms_that_do_not_covary_are_analysed_marginally(self):
-        # independent arms: covariance 0 (a d = b c), so marginal, its width at the pooled rate
-        s = mc.pilot_summary([(True, True)] * 1 + [(True, False)] * 9 + [(False, True)] * 9 +
-                             [(False, False)] * 81, self.N)
-        self.assertEqual((s['cov'], s['analysis']), (0.0, 'marginal'))
-        level = mc.bound_level(self.N)
-        lo, hi = mc.clopper_pearson(20, 200, level)
-        self.assertAlmostEqual(s['half_width'], hi - lo)
         with self.assertRaises(ValueError):
-            mc.pilot_summary([(None, True)], self.N)
+            mc.pilot_summary([p(('u', 1), 1)], self.N)
+
+    def test_an_arms_tries_in_words(self):
+        never = mc.NEVER
+        self.assertEqual(mc.tries_words(mc.tries_summary([1, 3, 2, never])),
+                         'median 2, 3 of 4 cleared clean within the cap')
+        self.assertEqual(mc.tries_words(mc.tries_summary([1, never, never])),
+                         'median none within the cap, 1 of 3 cleared clean within the cap')
+        self.assertEqual(mc.tries_words(mc.tries_summary([])), 'no replicate')
 
 
 class Cell(unittest.TestCase):
@@ -800,12 +821,20 @@ class Cell(unittest.TestCase):
         return play
 
     @staticmethod
-    def died(yes, chapter, clean=None):
-        # a played record as botrun.lua writes one: its environment held, its death graded
-        deaths = [{'charId': 1, 'faction': 'blue', 'cause': 'rng_tail', 'turn': 3}] if yes else []
-        return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'deaths': deaths,
-                 'clean': (not yes) if clean is None else clean, 'env_status': 'clean'},
-                {'kind': 'campaign', 'outcome': 'done'}]
+    def tries(at, chapter, end='done'):
+        """A play as campaign.lua writes one: attempts 1..at, each before the last losing a
+        unit (its death graded, its environment held) and the last the first clean clear, then
+        the campaign's end. `at` None: the cap's 12 attempts, none clean, and a NO_CLEAN end."""
+        n = 12 if at is None else at
+        recs = [{'chapter': chapter, 'attempt': k, 'outcome': 'won', 'clean': k == at,
+                 'deaths': [] if k == at else [{'charId': 1, 'faction': 'blue',
+                                                'cause': 'rng_tail', 'turn': 3}],
+                 'env_status': 'clean'} for k in range(1, n + 1)]
+        return recs + [{'kind': 'campaign', 'outcome': end if at is not None else 'bot_fault'}]
+
+    def died(self, yes, chapter):
+        # the slower arm: its attempt 1 lost someone, its attempt 2 cleared clean
+        return self.tries(2 if yes else 1, chapter)
 
     def test_kept_pairs_are_read_from_the_store_first(self):
         sides = self.sides()
@@ -814,8 +843,7 @@ class Cell(unittest.TestCase):
                 mc.append_record(sides['vanilla']['store'],
                                  dict(r, seed=s, **sides['vanilla']['stamp']))
         log = []
-        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.died(True, ch), log), self.N,
-                        'paired')
+        v = mc.run_cell(sides, self.play(lambda n, s, ch: self.died(True, ch), log), self.N)
         self.assertEqual((v['verdict'], v['look']), ('HARDER', 50))
         self.assertEqual(v['played'], {'ours': 50, 'vanilla': 0})
         self.assertNotIn('vanilla', {n for n, _ in log})
@@ -829,39 +857,62 @@ class Cell(unittest.TestCase):
             for r in self.died(True, 3):
                 mc.append_record(sides['vanilla']['store'], dict(r, seed=s, **other))
         v = mc.run_cell(sides, self.play(lambda n, s, ch: self.died(n == 'ours', ch), []),
-                        self.N, 'paired')
+                        self.N)
         self.assertEqual(v['played']['vanilla'], 50)
 
     def test_a_cell_stops_at_the_first_look_that_decides(self):
         # no discordance: +-15.9 at 50 is too wide, +-8.3 at 100 is inside the margin
         v = mc.run_cell(self.sides(), self.play(lambda n, s, ch: self.died(False, ch), []),
-                        self.N, 'paired')
+                        self.N)
         self.assertEqual((v['look'], v['verdict'], v['settled']), (100, 'EQUIVALENT', True))
         self.assertEqual(v['played'], {'ours': 100, 'vanilla': 100})
         # 10% discordance, evenly split, decides nothing anywhere and plays to the last look
         v = mc.run_cell(self.sides(), self.play(
             lambda n, s, ch: self.died((s % 20 == 0) if n == 'ours' else (s % 20 == 10), ch),
-            []), self.N, 'paired')
+            []), self.N)
         self.assertEqual((v['look'], v['verdict'], v['settled']), (200, 'INCONCLUSIVE', True))
         self.assertEqual(v['played'], {'ours': 200, 'vanilla': 200})
 
-    def test_the_endpoint_is_any_death_in_attempt_one_and_clean_is_only_reported(self):
-        # a won attempt with a death is a death; a lost attempt with none is not; a later
-        # retry is not the first attempt
+    def test_the_endpoint_is_the_first_clean_clear_and_attempt_one_is_only_reported(self):
+        # ADR 0474: attempt 2 cleared clean, so its tries are 2; attempt 1's death and its
+        # clean are columns
         recs = [{'chapter': 3, 'attempt': 1, 'outcome': 'won', 'clean': False,
                  'deaths': [{'charId': 2, 'faction': 'blue'}]},
-                {'chapter': 3, 'attempt': 2, 'outcome': 'won', 'clean': True, 'deaths': []}]
+                {'chapter': 3, 'attempt': 2, 'outcome': 'won', 'clean': True, 'deaths': []},
+                {'kind': 'campaign', 'outcome': 'done'}]
         r = mc.chapter_result(recs, 3)
-        self.assertEqual((r['status'], r['died'], r['clean']), ('played', True, False))
-        r = mc.chapter_result([{'chapter': 3, 'attempt': 1, 'outcome': 'lost', 'deaths': []}], 3)
-        self.assertEqual((r['died'], r['clean']), (False, False))
-        # a green whose death does not end the game is not the endpoint; one that does is
+        self.assertEqual((r['status'], r['clean_at'], r['died'], r['clean'], r['rec']),
+                         ('played', 2, True, False, recs[0]))
+        self.assertEqual(r['recs'], recs[:2])
+        self.assertEqual(mc.span(r), (2, 2))
+        # the cap passed with no clean clear: known, and worse than any attempt
+        r = mc.chapter_result(self.tries(None, 3), 3)
+        self.assertEqual((r['status'], r['clean_at'], mc.span(r)),
+                         ('played', None, (mc.NEVER, mc.NEVER)))
+        # a green whose death does not end the game is not counted; one that does is
         green = {'charId': 9, 'faction': 'green', 'escort': False}
         vip = dict(green, escort=True)
         for d, want in ((green, False), (vip, True)):
-            r = mc.chapter_result([{'chapter': 3, 'attempt': 1, 'outcome': 'won',
-                                    'deaths': [d]}], 3)
+            r = mc.chapter_result([{'chapter': 3, 'attempt': 1, 'outcome': 'won', 'clean': True,
+                                    'deaths': [d]}, {'kind': 'campaign', 'outcome': 'done'}], 3)
             self.assertEqual(r['died'], want, d)
+
+    def test_a_play_cut_short_is_unresolved_from_its_next_attempt(self):
+        # three attempts, none clean, and no end saying the attempts ran out: tries are 4 or
+        # more, never "none within the cap"
+        cut = self.tries(None, 3)[:3] + [{'kind': 'campaign', 'outcome': 'done', 'why': 'x'}]
+        r = mc.chapter_result(cut, 3)
+        self.assertEqual((r['status'], r['lo'], mc.span(r)), ('unresolved', 4, (4, mc.NEVER)))
+        self.assertIn('stopped after attempt 3', r['why'])
+        # an attempt with no game result: tries are that attempt or more
+        crash = self.tries(None, 3)[:2] + [{'chapter': 3, 'attempt': 3, 'outcome': 'crashed',
+                                            'why': 'boom'},
+                                           {'kind': 'campaign', 'outcome': 'crashed'}]
+        r = mc.chapter_result(crash, 3)
+        self.assertEqual((r['status'], r['lo'], r['why']), ('unresolved', 3, 'boom'))
+        # its same-seed retry replays the whole play, and the first play known is the reading
+        r = mc.chapter_result(crash + self.tries(4, 3), 3)
+        self.assertEqual((r['status'], r['clean_at'], r['tries']), ('played', 4, 1))
 
     def test_a_crash_is_retried_once_on_its_own_seed_then_bounded(self):
         # T091: Manchego Stars seed 3 crashes twice; it stays in the pairs as unresolved
@@ -876,7 +927,7 @@ class Cell(unittest.TestCase):
         self.assertEqual(log.count(('ours', 3)), 2, 'played, then retried once on its seed')
         self.assertNotIn(('ours', 51), log, 'and no seed stands in for it')
         self.assertEqual(len(got['pairs']), 50)
-        self.assertEqual(got['pairs'][2], (None, False))
+        self.assertEqual(got['pairs'][2], ((1, mc.NEVER), (1, 1)))
         p = got['problems']
         self.assertEqual([(x['side'], x['seed'], x['status']) for x in p],
                          [('ours', 3, 'unresolved')])
@@ -893,7 +944,7 @@ class Cell(unittest.TestCase):
                         {'kind': 'campaign', 'outcome': 'crashed'}]
             return self.died(n == 'ours', ch)
         got = mc.cell_pairs(self.sides(), self.play(fate, []), [3])
-        self.assertEqual(got['pairs'], [(True, False)])
+        self.assertEqual(got['pairs'], [((2, 2), (1, 1))])
         self.assertEqual(got['problems'], [])
 
     def test_a_campaign_cell_compares_only_what_both_arms_reach(self):
@@ -923,7 +974,7 @@ class Cell(unittest.TestCase):
                         {'kind': 'campaign', 'outcome': 'crashed', 'why': 'chapter 2 crashed'}]
             return self.died(False, ch)
         log = []
-        v = mc.run_cell(self.sides(), self.play(fate, log), self.N, 'paired')
+        v = mc.run_cell(self.sides(), self.play(fate, log), self.N)
         self.assertEqual((v['verdict'], v['settled'], v['look']), ('WITHHELD', False, 50))
         self.assertIn('whether it reaches it is unknown', v['reason'])
         p = v['problems'][0]
@@ -944,10 +995,11 @@ class Cell(unittest.TestCase):
         for side in sides.values():
             side['pinned'] = True
         got = mc.cell_pairs(sides, self.play(
-            lambda n, s, ch: crash if (n, s) == ('ours', 2) else self.died(False, ch)[:1], []),
+            lambda n, s, ch: crash if (n, s) == ('ours', 2) else self.died(False, ch), []),
             [1, 2, 3])
         self.assertFalse(got['withheld'])
-        self.assertEqual(got['pairs'], [(False, False), (None, False), (False, False)])
+        self.assertEqual(got['pairs'], [((1, 1), (1, 1)), ((1, mc.NEVER), (1, 1)),
+                                        ((1, 1), (1, 1))])
         self.assertEqual(got['results'][2]['ours']['status'], 'unresolved')
 
     def test_a_retry_counts_only_the_plays_that_stopped_where_this_one_did(self):
@@ -966,7 +1018,7 @@ class Cell(unittest.TestCase):
 
     def test_a_cell_needs_its_last_looks_seeds(self):
         with self.assertRaises(ValueError):
-            mc.run_cell(self.sides(), self.play(lambda n, s, ch: [], []), self.N, 'paired',
+            mc.run_cell(self.sides(), self.play(lambda n, s, ch: [], []), self.N,
                         seeds=range(1, 100))
 
     def test_campaign_tasks_keep_their_seed_from_new_game(self):
@@ -1207,6 +1259,12 @@ class Suite(unittest.TestCase):
         for bad in (('pilot', [7]), ('tuning', [2001]), ('nope', None)):
             with self.assertRaises(ValueError):
                 mc.chapter_tasks(suite, envs, 'i', outs, v3, *bad)
+        # a cell's plays every attempt to the first clean clear (ADR 0474), its retries' start
+        # held in memory, never written over the pin every worker reads
+        cell = mc.chapter_tasks(suite, envs, 'i', outs, v3, 'pilot', [3001], tries=True)[0]
+        self.assertEqual(cell['campaign'], {'last': [3], 'claims': {}, 'id': 'c', 'from': 3,
+                                            'shared_start': True})
+        self.assertNotIn('task_attempt', cell['stamp'])
 
     def cell_start(self, campaign, chapter=3, game='vanilla', seed=4001):
         return {'start_id': '%s/%d' % (campaign, chapter), 'game': game, 'chapter': chapter,
@@ -1234,7 +1292,14 @@ class Suite(unittest.TestCase):
                                store, 'h')
         self.assertEqual(sorted(side['kept']()), [3001, 3002])
         self.assertEqual((side['chapter'], side['vanilla'], side['starts']), (3, True, starts))
+        # a play's campaign end is kept beside its attempts: it says the cap passed with no
+        # clean clear (ADR 0474)
+        mc.append_record(store, dict(base, kind='campaign', outcome='bot_fault', seed=3001,
+                                     suite={'start_id': 'cs-s4001/3', 'set': 'pilot',
+                                            'version': 1}))
+        self.assertEqual([r.get('kind') for r in side['kept']()[3001]], [None, 'campaign'])
         got = side['tasks']([3009, 3002, 3001])
+        self.assertTrue(all(t['campaign']['shared_start'] for t in got), 'a cell plays tries')
         self.assertEqual(sorted((t['seed'], t['stamp']['suite']['start_id'], t['campaign']['id'])
                                 for t in got),
                          [(3001, 'cs-s4001/3', 'cs-s4001'), (3002, 'cs-s4002/3', 'cs-s4002'),
@@ -1728,10 +1793,10 @@ class Suite(unittest.TestCase):
 
     def test_a_cell_takes_one_kind_of_flags(self):
         # review of #582: a mix of chapter and campaign flags is an error, never half-read
-        for argv in (['cell', '--analysis', 'paired', '--chapter', '3', '--ours', 'o.json'],
-                     ['cell', '--analysis', 'paired', '--chapter', '3', '--ours', 'o',
+        for argv in (['cell', '--chapter', '3', '--ours', 'o.json'],
+                     ['cell', '--chapter', '3', '--ours', 'o',
                       '--vanilla', 'v', '--ours-chapter', '4', '--vanilla-chapter', '3'],
-                     ['cell', '--analysis', 'paired', '--ours', 'o', '--vanilla', 'v',
+                     ['cell', '--ours', 'o', '--vanilla', 'v',
                       '--ours-chapter', '4']):
             with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
                 mc.main(argv)
@@ -1750,7 +1815,8 @@ class Suite(unittest.TestCase):
                                                                      'vanilla': side}), \
                 mock.patch.object(mc, 'kept_walls', return_value={}), \
                 mock.patch.object(mc, 'cell_pairs', return_value={
-                    'pairs': [(None, False)] * 50, 'problems': [problem], 'cpu_s': 0.0,
+                    'pairs': [((1, mc.NEVER), (1, 1))] * 50, 'problems': [problem],
+                    'cpu_s': 0.0,
                     'reach': {}, 'results': {}}), \
                 contextlib.redirect_stdout(out):
             self.assertEqual(mc.main(['pilot', '--chapter', '2']), 1)
@@ -1758,9 +1824,10 @@ class Suite(unittest.TestCase):
         self.assertIn('Lua error: x', out.getvalue())
 
     def test_a_cell_with_no_resolved_pair_prints_its_withheld_verdict(self):
-        # review of #582: no resolved pair leaves the rates None, and that must not crash
-        v = mc.paired_verdict([(None, None)] * 50, 24, 'paired', look=50)
-        self.assertEqual((v['verdict'], v['ours'], v['table']), ('WITHHELD', None, (0, 0, 0, 0)))
+        # review of #582: no resolved pair leaves the difference None, and that must not crash
+        unknown = ((1, mc.NEVER), (1, mc.NEVER))
+        v = mc.paired_verdict([unknown] * 50, 24, look=50)
+        self.assertEqual((v['verdict'], v['diff'], v['table']), ('WITHHELD', None, (0, 0, 0)))
         d = tempfile.mkdtemp()
         for n in ('o', 'v'):
             with open(os.path.join(d, n), 'w') as fh:
@@ -1776,7 +1843,7 @@ class Suite(unittest.TestCase):
                     paired=[])), \
                 mock.patch.object(mc, 'CELLS_FILE', os.path.join(d, 'cells.jsonl')), \
                 contextlib.redirect_stdout(out):
-            self.assertEqual(mc.main(['cell', '--analysis', 'paired', '--ours',
+            self.assertEqual(mc.main(['cell', '--ours',
                                       os.path.join(d, 'o'), '--vanilla', os.path.join(d, 'v'),
                                       '--ours-chapter', '4', '--vanilla-chapter', '3']), 0)
         self.assertIn('WITHHELD at 50', out.getvalue())
@@ -1792,7 +1859,7 @@ class Suite(unittest.TestCase):
         out = io.StringIO()
         with mock.patch.object(mc, 'load_suite', return_value={'cells': 24}), \
                 mock.patch.object(mc, 'run_cell') as run, contextlib.redirect_stdout(out):
-            self.assertEqual(mc.main(['cell', '--analysis', 'paired', '--ours', d, '--vanilla',
+            self.assertEqual(mc.main(['cell', '--ours', d, '--vanilla',
                                       d, '--ours-chapter', '99', '--vanilla-chapter', '3']), 1)
         run.assert_not_called()
         self.assertIn("refused: --ours-chapter 99 is no written chapter's index", out.getvalue())
@@ -1802,7 +1869,7 @@ class Suite(unittest.TestCase):
         d = tempfile.mkdtemp()
         side = {'kept': dict, 'tasks': lambda seeds: [], 'chapter': 2, 'pinned': True,
                 'store': os.path.join(d, 'runs.jsonl')}
-        got = {'pairs': [(r['ours']['died'], r['vanilla']['died']) for r in results.values()],
+        got = {'pairs': [mc.pair_of(r) for r in results.values()],
                'paired': list(results), 'results': results, 'cpu_s': 1.0, 'problems': [],
                'reach': {}}
         suite = {'cells': 24, 'seed_sets': {'pilot': [1, len(results)]}, 'starts': []}
@@ -1826,12 +1893,20 @@ class Suite(unittest.TestCase):
         def res(died, detail=None):
             deaths = [{'cause': 'other' if detail else 'rng_tail', 'charId': 1,
                        'detail': detail}] if died else []
-            return dict(played(deaths), rec=dict(played(deaths)['rec'], trace='t', seed=1,
-                                                 suite={'start_id': 'cs-s4001/2'}))
+            r = played(deaths, clean_at=2 if died else 1)
+            r['rec'] = r['recs'][0] = dict(r['rec'], trace='t', seed=1,
+                                           suite={'start_id': 'cs-s4001/2'})
+            return r
         ok = {s: {'ours': res(s % 3 == 0), 'vanilla': res(s % 5 == 0)} for s in range(1, 21)}
         code, out, recs = self.pilot(ok)
         self.assertEqual(code, 0)
         self.assertEqual([(r['cell_kind'], r['verdict']) for r in recs], [('pilot', None)])
+        self.assertEqual(recs[0]['tries']['ours'][:3], [1, 1, 2], 'each played seed\'s tries')
+        self.assertIn('Manchego Stars needed more tries in 5, the twin in 3, the same in 12', out)
+        self.assertIn('seed 3 (cs-s4001/2, cs-s4001/2), Manchego Stars needed more tries '
+                      '(Manchego Stars 2, the twin 1)', out)
+        self.assertIn('a protected unit died on attempt 1: Manchego Stars 6 of 20, the twin 4 '
+                      'of 20', out)
         # an experiment with a benched unit is not the instrument's pilot: no record
         code, out, recs = self.pilot(ok, bench=['5'])
         self.assertEqual(recs, [])
@@ -1841,7 +1916,7 @@ class Suite(unittest.TestCase):
         code, out, recs = self.pilot(bad)
         self.assertEqual(code, 1)
         self.assertTrue(out.splitlines()[1].startswith('NOT READABLE (sandbox_fault): this '
-                                                       "pilot's analysis choice cannot be used"))
+                                                       'pilot cannot plan a cell'))
         self.assertEqual(recs[0]['verdict'], 'NOT_READABLE')
 
     def test_the_pilot_and_confirmatory_seeds_never_meet(self):
@@ -2161,12 +2236,13 @@ class Suite(unittest.TestCase):
         d = tempfile.mkdtemp()
         path = os.path.join(d, 'runs.jsonl')
         base = {'suite': {'start_id': 'a'}, 'game': 'vanilla', 'rom_hash': 'h',
-                'instrument': 'i', 'outcome': 'won', 'wall_s': 40.0}
+                'instrument': 'i', 'outcome': 'won', 'wall_s': 40.0, 'attempt': 1}
         for r in (base, dict(base, wall_s=60.0),
                   dict(base, instrument='old', wall_s=5.0),       # other code
                   dict(base, rom_hash='g', wall_s=5.0),            # another ROM
                   dict(base, outcome='crashed', wall_s=5.0),       # died at boot
                   dict(base, kind='campaign', wall_s=40.0),        # the worker's other record
+                  dict(base, attempt=2, wall_s=40.0),              # the same run's attempt 2
                   {'seed': 1, 'wall_s': 5.0}):                     # a cell's run
             mc.append_record(path, r)
         self.assertEqual(mc.kept_walls([path], 'i', {'vanilla': 'h'}), {'a': [40.0, 60.0]})
@@ -3164,13 +3240,15 @@ class Replay(unittest.TestCase):
             self.assertEqual(fh.read(), b'state')
 
 
-def played(deaths=(), env='clean', outcome='won', **kw):
+def played(deaths=(), env='clean', outcome='won', clean_at=1, **kw):
     """A played attempt-1 record as botrun.lua writes one, each death a dict (blue unless
-    said), and its chapter_result."""
+    said), and its chapter_result: cleared clean on attempt `clean_at` (None: not within the
+    cap), its attempts that one record."""
     rec = dict({'kind': 'bot', 'chapter': 4, 'attempt': 1, 'outcome': outcome,
                 'env_status': env, 'deaths': [dict({'faction': 'blue', 'turn': 3}, **d)
                                               for d in deaths]}, **kw)
-    return {'status': 'played', 'rec': rec, 'died': bool(deaths)}
+    return {'status': 'played', 'rec': rec, 'recs': [rec], 'died': bool(deaths),
+            'clean_at': clean_at}
 
 
 class Validity(unittest.TestCase):
@@ -3188,11 +3266,9 @@ class Validity(unittest.TestCase):
         return {'ours': arm(ours), 'vanilla': arm(vanilla)}
 
     def verdict(self, results):
-        pairs = [(o['died'] if o['status'] == 'played' else None,
-                  v['died'] if v['status'] == 'played' else None)
+        pairs = [mc.pair_of({'ours': o, 'vanilla': v})
                  for o, v in zip(results['ours'], results['vanilla'])]
-        return mc.judged(mc.paired_verdict(pairs * 10, 24, 'paired', look=200),
-                         mc.validity(results))
+        return mc.judged(mc.paired_verdict(pairs * 10, 24, look=200), mc.validity(results))
 
     def test_a_valid_cell_keeps_its_verdict(self):
         v = self.verdict(self.results())
@@ -3216,7 +3292,8 @@ class Validity(unittest.TestCase):
                                                                'over_cap': True}])]),
             'unjustified_seize_skip': self.results(ours=[played(seize_skips=[
                 {'turn': 4, 'justified': False}])]),
-            'vanilla_deaths': self.results(vanilla=[played([self.TAIL])] * 17),
+            # 17 of 20 with no clean clear within the cap: 85%, at the bar fails
+            'vanilla_uncleared': self.results(vanilla=[played(clean_at=None)] * 17),
         }
         for name, results in cases.items():
             with self.subTest(name):
@@ -3229,11 +3306,22 @@ class Validity(unittest.TestCase):
         self.assertEqual(sorted(cases), sorted(mc.VALIDITY), 'every invariant is tested')
 
     def test_the_bars_are_the_specs(self):
-        # just inside each bar holds: 18 of 20 clean, 1 of 20 blind, the twin losing 16 of 20
+        # just inside each bar holds: 18 of 20 clean, 1 of 20 blind, the twin with no clean
+        # clear within the cap on 16 of 20
         self.assertEqual(mc.validity(self.results(
             ours=[{'status': 'unresolved', 'rec': {'env_status': {'fault': 'crash'}}}] * 2,
-            vanilla=[played([{'cause': 'other', 'charId': 2, 'detail': 'noncombat'}])]
-            + [played([self.TAIL])] * 14)), {'failed': [], 'withheld': [], 'unread': []})
+            vanilla=[played([{'cause': 'other', 'charId': 2, 'detail': 'noncombat'}],
+                            clean_at=None)]
+            + [played(clean_at=None)] * 15)), {'failed': [], 'withheld': [], 'unread': []})
+
+    def test_every_attempt_is_read_not_only_the_first(self):
+        # ADR 0474: attempt 2's sandbox-fault death fails the cell though attempt 1 was clean
+        r = played(clean_at=3)
+        r['recs'] = [r['rec'], dict(r['rec'], attempt=2, deaths=[
+            {'faction': 'blue', 'turn': 2, 'cause': 'other', 'charId': 2,
+             'detail': 'missing_prediction'}]), dict(r['rec'], attempt=3)]
+        self.assertEqual([n for n, _ in mc.validity(self.results(ours=[r]))['failed']],
+                         ['sandbox_fault'])
 
     def test_an_over_cap_death_a_fallback_names_is_no_failure(self):
         ok = played([{'cause': 'over_cap', 'charId': 2, 'over_cap': True}],
@@ -3286,9 +3374,12 @@ class Validity(unittest.TestCase):
             deaths = [{'charId': 1, 'faction': 'blue', 'cause': 'other', 'turn': 2,
                        'detail': 'forecast_desync'}] if name == 'ours' and seed == 7 else []
             return [{'chapter': chapter, 'attempt': 1, 'outcome': 'won', 'deaths': deaths,
-                     'env_status': 'clean'}, {'kind': 'campaign', 'outcome': 'done'}]
+                     'clean': not deaths, 'env_status': 'clean'},
+                    {'chapter': chapter, 'attempt': 2, 'outcome': 'won', 'deaths': [],
+                     'clean': True, 'env_status': 'clean'}][:1 if not deaths else 2] + \
+                [{'kind': 'campaign', 'outcome': 'done'}]
         log = []
-        v = mc.run_cell(Cell().sides(), Cell().play(fate, log), 24, 'paired')
+        v = mc.run_cell(Cell().sides(), Cell().play(fate, log), 24)
         self.assertEqual((v['look'], v['verdict'], v['failed_invariants']),
                          (50, 'NOT_READABLE', ['sandbox_fault']))
         self.assertEqual(len(log), 100, 'no seed past the first look plays')
@@ -3306,7 +3397,8 @@ class Report(unittest.TestCase):
                      'diff': 0.12, 'pairs': 100, 'games': 'over 10 Manchego Stars games and 10 '
                      'vanilla games',
                      'failed_invariants': [], 'validity': {'failed': [], 'withheld': []},
-                     'cpu_s': 7200.0}, **kw)
+                     'cpu_s': 7200.0, 'endpoint': 'tries_to_clean',
+                     'tries': {'ours': [2, None, 1], 'vanilla': [1, 1, 3]}}, **kw)
 
     def arms(self):
         boss = {'cause': 'rng_tail', 'charId': 2, 'flags': {'boss': True}, 'turn': 4}
@@ -3335,8 +3427,11 @@ class Report(unittest.TestCase):
         self.assertEqual(sentences[0],
                          'Manchego Stars ch03 vs vanilla Ch3, 100 pairs over 10 Manchego Stars '
                          'games and 10 vanilla '
-                         'games: harder, +4.0 to +19.0 points on any protected death; a '
-                         'protected unit died in Manchego Stars 2 of 3, the twin 1 of 3, driven by '
+                         'games: harder, +4.0 to +19.0 points on tries to a clean clear; tries '
+                         'to a clean clear: Manchego Stars median 2, 2 of 3 cleared clean within '
+                         'the cap, the twin median 1, 3 of 3 cleared clean within the cap; a '
+                         'protected unit died on attempt 1 in Manchego Stars 2 of 3, the twin 1 '
+                         'of 3, driven by '
                          'other deaths (Manchego Stars 0.33 an attempt, twin 0.00) and '
                          'over_cap, boss '
                          'deaths (Manchego Stars 0.33 an attempt, twin 0.00) and 1 escort-green '
@@ -3424,7 +3519,8 @@ class Report(unittest.TestCase):
         for a, recs in self.arms().items():
             for i, r in enumerate(recs):
                 mc.append_record(stores[a], named(r, a, i))
-                results.setdefault(i, {})[a] = {'status': 'played', 'rec': named(r, a, i)}
+                results.setdefault(i, {})[a] = {'status': 'played', 'rec': named(r, a, i),
+                                                'clean_at': i + 1}
             # another instrument's trace-less run of another seed, filed later, is never read
             mc.append_record(stores[a], dict(recs[0], campaign='x', seed=9, attempt=1,
                                              instrument='old+v2', trace=None, turns_to_win=99))
@@ -3445,6 +3541,12 @@ class Report(unittest.TestCase):
         got = mc.report_cells(path)
         self.assertEqual([(c['instrument'], c['pairs']) for c in got], [('i+v2', 50)])
         self.assertEqual(len(mc.report_cells(path, 'old+v2')), 1)
+        # a cell judged on the attempt-1 death endpoint ADR 0474 replaced is refused, never
+        # read as tries
+        mc.append_record(path, dict(cell, instrument='death+v2', endpoint=None))
+        with self.assertRaises(ValueError) as err:
+            mc.report_cells(path, 'death+v2')
+        self.assertIn('play the cell again', str(err.exception))
         self.assertEqual(mc.report_cells(os.path.join(d, 'none')), [])
         cell['runs']['ours'].append(['gone/1/4/1', 't/gone', 'i+v2'])
         with self.assertRaises(ValueError) as err:
@@ -3458,7 +3560,9 @@ class Report(unittest.TestCase):
         self.assertIn('rerun the pilot', str(err.exception))
         # a pilot's sentence says it has no verdict
         line = mc.cell_sentence(cell, {a: mc.describe(r) for a, r in self.arms().items()})
-        self.assertIn(': a pilot, no verdict on any protected death', line)
+        self.assertIn(': a pilot, no verdict on tries to a clean clear; tries to a clean '
+                      'clear: Manchego Stars median 2, 3 of 3', line)
+        self.assertEqual(cell['tries'], {'ours': [1, 2, 3], 'vanilla': [1, 2, 3]})
 
 
 
