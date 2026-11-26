@@ -257,11 +257,16 @@ def ours_env(store, lord=None, campaign=campaign_chapters.CAMPAIGN):
     return env
 
 
-def pinned_env(env, campaign_id, chapter):
+def pinned_env(env, campaign_id, chapter, tries=False):
     """`env` resumed at chapter index `chapter` from the start state campaign `campaign_id`
-    saved, attempt 1 only, ended there: a pinned chapter start, as the suite and a chapter
-    cell play it (#510 step 9, FR-024). Attempt mode saves no state, so the pinned file is
-    never rewritten (campaign.lua)."""
+    saved, ended there: a pinned chapter start (#510 step 9, FR-024). Attempt 1 only, as the
+    suite plays it, or with `tries` every attempt to the first clean clear or the cap, as a
+    chapter cell plays it (ADR 0474). Attempt mode saves no state; `shared_start` keeps the
+    retries' start in memory only. Either way the pinned file, which every worker on this
+    start reads, is never rewritten (campaign.lua, harness.lua)."""
+    if tries:
+        return dict(env, id=campaign_id, shared_start=True, last=[chapter],
+                    **{'from': chapter})
     return dict(env, id=campaign_id, attempt=1, last=[chapter], **{'from': chapter})
 
 

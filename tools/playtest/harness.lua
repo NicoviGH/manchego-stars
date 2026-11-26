@@ -4563,6 +4563,12 @@ INSPECT.campaignApi = function(game)
     api.save = function(ch, record)
         local st = emu:saveStateBuffer()
         states[ch] = st
+        -- cfg.shared_start: a chapter cell's play (montecarlo.py chapter_tasks' tries, ADR 0474)
+        -- resumes a pinned start every worker on it reads; its retries load the start from
+        -- memory, and a write here would race the others and break the pin's sha1. The start
+        -- record is skipped too: only arrive's resume reads it, once, before this save
+        -- (`last` ends the play before any later arrive)
+        if cfg.shared_start then return true end
         os.execute(string.format('mkdir -p "%s"', dir))
         if not INSPECT.writeStateFile(string.format("%s/%d.ss", dir, ch), st) then
             return nil, "cannot write " .. dir
