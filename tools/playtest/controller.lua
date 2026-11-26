@@ -24,6 +24,7 @@ local MENU_VENDOR = 0x60
 local MENU_ARENA = 0x62
 local MENU_ITEM = 0x67
 local MENU_STAFF = 0x51
+local MENU_TRADE = 0x68   -- menu_def.c: the unit menu's Trade (ItemSubMenu_IsTradeAvailable)
 local MENU_SUPPLY = 0x69
 local MENU_WAIT = 0x6B
 -- The two arms of ConvoyMenuProc_StarMenu (convoymenu.c), which is raised whenever a unit is
@@ -230,7 +231,7 @@ local RULES = {
             end
             local kind = observation.target.kind
             if kind ~= "attack" and kind ~= "talk" and kind ~= "heal" and kind ~= "rescue"
-                    and kind ~= "drop" then
+                    and kind ~= "drop" and kind ~= "trade" then
                 return unsupported("unsupported target selection kind")
             end
             return matched("target_selection", "target_selection in its input loop")
@@ -374,6 +375,26 @@ local RULES = {
                     tostring(idleOf(observation, "supply_screen"))))
             end
             return matched("supply_screen", "supply_screen in its key handler")
+        end,
+    },
+    {
+        -- The Trade screen (ProcScr_TradeMenu, bmtrade.c), opened by the unit menu's Trade on a
+        -- chosen ally. Above player_phase: it locks the game (LockGame) with the map underneath.
+        -- It reads keys in two loops: TradeMenu_OnLoopUnselected (the hand picks a cell) and
+        -- TradeMenu_OnLoopSelected (one cell held, the hand picks where it goes); between them
+        -- it is drawing or ending.
+        name = "trade_menu",
+        check = function(observation)
+            if not proc(observation, "trade_menu") then return rejected("trade_menu proc absent") end
+            if not (idleIs(observation, "trade_menu", "trade_pick_input")
+                    or idleIs(observation, "trade_menu", "trade_place_input")) then
+                return matched("transition", string.format("trade_menu idle=%s, not a key loop",
+                    tostring(idleOf(observation, "trade_menu"))))
+            end
+            if not observation.trade then
+                return matched("transition", "trade_menu live with no observed hand")
+            end
+            return matched("trade_menu", "trade_menu in a key loop")
         end,
     },
     {
@@ -743,6 +764,18 @@ function M.legalActions(observation)
         end
     elseif state == "supply_screen" then
         add(actions, "close_supply", "B", "supply_screen.on_b")
+    elseif state == "trade_menu" then
+        -- TradeMenu_UpdateSelection: LEFT/RIGHT cross to the other bag (from the right one,
+        -- from the left one), UP/DOWN walk the rows the bag holds (wrapping); A picks the cell
+        -- under the hand, or, holding one, swaps the two (TradeMenu_ApplyItemSwap); B ends the
+        -- screen, or, holding one, lets it go.
+        local t = observation.trade
+        if t.column == 1 then add(actions, "trade_left", "LEFT", "trade.hoverColumn") end
+        if t.column == 0 then add(actions, "trade_right", "RIGHT", "trade.hoverColumn") end
+        add(actions, "trade_up", "UP", "trade.hoverRow")
+        add(actions, "trade_down", "DOWN", "trade.hoverRow")
+        add(actions, "trade_choose", "A", "trade.hover")
+        add(actions, t.holding and "trade_release" or "trade_close", "B", "trade.on_b")
     elseif state == "stat_screen" then
         -- StatScreen_OnIdle: R starts the help box (StartStatScreenHelp, on Str on page 1), B
         -- leaves. Page turns are not offered: nothing needs them yet.
@@ -791,6 +824,7 @@ function M.legalActions(observation)
         addMenuCommand(actions, observation, MENU_VENDOR, "vendor")
         addMenuCommand(actions, observation, MENU_ITEM, "open_items")
         addMenuCommand(actions, observation, MENU_STAFF, "staff")
+        addMenuCommand(actions, observation, MENU_TRADE, "trade")
         addMenuCommand(actions, observation, MENU_SUPPLY, "open_supply")
         addMenuCommand(actions, observation, MENU_WAIT, "wait")
     elseif state == "map_command_menu" then

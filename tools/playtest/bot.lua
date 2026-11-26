@@ -62,7 +62,10 @@
 --              menu's own check; without them nothing is explored.
 --            locked(unit, x, y) -> terrain|nil, keySources(unit, terrain) -> {enemy}, OPTIONAL
 --              (sight.lua's): a chest or door the unit holds no key for, and the enemies
---              whose fall gives it one; without them no way runs through a key. }
+--              whose fall gives it one; without them no way runs through a key.
+--            bagKey(unit, mate, terrain) -> { id, uses, slot }|nil, bagFacts(unit, item),
+--              OPTIONAL: a teammate's key the unit could Trade for, and what a full bag gives
+--              back (Bot.fullBag's facts); without them no way runs through a teammate's bag. }
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, slot = n|nil }.
@@ -72,8 +75,11 @@
 --   the first the Weapon Select menu lists.
 --   "talk" and "staff" are acts the claim behaviours add; "visit", "chest", "rescue",
 --   "drop" (a Drop's `dropAt` is the tile it sets the carried unit on) and "supply" (the
---   convoy's door key taken, `item`/`uses`, then Wait: supplyKey) only the planner's
---   proposals (Bot.candidates) make. `canto` (optional, the proposals'): the tile a Canto
+--   convoy's door key taken, `item`/`uses`, then Wait: supplyKey) and "trade" (a teammate's
+--   key, `item`/`uses`/`lock`, handed over on the Trade screen with the target: taken by the
+--   actor, or with `gives` handed by it; `back` the { id, uses } a full bag gives back; then
+--   Wait: trades) only the planner's proposals (Bot.candidates) make. `canto` (optional, the
+--   proposals'): the tile a Canto
 --   unit moves on to after the act (cantoMoves); the unit ends there (Board.endTile).
 --
 -- Worst case on an end tile = the sum, over every enemy that reaches it, of the most that
@@ -1629,6 +1635,25 @@ local function convoyChestKey(ctx, u, tile)
     return ctx.sight.convoyKey(u, lock)
 end
 
+-- The teammates whose key `u` could take by Trade for the chest at `tile` (Goals.spareKey: a
+-- holder's key counts only once its own trip to that chest stalled), read once a decision
+-- (#688). Each is a key source as keyWay reads one, { x, y, id, holder = the teammate, lock, key
+-- = { id, uses, slot } }: `u` walks to it, they Trade (tradeAct), and `u` walks on. The holder's
+-- hand-over is offered only where it already reaches a tile beside `u`; it is never priced.
+local function bagHolders(ctx, u, lock, tile)
+    ctx.bagSrc = ctx.bagSrc or {}
+    local k = u.id .. ":" .. tostring(lock) .. "@" .. tileKey(tile.x, tile.y)
+    if ctx.bagSrc[k] == nil then
+        local out = {}
+        for _, s in ipairs(Goals.spareKeys(ctx.sight, ctx, u, lock, tile, ctx.blues)) do
+            local m = s.unit
+            out[#out + 1] = { x = m.x, y = m.y, id = m.id, holder = m, lock = lock, key = s.key }
+        end
+        ctx.bagSrc[k] = out
+    end
+    return ctx.bagSrc[k]
+end
+
 local keyWay, turnsFor, turnsOn, strikersNear
 
 -- The goal kind of a recruit a Talk is made to (goals.lua's), carried on the goal tiles the march
@@ -2004,8 +2029,9 @@ turnsFor = function(ctx, u, tile, from, seeking, unlocked)
     return n
 end
 
--- The enemy whose fall gives `u` what opens `lock` at `tile` (keySources), the one on the
--- fewest turns there and on (turnsFor), and those turns; nil when none has a way.
+-- The source of what opens `lock` at `tile` for `u` on the fewest turns there and on
+-- (turnsFor), and those turns; nil when none has a way. A source is an enemy whose fall gives
+-- it the key (keySources) or a teammate whose bag holds it (bagHolders: a Trade, #688).
 keyWay = function(ctx, u, tile, from, lock, seeking)
     if seeking and seeking[lock] then return nil end
     local fetching, best, bestN = withLock(seeking, lock), nil, nil
@@ -2013,6 +2039,16 @@ keyWay = function(ctx, u, tile, from, lock, seeking)
         local a = turnsFor(ctx, u, e, from, fetching)
         local b = a and turnsFor(ctx, u, tile, e, seeking, true)
         if b and (not bestN or a + b < bestN) then best, bestN = e, a + b end
+    end
+    -- a teammate's key (bagHolders): `u` walks to the holder, they Trade, and `u` walks on from
+    -- there. Never the holder's walk to `u`: nothing sends the holder, so that price counted a
+    -- meeting no one walks (vanilla Ch21 s4009, replay t688a: Dozla stood by the (21,18) chest
+    -- four turns, priced 1 turn through Gerik's Chest Key, while Gerik held back and died). The
+    -- holder's hand-over (tradeAct's `gives`) is still offered when it stands beside the taker.
+    for _, h in ipairs(bagHolders(ctx, u, lock, tile)) do
+        local a = turnsFor(ctx, u, h, from, fetching)
+        local b = a and turnsFor(ctx, u, tile, h, seeking, true)
+        if b and (not bestN or a + b < bestN) then best, bestN = h, a + b end
     end
     return best, bestN
 end
@@ -2228,6 +2264,84 @@ local function partyGold(ctx)
         ctx.partyGold = ctx.sight.gold and ctx.sight.gold() or math.huge
     end
     return ctx.partyGold
+end
+
+local trades
+do
+    -- The teammate's key `u`'s way to `tile` is fetched by (keyWay's bagHolders source), on the
+    -- chain stepFor walks: the tile's own lock, else the first locked door on the cheapest way
+    -- (chainTo); nil when the way takes no Trade.
+    local function tradeFor(ctx, u, tile, seeking)
+        local lock = tile and lockAt(ctx, u, tile.x, tile.y)
+        if lock then
+            local e = keyWay(ctx, u, tile, u, lock, seeking)
+            if e and e.holder then return e end
+            return e and tradeFor(ctx, u, e, withLock(seeking, lock)) or nil
+        end
+        local first = chainTo(ctx, u, tile, seeking)[1]
+        if first and first.door and lockAt(ctx, u, first.x, first.y) then
+            return tradeFor(ctx, u, first, seeking)
+        end
+        return nil
+    end
+
+    -- What a taker `u` with a full bag gives back for the item `new`: the item the game's full-bag
+    -- chooser would send (Bot.fullBag over sight.bagFacts), as { id, uses }; nil when everything it
+    -- carries is needed (no Trade) or there is no such read.
+    local function giveBack(ctx, u, new)
+        local facts = ctx.sight.bagFacts and ctx.sight.bagFacts(u, new)
+        if not facts then return nil end
+        local slot = M.fullBag(facts.held, facts.new, false)
+        local it = slot > 0 and u.items[slot]
+        return it and { id = it.id, uses = it.uses } or nil
+    end
+
+    -- `actor`'s Trade with `other` that moves the key `h` (a bagHolders source) to its taker: the
+    -- actor takes it from the holder, or (`gives`) the actor is the holder and hands it over. From
+    -- the safest wait tile the gate allows where the game's Trade command lists `other`
+    -- (ItemSubMenu_IsTradeAvailable: an adjacent ally, before any Canto move). The taker gives one
+    -- back only with a full bag (giveBack); nil when it would give nothing. The game returns to the
+    -- unit menu after a Trade (UNIT_ACTION_TRADED); the act ends with a Wait, which earns no Canto
+    -- (TryMakeCantoUnit), as Supply's Take does.
+    local function tradeAct(ctx, actor, other, h, gives, gate)
+        local s = ctx.sight
+        if not s.offers then return nil end
+        local taker = gives and other or actor
+        local back
+        if #(taker.items or {}) >= Board.ITEM_COUNT then
+            back = giveBack(ctx, taker, { id = h.key.id, uses = h.key.uses })
+            if not back then return nil end
+        end
+        local tiles = s.offers(actor, waitTiles(ctx, actor), "trade", other)
+        local best = safest(ctx, actor, gated(ctx, actor, tiles, gate))
+        if not best then return nil end
+        local a = action(actor, best, "trade", other)
+        a.item, a.uses, a.lock, a.back, a.gives = h.key.id, h.key.uses, h.lock, back, gives or nil
+        return a
+    end
+
+    -- Each unit's Trade (tradeFor on its goal), read once a decision: every unit's proposals ask
+    -- every teammate's.
+    local function need(ctx, u, objective)
+        ctx.tradeNeed = ctx.tradeNeed or {}
+        if ctx.tradeNeed[u.id] == nil then
+            ctx.tradeNeed[u.id] = tradeFor(ctx, u, goalFor(ctx, u, objective)) or false
+        end
+        return ctx.tradeNeed[u.id] or nil
+    end
+
+    -- The Trades on the army's key ways (#688): `u` takes the key its own way is fetched by
+    -- (tradeFor), and, holding one, hands it to each teammate whose way is fetched by it.
+    trades = function(ctx, u, gate, objective)
+        local out = {}
+        local h = need(ctx, u, objective)
+        out[#out + 1] = h and tradeAct(ctx, u, h.holder, h, false, gate)
+        for _, t in ipairs(ctx.blues or {}) do
+            local n = t.id ~= u.id and not t.dead and need(ctx, t, objective)
+            if n and n.holder.id == u.id then out[#out + 1] = tradeAct(ctx, u, t, n, true, gate) end
+        end
+        return out
+    end
 end
 
 -- Whether the game lets `u` Talk to `t` (sight.canTalk), asked once per pair per decide.
@@ -3195,6 +3309,16 @@ local function exploring(ctx, sent, barred, triedIn)
     local function ownOpener(u, t)
         return u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)
     end
+    -- Whether `u` is as sure of opening `t` as an opener: it opens it itself, or a teammate spares
+    -- it the key (Goals.spareKey: a Trade hands it over, #688). A key an enemy's fall gives is not
+    -- sure, so that unit pairs after the openers. Vanilla Ch21 s4009 (`t688c`): once Eirika's
+    -- trip to the (2,18) chest stalled, ten units could take her Chest Key, but Gerik, holding his
+    -- own from turn 3 in the north, five turns off, was paired first and never got there.
+    local function sure(u, t)
+        if ownOpener(u, t) then return true end
+        local lock = t.kind == "chest" and lockAt(ctx, u, t.x, t.y)
+        return lock and #bagHolders(ctx, u, lock, t) > 0 or false
+    end
     local function reaches(u, t)
         if ownOpener(u, t) then return marchLength(ctx, u, t) end
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
@@ -3332,11 +3456,14 @@ local function exploring(ctx, sent, barred, triedIn)
     for id in pairs(triedIn or {}) do
         if quiet[id] then triedOn(id) end
     end
+    -- a spare key (Goals.spareKey) reads `tried`, which was empty for every price read before
+    -- this decision's exploring (stepsToward, releasesOf): those prices are read again
+    if next(tried) then ctx.keyTurns, ctx.bagSrc, ctx.tradeNeed = {}, nil, nil end
     for _, keyless in ipairs({ false, true }) do
         for _, g in ipairs(sent or {}) do
             local t, u = open[tileKey(g.x, g.y)], blues[g.id]
             if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-                and ownOpener(u, t) ~= keyless and not isBarred(barred, u.id, t) then
+                and sure(u, t) ~= keyless and not isBarred(barred, u.id, t) then
                 if not u.acted and quiet[t.id] and not triedOn(t.id)[u.id] then
                     triedOn(t.id)[u.id] = true
                 elseif reaches(u, t) and worthSending(ctx, u, t)
@@ -3347,10 +3474,11 @@ local function exploring(ctx, sent, barred, triedIn)
         end
     end
     -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
-    -- slow one would lose), the nearer on a tie; the units that open the tile themselves
-    -- first, then the keyless ones take what is left (a chest only an enemy's key opens for
-    -- them goes to an opener, but two chests still go to two units while one opener is
-    -- free for one: ch23's win took its chests in parallel that way), and last the unit a
+    -- slow one would lose), the nearer on a tie; the units sure to open the tile (sure: their
+    -- own key, or a teammate's spare one) first, then the keyless ones take what is left (a
+    -- chest only an enemy's key opens for them goes to an opener, but two chests still go to
+    -- two units while one opener is free for one: ch23's win took its chests in parallel that
+    -- way), and last the unit a
     -- stalled pair just dropped, when no other is left to take its goal
     local byOpen = { {}, {}, {} }
     for _, t in ipairs(openTiles(ctx)) do
@@ -3360,7 +3488,7 @@ local function exploring(ctx, sent, barred, triedIn)
                 local v, c, turns = sendWorth(ctx, u, t)
                 if worthSending(ctx, u, t) then
                     local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
-                        or byOpen[ownOpener(u, t) and 1 or 2]
+                        or byOpen[sure(u, t) and 1 or 2]
                     list[#list + 1] = { t = t, u = u, d = d, v = v, turns = turns }
                 end
             end
@@ -3619,6 +3747,7 @@ local function proposeOne(ctx, u)
     add(breach(ctx, u, open, objective), "breach")
     for _, a in ipairs(wallStrikes(ctx, u, open, objective)) do add(a, "breach") end
     add(supplyKey(ctx, u, open, objective), "supply")
+    for _, a in ipairs(trades(ctx, u, open, objective)) do add(a, "trade") end
     for _, t in ipairs(ctx.onField) do
         if t.faction ~= "blue" then add(talkFrom(ctx, u, t, open), "talk") end
     end

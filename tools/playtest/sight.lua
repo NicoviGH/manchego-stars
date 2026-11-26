@@ -202,6 +202,11 @@
 --                            a downed unit's last item to the blue unit that downs it
 --                            (bmmind.c, GetUnitLastItem) -- and `u` holding that item passes
 --                            GetUnitKeyItemSlotForTerrain (a lockpick only for a thief).
+--   bagKey(u, m, terrain)    the first { id, uses, slot } in teammate `m`'s bag that opens `terrain`
+--                            for `u` (GetUnitKeyItemSlotForTerrain, as u): what a Trade hands u.
+--   bagFacts(u, new)         { held, new }: the game's facts of u's bag and of item `new` (the
+--                            harness's unitItemFacts, outer.itemFacts) that Bot.fullBag weighs;
+--                            nil with no such read.
 --   explorable()             the villages and chests still open now: { x, y, kind =
 --                            "visit"|"chest", house (a Visit whose entry has flag 0) } per tile whose Visit or Chest command (read with
 --                            the Seize tile) GetAvailableTileEventCommand still returns -- a
@@ -221,7 +226,9 @@
 --                            a weapon CanUnitUseWeaponNow allows (MakeTargetListForWeapon: the
 --                            unit or the wall still standing), heals() for a staff, CanUnitUseItem
 --                            for an item, and Talk/Door/Visit/Chest/Seize's *Usability with
---                            Talk's target in its list. nil = legal, else why not. A kept plan
+--                            Talk's target in its list; a Trade's (ItemSubMenu_IsTradeAvailable)
+--                            with its target listed and the items it names still in the bags.
+--                            nil = legal, else why not. A kept plan
 --                            plays its next act on this word, not its own (Planner.surprise).
 --   strikeWall(u, o, x, y)   `u`'s strike from (x, y) on the wall o = { x, y, hp }, as the
 --                            Attack menu forecasts it (InitObstacleBattleUnit, then
@@ -305,6 +312,7 @@ M.LOCK_TERRAIN = { doors = M.TERRAIN_DOOR, chests = M.TERRAIN_CHEST_FULL }
 M.LOCK_KIND = { [M.TILE_COMMAND_CHEST] = "chests", [M.TILE_COMMAND_DOOR] = "doors" }
 M.ITEM_BOOSTER_SKL = 0x5D    -- include/constants/items.h: ADR 0379's line, the first booster
 M.MENU_ENABLED = 1           -- include/uimenu.h
+M.BMST_TAKEN_ACTION = 0x3D    -- include/types.h struct BmSt +3D taken_action
 M.MENU_NOTSHOWN = 3
 M.FACTION_MASK = 0xC0        -- include/bmunit.h: a unit index's faction bits (blue 0x00)
 M.EVFLAG_WIN = 3             -- the same; the completion flag of a win event
@@ -5038,6 +5046,30 @@ function M.new(outer)
         return M.convoyKey(Board, mem, S, u, function(id) return opensWith(u, id, terrain) end)
     end
 
+    -- The first item of teammate `m`'s bag that would open `terrain` for `u` (opensWith: the
+    -- game's own key check, as `u`), { id, uses, slot (0-based) }, or nil: what a Trade between
+    -- the two would hand `u` for that lock (a thief's Lockpick opens nothing for a non-thief).
+    function s.bagKey(u, m, terrain)
+        for k, it in ipairs(m.items or {}) do
+            if opensWith(u, it.id, terrain) then return { id = it.id, uses = it.uses, slot = k - 1 } end
+        end
+        return nil
+    end
+
+    -- What Bot.fullBag weighs of `u`'s bag and of the item `new` ({ id, uses }) handed to it:
+    -- { held = { facts }, new = facts }, the game's facts (outer.itemFacts, the harness's
+    -- INSPECT.unitItemFacts), or nil with no such read. A Trade into a full bag gives back
+    -- what the game's full-bag chooser would send (Bot.giveBack).
+    function s.bagFacts(u, new)
+        if not outer.itemFacts then return nil end
+        return sandbox(function(call)
+            local out = { held = {} }
+            for _, it in ipairs(u.items or {}) do out.held[#out.held + 1] = outer.itemFacts(call, u.addr, it) end
+            out.new = outer.itemFacts(call, u.addr, new)
+            return out
+        end)
+    end
+
     -- (like opensDoor: the bot asks the one lock, not the terrain)
     function s.opensChest(u) return s.opens(u, M.LOCK_TERRAIN.chests) end
     function s.isChestLock(terrain) return terrain == M.LOCK_TERRAIN.chests end
@@ -5173,7 +5205,8 @@ function M.new(outer)
     local MENU_CHECK = { talk = "TalkCommandUsability", door = "DoorCommandUsability",
                          visit = "VisitCommandUsability", chest = "ChestCommandUsability",
                          seize = "UnitActionMenu_CanSeize", rescue = "RescueUsability",
-                         drop = "DropUsability", supply = "SupplyUsability" }
+                         drop = "DropUsability", supply = "SupplyUsability",
+                         trade = "ItemSubMenu_IsTradeAvailable" }
 
     -- whether the last target list built holds unit `id`, or the tile `at` with uid `uid` (a
     -- wall's is 0, a door's TERRAIN_DOOR: TryAddClosedDoorToTargetList)
@@ -5194,6 +5227,9 @@ function M.new(outer)
     -- Inside a sandbox with the unit active: the unit menu's own check for `act` is enabled
     -- and, given a target, the list it built holds it (a unit by its id, a door by its tile).
     local function menuOffers(call, act, target)
+        -- Trade is shown once a selection (BM_TAKEN_ACTION_TRADE): the game clears the flags
+        -- when a unit is selected (bmunit.c), as the unit asked about would be
+        if act == "trade" then api.write8(S.gBmSt + M.BMST_TAKEN_ACTION, 0) end
         if call(S[MENU_CHECK[act]], { 0, 0 }) ~= M.MENU_ENABLED then return false end
         if not target then return true end
         if act == "door" then return listed(call, nil, target, M.TERRAIN_DOOR) end
@@ -5274,6 +5310,28 @@ function M.new(outer)
         end)
     end
 
+    -- Whether a Trade act `a` of `u`'s still finds its items where it names them: the item
+    -- (`item`, `uses`) in the holder's bag (`u`'s own with a.gives, else the target's), and
+    -- the taker with room, or holding the item it gives back (`back`).
+    local function tradeHolds(u, a)
+        local t
+        for _, o in ipairs(units()) do
+            if o.id == a.targetId then t = o end
+        end
+        if not t then return false end
+        local holder, taker = t, u
+        if a.gives then holder, taker = u, t end
+        local function has(bag, id, uses)
+            for _, it in ipairs(bag or {}) do
+                if it.id == id and it.uses == uses then return true end
+            end
+            return false
+        end
+        if not has(holder.items, a.item, a.uses) then return false end
+        if a.back then return has(taker.items, a.back.id, a.back.uses) end
+        return #(taker.items or {}) < Board.ITEM_COUNT
+    end
+
     function s.legal(a, u)
         local x, y = a.move.x, a.move.y
         local reached = false
@@ -5310,6 +5368,10 @@ function M.new(outer)
                 local key = s.convoyKey(u, a.terrain)
                 return menuOffers(call, "supply") and key ~= nil and key.id == a.item
                     and key.uses == a.uses
+            elseif a.act == "trade" then
+                -- the Trade command lists the other unit, and the bags still hold what the act
+                -- names: the item with its holder, and the item given back with the taker
+                return menuOffers(call, "trade", { id = a.targetId }) and tradeHolds(u, a)
             elseif a.act == "drop" then
                 return call(S[MENU_CHECK.drop], { 0, 0 }) == M.MENU_ENABLED
                     and listed(call, nil, a.dropAt)   -- a drop tile's uid is 0 (TryAddToDropTargetList)

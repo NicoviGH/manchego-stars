@@ -3019,6 +3019,28 @@ do
           "convoyKey: no chest key into a full bag")
 end
 
+-- Trade (#688): the act is the game's unit-menu Trade (ItemSubMenu_IsTradeAvailable), asked with
+-- the selection's taken-action flags cleared as the game clears them for a selected unit, its
+-- target listed (MakeTradeTargetList), and legal only while the bags still hold what it names.
+do
+    check(sightSrc:find('trade = "ItemSubMenu_IsTradeAvailable"', 1, true) ~= nil, true,
+          "trade: the menu check is the game's Trade usability")
+    local at = sightSrc:find("local function menuOffers(call, act, target)", 1, true)
+    local body = at and sightSrc:sub(at, sightSrc:find("\n    end\n", at, true)) or ""
+    check(body:find('if act == "trade" then api.write8(S.gBmSt + M.BMST_TAKEN_ACTION, 0) end', 1, true) ~= nil,
+          true, "trade: the check reads a fresh selection's taken-action flags")
+    at = sightSrc:find('elseif a.act == "trade" then', 1, true)
+    local branch = at and sightSrc:sub(at, sightSrc:find("elseif", at + 10, true)) or ""
+    check(branch:find('menuOffers(call, "trade", { id = a.targetId }) and tradeHolds(u, a)', 1, true) ~= nil,
+          true, "legal: a Trade is legal while the game lists its ally and the bags hold its items")
+    at = sightSrc:find("local function tradeHolds(u, a)", 1, true)
+    body = at and sightSrc:sub(at, sightSrc:find("\n    end\n", at, true)) or ""
+    check(body:find("if a.back then return has(taker.items, a.back.id, a.back.uses) end", 1, true) ~= nil
+          and body:find("return #(taker.items or {}) < Board.ITEM_COUNT", 1, true) ~= nil, true,
+          "legal: the taker gives back the item it names, or has room")
+    check(Sight.BMST_TAKEN_ACTION, 0x3D, "trade: BmSt +3D taken_action (include/types.h)")
+end
+
 -- keyOpens / keyReader / opensAnyLock (#699): the game's key check read for both locks, on a
 -- mocked bag. The game answers GetUnitKeyItemSlotForTerrain with slot 0 for a key in the first
 -- slot, as the real one does: a Chest Key (0x69) opens a chest, a Door Key (0x6B) a door, and a

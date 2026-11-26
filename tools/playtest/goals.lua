@@ -228,6 +228,34 @@ function M.scriptedCloses(sight, ctx, board, out, paths, memory)
     return outCopy or out, pathCopy or paths
 end
 
+-- The key teammate `m` could hand `u` by Trade for the chest at `tile` locked to `u` by `lock`
+-- (sight.bagKey: the game's own key check, as `u`), or nil: the one test of a teammate's key,
+-- for Bot's keyWay and Goals.list's takers alike (#688, ADR 0479). Only once `m` has been sent
+-- to that chest and it stalled (`ctx.tried`, Bot's exploring: the units a stalled chest was
+-- taken from): a holder opens its own chest itself and the job matcher already weighs it there,
+-- so pricing its key as every teammate's way too priced each chest 2-5 turns nearer for the whole
+-- army (replay t688b, vanilla Ch21 s4009: the two Chest Keys were Eirika's and Dozla's, the two
+-- chest jobs' own takers). Never a door's: a holder opens the door itself, and its escort is
+-- already every unit's way (Bot's doorMates).
+function M.spareKey(sight, ctx, u, m, lock, tile)
+    if not (sight.bagKey and sight.isChestLock and sight.isChestLock(lock)) then return nil end
+    if m.id == u.id or m.dead then return nil end
+    local tried = ctx and ctx.tried and ctx.tried["chest:" .. key(tile.x, tile.y)]
+    if not (tried and tried[m.id]) then return nil end
+    return sight.bagKey(u, m, lock)
+end
+
+-- Each of `units` that spares `u` the key for the chest at `tile` (M.spareKey), with that key:
+-- { { unit, key } }, in `units`' order. The one list Bot's bagHolders and Goals.list's takers read.
+function M.spareKeys(sight, ctx, u, lock, tile, units)
+    local out = {}
+    for _, m in ipairs(units or {}) do
+        local k = M.spareKey(sight, ctx, u, m, lock, tile)
+        if k then out[#out + 1] = { unit = m, key = k } end
+    end
+    return out
+end
+
 -- The villages and chests still open, each with its worth in gold and when it closes:
 -- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
 -- is sent where by it.
@@ -362,7 +390,11 @@ function M.list(board, sight, style, ctx)
             -- a chest whose key an enemy drops (sight.keySources): its turns run by way of
             -- that enemy (Bot's turnsTo), so its chance says whether that way is worth it
             local lock = g.kind == "chest" and sight.locked and sight.locked(u, g.tile.x, g.tile.y)
-            return lock and sight.keySources ~= nil and #sight.keySources(u, lock) > 0 or false
+            if not lock then return false end
+            if sight.keySources ~= nil and #sight.keySources(u, lock) > 0 then return true end
+            -- or whose key a teammate spares (M.spareKey): the game's Trade hands it over
+            -- (Bot's trades, #688; vanilla Ch21's Chest Key on Eirika, who held back, R4 #768)
+            return #M.spareKeys(sight, ctx, u, lock, g.tile, blues) > 0
         end)
         goals[#goals + 1] = g
     end

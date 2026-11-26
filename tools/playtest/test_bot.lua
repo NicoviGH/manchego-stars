@@ -539,6 +539,9 @@ local function sightOf(o)
         local may = act == "door" and (o.openers or {})[u.id] == true
             or act == "talk" and s.canTalk ~= nil and s.canTalk(u, target)
             or act == "rescue" and ((o.rescue or {})[u.id] or {})[target.id] == true
+            -- Trade (ItemSubMenu_IsTradeAvailable) lists an adjacent ally, unless o.noTrade
+            -- names the unit (a Phantom, a supply unit: the game's own NOTSHOWN)
+            or act == "trade" and not (o.noTrade or {})[u.id]
         local out = {}
         for _, t in ipairs(tiles) do
             -- Supply (SupplyUsability) has no target: the tiles o.supplyAt holds ("x,y")
@@ -557,6 +560,17 @@ local function sightOf(o)
             return ((lock == nil) and (o.convoyKey or {}) or (o.convoyChestKey or {}))[u.id]
         end
         s.opensChest = function(u) return (o.chestOpeners or {})[u.id] == true end
+    end
+    -- what a teammate's bag holds that opens a lock for a unit (sight.bagKey):
+    -- o.bagKey[taker id][holder id][lock] = { id, uses, slot }
+    if o.bagKey then
+        s.bagKey = function(u, m, lock) return ((o.bagKey[u.id] or {})[m.id] or {})[lock] end
+    end
+    -- the game's facts of a unit's bag and of a new item (sight.bagFacts): o.bagFacts[id] = held
+    if o.bagFacts then
+        s.bagFacts = function(u, new)
+            return { held = o.bagFacts[u.id], new = { id = new.id, kind = "key", uses = new.uses } }
+        end
     end
     -- the Drop list (MakeDropTargetList): from each tile, its neighbours o.dropOn holds ("x,y")
     if o.dropOn then
@@ -4728,6 +4742,132 @@ do
     G.acted = false
     goals = run({ [0x02] = true }, nil, { stuck = {} })
     check(goals[0x02] and goals[0x02].door, true, "door mate: unbarred, the same G is sent")
+end
+
+-- The trade fixture (#688, ADR 0479; vanilla Ch21: the Chest Keys sat on units that held back):
+-- the chest at (4,0) is locked to A, and K's bag holds a Chest Key that opens it for A. A
+-- reaches (0,0) and (1,0); K stands at (1,1), beside (1,0). STALLED is the board where K was
+-- sent to that chest and it stalled (Bot's exploring: quietGoals and the units tried on it).
+local STALLED = { tried = { ["chest:4,0"] = { [0x02] = true } }, quietGoals = { ["chest:4,0"] = true } }
+local function tradeFixture()
+    local A = blue(0x01, 0, 0, 0)
+    local K = blue(0x02, 1, 1, 1, { items = { { id = 0x69, uses = 1 } } })
+    local E = red(0x81, 0, 9, { minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 1, 1 }) },
+        doors = {}, obstacles = {},
+        locked = { [0x01] = { ["4,0"] = "chest" } },
+        explorable = { { x = 4, y = 0, kind = "chest" } },
+        canExplore = { [0x02] = { ["4,0"] = "chest" } },
+        bagKey = { [0x01] = { [0x02] = { chest = { id = 0x69, uses = 1, slot = 0 } } } },
+    }
+    return A, K, E, o
+end
+local function tradesOf(cands, id)
+    local out = {}
+    for _, c in ipairs(cands) do
+        if c.unit.id == id then
+            for _, a in ipairs(c.acts) do
+                if a.act == "trade" then out[#out + 1] = a end
+            end
+        end
+    end
+    return out
+end
+
+-- test_a_holders_own_chest_key_is_no_teammates_way (#688, replay t688b): K opens the chest
+-- itself and its trip has not stalled, so its key is no way for A: no Trade, and A has no way
+-- to the chest (pricing it as A's too put every chest 2-5 turns nearer for the whole army).
+do
+    local A, K, E, o = tradeFixture()
+    local cands, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    check(ctx.turnsTo(A, { x = 4, y = 0 }), nil, "not spare: K's own chest key is no way for A")
+    check(#tradesOf(cands, 0x01) + #tradesOf(cands, 0x02), 0, "not spare: and no Trade is offered")
+end
+
+-- test_a_stalled_holders_key_is_a_way_by_trade (#688): once K's trip to the chest stalled, its
+-- key is A's way: A takes it from (1,0), beside K, and K, which reaches no tile beside A, hands
+-- nothing. When K reaches a tile beside A it hands the key over. Where the game's Trade lists no
+-- one (a Phantom: o.noTrade), none is offered.
+do
+    local A, K, E, o = tradeFixture()
+    local cands, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    check(ctx.turnsTo(A, { x = 4, y = 0 }) ~= nil, true, "spare: the chest has a way through K's key")
+    local t = tradesOf(cands, 0x01)[1]
+    check(t and string.format("%d,%d>%d %dx%d %s", t.move.x, t.move.y, t.targetId, t.item, t.uses,
+        tostring(t.gives)), "1,0>2 105x1 nil", "trade: A takes K's Chest Key from beside K")
+    check(t and t.back, nil, "trade: with room in its bag A gives nothing back")
+    check(#tradesOf(cands, 0x02), 0, "trade: K reaches no tile beside A, so it hands nothing")
+    o.reach[0x02] = tiles({ 1, 1 }, { 1, 0 })
+    o.reach[0x01] = tiles({ 0, 0 })
+    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    local g = tradesOf(cands, 0x02)[1]
+    check(g and string.format("%d,%d>%d %d %s", g.move.x, g.move.y, g.targetId, g.item, tostring(g.gives)),
+          "1,0>1 105 true", "trade: K walks to A and hands its key over")
+    o.noTrade = { [0x01] = true, [0x02] = true }
+    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    check(#tradesOf(cands, 0x01) + #tradesOf(cands, 0x02), 0, "trade: none where the game lists no Trade")
+end
+
+-- test_a_spare_key_is_read_after_a_stuck_recheck (#783 re-review): a stuck record on A's chest is
+-- tested again before exploring (opts.stuck), while `tried` is still empty, so that read finds no
+-- spare key. The decision reads the price again once `tried` is seeded: A's way runs through K's
+-- key and the Trade is offered, as with no stuck record.
+do
+    local A, K, E, o = tradeFixture()
+    local opts = { tried = STALLED.tried, quietGoals = STALLED.quietGoals,
+                   stuck = { [B.jobKey(0x01, nil, 4, 0)] = { id = 0x01, x = 4, y = 0, since = 1 } } }
+    local cands, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), opts)
+    check(ctx.turnsTo(A, { x = 4, y = 0 }) ~= nil, true, "stuck recheck: the price sees the spare key")
+    check(#tradesOf(cands, 0x01), 1, "stuck recheck: and A's Trade is offered")
+end
+
+-- test_a_spare_key_taker_pairs_with_the_openers (#688, replay t688c, vanilla Ch21 s4009): once
+-- K's trip to the chest stalled, A (beside K, 1.2 turns by Trade) and G (its own key, 3.8 turns
+-- off) are both sure to open it, and the trip's worth decides: A is sent. With the teammate's key
+-- ranked after every opener, G was sent from five turns off and never got there.
+do
+    local A, K, E, o = tradeFixture()
+    local G = blue(0x03, 2, 14, 9)
+    o.reach[0x03] = tiles({ 14, 9 })
+    o.canExplore[0x03] = { ["4,0"] = "chest" }
+    o.field = fieldsOf { ["4,0"] = { ["14,9"] = 19, ["1,1"] = 4, ["0,0"] = 4, ["1,0"] = 3, ["4,0"] = 0 } }
+    local _, ctx = B.candidates(boardOf(A, K, G, E), sightOf(o), style("careful"), STALLED)
+    check(ctx.exploreGoal[0x01] and (ctx.exploreGoal[0x01].x .. "," .. ctx.exploreGoal[0x01].y), "4,0",
+          "spare taker: A, by Trade from beside K, is sent before the far opener G")
+    check(ctx.exploreGoal[0x03] == nil, true, "spare taker: and G is not sent to it")
+end
+
+-- test_a_teammates_key_is_priced_by_the_takers_walk (#688, replay t688a: Dozla was priced 1 turn
+-- from the (21,18) chest through Gerik's Chest Key, with Gerik walking to him; nothing sent Gerik,
+-- who held back and died). K, at (14,0), spares the key. The way is A's own walk to K (14 tiles,
+-- MOV 5: 2.8 turns) and on to the chest (10: 2), never K's walk to A (2.8) plus A's (0.8).
+do
+    local A, K, E, o = tradeFixture()
+    K.x, K.y = 14, 0
+    o.reach[0x02] = tiles({ 14, 0 })
+    local _, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    local n = ctx.turnsTo(A, { x = 4, y = 0 })
+    check(n and string.format("%.1f", n), "4.8", "trade price: the taker walks to the holder and on")
+end
+
+-- test_a_full_bag_gives_one_back (#688): A's bag is full. The Trade gives back what the game's
+-- full-bag chooser would send (Bot.fullBag: money first), and with everything it carries needed
+-- no Trade is offered.
+do
+    local A, K, E, o = tradeFixture()
+    A.items = { { id = 0x6A, uses = 1 }, { id = 0x01, uses = 40 }, { id = 0x7F, uses = 1 },
+                { id = 0x6C, uses = 3 }, { id = 0x02, uses = 30 } }
+    local key = { kind = "key" }
+    o.bagFacts = { [0x01] = { key, { kind = "weapon", usable = true, type = "sword", rank = 1 },
+                              { kind = "money" }, { kind = "heal", uses = 3 },
+                              { kind = "weapon", usable = true, type = "lance", rank = 1 } } }
+    local cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    local t = tradesOf(cands, 0x01)[1]
+    check(t and t.back and (t.back.id .. "x" .. t.back.uses), "127x1", "full bag: A gives back its money")
+    o.bagFacts[0x01][3] = { kind = "passive" }
+    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    check(#tradesOf(cands, 0x01), 0, "full bag: everything carried is needed, no Trade")
 end
 
 -- test_goal_turns_are_read_once_per_decision: the planner asks the same unit, tile and start

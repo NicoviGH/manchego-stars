@@ -169,6 +169,31 @@ a = action(supply, "close_supply")
 check(a and a.key, "B", "B leaves the convoy (PrepItemSupply_Loop_GiveTakeKeyHandler)")
 check(action(supply, "cursor_down"), nil, "and the map cursor is not offered while it is up")
 
+-- The Trade screen (#688): above the map it locks, its two key loops named, and its hand's
+-- moves the game's (TradeMenu_UpdateSelection: LEFT only from the right bag, RIGHT from the left).
+local trade = {
+    procs = { trade_menu = { idle = "trade_pick_input" }, player_phase = { idle = "player_main_idle" } },
+    trade = { column = 0, row = 0, holding = false },
+}
+classify(trade, "trade_menu", "the Trade screen outranks the map underneath it")
+check(action(trade, "trade_left"), nil, "no LEFT from the left bag")
+check((action(trade, "trade_right") or {}).key, "RIGHT", "RIGHT crosses to the other bag")
+check((action(trade, "trade_choose") or {}).key, "A", "A picks the cell under the hand")
+check((action(trade, "trade_close") or {}).key, "B", "B ends the screen")
+check(action(trade, "cursor_down"), nil, "and the map cursor is not offered while it is up")
+trade.procs.trade_menu.idle, trade.trade = "trade_place_input", { column = 1, row = 2, holding = true }
+classify(trade, "trade_menu", "holding a cell is the same screen")
+check((action(trade, "trade_left") or {}).key, "LEFT", "LEFT crosses back from the right bag")
+check((action(trade, "trade_release") or {}).key, "B", "B lets the held cell go")
+check(action(trade, "trade_close"), nil, "and B does not end the screen while a cell is held")
+classify({ procs = { trade_menu = { idle = "0x08000000" } }, trade = { column = 0, row = 0 } },
+    "transition", "a Trade screen drawing or ending takes no input")
+local tradeSel = {
+    procs = proc("target_selection", "target_selection_input"),
+    target = { kind = "trade", x = 1, y = 1, uid = 3, extra = 0 },
+}
+classify(tradeSel, "target_selection", "the Trade command's selector is a target selection")
+
 -- The shop's item list (#510 step 9 PR E): above the map it blocks, and its bounds are the list's.
 local shop = {
     procs = { shop = { idle = "shop_buy_input" }, player_phase = { idle = "player_main_idle" } },

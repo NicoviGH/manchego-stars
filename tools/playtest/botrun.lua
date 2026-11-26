@@ -869,6 +869,9 @@ function M.run(api)
                   -- every Talk made: the harness's entry (turn, unit, target, asked, spent: a
                   -- paid recruit's question and its gold, #679) and whether the target joined
                   talks = {},
+                  -- every Trade made (#688): the harness's entry (turn, from, to: charIds; the
+                  -- item handed over and the one given back, if any)
+                  trades = {},
                   board_repeats = 0, arrivals_seen = {}, enemies_seen = {},
                   -- the planner's lookahead, summed over the attempt (FR-018): decisions
                   -- planned, triggered, extended, skipped for budget, its calls and CPU
@@ -1129,6 +1132,12 @@ function M.run(api)
             rec.bag[#rec.bag + 1] = b
             trace({ t = "bag", charId = b.charId, item = b.item, sent = b.sent,
                     discard = b.discard, why = b.why })
+        end
+        -- each Trade the harness made (api.trades, #688): who handed which item to whom
+        for _, t in ipairs(api.trades and api.trades() or {}) do
+            rec.trades[#rec.trades + 1] = t
+            trace({ t = "trade", turn = t.turn, from = t.from, to = t.to, item = t.item,
+                    back = t.back })
         end
         for _, d in ipairs(api.drops and api.drops() or {}) do
             explore.dropped(d)
@@ -1641,6 +1650,9 @@ function M.run(api)
                 local price = Bot.hirePrice(sight, u, t)
                 if price > 0 then a.hirePrice = price end
             end
+            -- a Trade's items are the way's (Bot's trades), never in its key: one no candidate
+            -- offers is no act
+            if a.act == "trade" then return nil end
             pin.unoffered[#pin.unoffered + 1] = k
             a.unit = u.charId
             if a.targetId then a.target = byIdNow[a.targetId] and byIdNow[a.targetId].charId end
@@ -2122,12 +2134,13 @@ function M.run(api)
                 end
                 if not trapped and not unrecruited and (action.act == "visit" or action.act == "chest"
                         or action.act == "talk" or action.act == "rescue" or action.act == "drop"
-                        or action.act == "supply") then
+                        or action.act == "supply" or action.act == "trade") then
                     progressed = true
                 end
                 if not trapped and not unrecruited then
                     if action.act == "visit" or action.act == "chest" or action.act == "talk"
-                        or action.act == "door" or action.act == "seize" or action.act == "supply" then
+                        or action.act == "door" or action.act == "seize" or action.act == "supply"
+                        or action.act == "trade" then
                         markEvent(action.act)
                     elseif action.act == "attack" and action.obstacle
                         and action.obstacle.blow and action.obstacle.blow.dealt

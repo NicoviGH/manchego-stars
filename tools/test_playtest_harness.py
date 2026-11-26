@@ -199,6 +199,46 @@ class TestAwaitControllerState(unittest.TestCase):
         camp = _block(harness, 'INSPECT.campaignApi = function(game)', 'local seed = ')
         self.assertIn('INSPECT.onFullBag = INSPECT.answerFullBag', camp)
 
+    def test_a_trade_drives_the_real_trade_screen(self):
+        # #688: a teammate's key is handed over on the game's own Trade screen, never by
+        # writing the bags. The act opens Trade's ally selector, confirms the ally into the
+        # screen, walks the screen's hand to the holder's item and A holds it, walks it to the
+        # taker's cell and A swaps the two (TradeMenu_ApplyItemSwap), reads the bags after, and
+        # B gives the unit menu back for the Wait.
+        harness = _read_harness()
+        act = _block(harness, 'elseif a.act == "trade" then', 'elseif a.act == "seize" then')
+        self.assertIn('INSPECT.trade(a, u)', act)
+        self.assertIn('return chooseWait(', act)
+        body = _block(harness, 'INSPECT.trade = function(a, actor)', '\nend\n')
+        self.assertNotIn('write16', body, 'the bags move by the screen, not by writes')
+        self.assertRegex(body, r'selectSemantic\("trade",[\s\S]*?after\.target\.kind == "trade"')
+        self.assertRegex(body, r'guardedInput\("confirm_target", "A",[\s\S]*?== "trade_menu"')
+        hold = body.index('"the item is held"')
+        swap = body.index('"the two cells swap"')
+        self.assertLess(body.index('handTo(hcol, hslot)'), hold)
+        self.assertLess(hold, body.index('handTo(tcol, tslot)'))
+        self.assertLess(body.index('handTo(tcol, tslot)'), swap)
+        # the screen's postcondition: the item moved, and the given-back one the other way
+        after = body[swap:]
+        self.assertIn('count(takerNow, a.item, a.uses) == count(takerWas, a.item, a.uses) + 1', after)
+        self.assertIn('count(holderNow, a.back.id, a.back.uses)', after)
+        self.assertLess(after.index('if not moved then'), after.index('guardedInput("trade_close", "B"'))
+        self.assertRegex(after, r'guardedInput\("trade_close", "B",[\s\S]*?== "unit_command_menu"')
+        self.assertIn('INSPECT.tradeLog[#INSPECT.tradeLog + 1]', after)
+        # the screen is observed: its proc, its two key loops and the hand's cell
+        self.assertIn('put("trade_menu", tradeProc)', harness)
+        self.assertIn('[SYM.TradeMenu_OnLoopUnselected] = "trade_pick_input"', harness)
+        self.assertIn('[SYM.TradeMenu_OnLoopSelected] = "trade_place_input"', harness)
+        self.assertIn('elseif routines == SYM.gSelectInfo_Trade then kind = "trade"', harness)
+        self.assertRegex(harness, r'column = ru8\(tradeProc\.addr \+ 0x41\), row = ru8\(tradeProc\.addr \+ 0x42\)')
+        with open(os.path.join(REPO, 'tools/playtest/gen_symbols.py'), encoding='utf-8') as fh:
+            syms = fh.read()
+        for name in ('gSelectInfo_Trade', 'ProcScr_TradeMenu', 'TradeMenu_OnLoopUnselected',
+                     'TradeMenu_OnLoopSelected', 'ItemSubMenu_IsTradeAvailable'):
+            self.assertIn("'%s'" % name, syms)
+        # and recorded: botrun reads api.trades into the chapter record
+        self.assertIn('trades = function() return unread(INSPECT.tradeLog) end', harness)
+
     def test_a_talks_question_is_answered_in_the_talk_acts_wait(self):
         # #679: vanilla E_14's Eirika-Rennac talk asks a yes/no question (the paid recruit) and
         # the wait never answered it. The Talk act passes `talk` to awaitActed, whose wait hands
@@ -626,10 +666,10 @@ class TestUnitStateBits(unittest.TestCase):
 class TestStepTargetSaysWhy(unittest.TestCase):
     def test_every_act_that_steps_a_target_hands_the_reason_up(self):
         # The wording is unit-tested in test_controller.lua (Controller.targetNotOffered); only
-        # the emulator runs stepTarget, so this is the wiring: the four callers (talk, attack,
-        # staff, rescue/drop) go through stepThen, none calls stepTarget bare (#654).
+        # the emulator runs stepTarget, so this is the wiring: the five callers (talk, attack,
+        # staff, rescue/drop, trade) go through stepThen, none calls stepTarget bare (#654).
         text = open(os.path.join(REPO, 'tools', 'playtest', 'harness.lua')).read()
-        self.assertEqual(text.count('INSPECT.stepThen('), 4)
+        self.assertEqual(text.count('INSPECT.stepThen('), 5)
         self.assertEqual(text.count('INSPECT.stepTarget('), 1, 'only stepThen calls it')
 
 
