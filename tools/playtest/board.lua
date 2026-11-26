@@ -130,6 +130,21 @@ local PHASE = { [0x00] = "blue", [0x40] = "green", [0x80] = "red" }
 local function onFieldState(state, x, y)
     return x >= 0 and y >= 0 and (state & OFF_FIELD) == 0
 end
+Board.onFieldState = onFieldState
+
+-- include/constants/terrains.h
+Board.TERRAIN_ROOF = 0x22
+-- UpdateRoofedUnits' rule (bmtrick.c), the one owner: a unit hidden under a roof
+-- (US_UNDER_A_ROOF, set with US_HIDDEN by UnitHideIfUnderRoof) whose tile's terrain is no roof
+-- now comes out: both bits cleared, US_BIT8 set. -> its new state word, or nil when it stays
+-- as it is (not roofed, or `terrain` still a roof or unknown). sight.unroof applies it in a
+-- sandbox; the planner's re-listing reads a plan's door with it (#766).
+function Board.unroofed(state, terrain)
+    if (state or 0) & Board.US_UNDER_A_ROOF == 0 or terrain == nil or terrain == Board.TERRAIN_ROOF then
+        return nil
+    end
+    return (state & ~(Board.US_UNDER_A_ROOF | Board.US_HIDDEN)) | Board.US_BIT8
+end
 
 -- An item's attack reach, (minRange, maxRange), as bmitem.c GetItemMinRange/GetItemMaxRange read
 -- it (encodedRange >> 4 and & 0xF, read off ItemData with no game call), or nil for a staff /
@@ -715,6 +730,7 @@ function Board.bind(mem, SYM)
         FACTIONS = Board.FACTIONS, UNIT_SIZE = Board.UNIT_SIZE, US_DEAD = Board.US_DEAD, US_HIDDEN = Board.US_HIDDEN,
         US_UNDER_A_ROOF = Board.US_UNDER_A_ROOF, US_NOT_DEPLOYED = Board.US_NOT_DEPLOYED,
         US_HAS_MOVED = Board.US_HAS_MOVED, US_DROP_ITEM = Board.US_DROP_ITEM, US_BIT9 = Board.US_BIT9,
+        US_BIT8 = Board.US_BIT8, TERRAIN_ROOF = Board.TERRAIN_ROOF, unroofed = Board.unroofed,
         US_UNSELECTABLE = Board.US_UNSELECTABLE,
         US_RESCUING = Board.US_RESCUING, US_RESCUED = Board.US_RESCUED, UNIT_RESCUE = Board.UNIT_RESCUE,
         ITEMDATA_STRIDE = Board.ITEMDATA_STRIDE, UNIT_ITEMS = Board.UNIT_ITEMS,

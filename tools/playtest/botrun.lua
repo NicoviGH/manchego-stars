@@ -2012,6 +2012,7 @@ function M.run(api)
                                 gentle = plan and plan.gentle,
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,
+                                jobs = plan and plan.jobs,
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
                                 nearest = plan and plan.nearest,

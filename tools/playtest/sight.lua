@@ -2427,16 +2427,45 @@ end
 -- rectangle (struct MapChange: +01 x, +02 y, +03 w, +04 h, +08 data) into gBmMapBaseTiles, and
 -- its terrain gTilesetTerrainLookup[tile >> 2] into gBmMapTerrain. Done by hand, not by
 -- TriggerMapChanges, whose own writes no journal sees: one plan's open door leaked into every
--- later plan's board (PR #596 review). What it leaves out: the change's enabled bit and a
--- wall's trap (read by no enemy's move), and a roof the change removes (UpdateRoofedUnits;
--- a door or wall is no roof). No change at the tile: nothing.
+-- later plan's board (PR #596 review). Then, as TriggerMapChange does (eventscr_utils.c), the
+-- roofed units the change unroofs come out (M.unroof): a door onto a roofed room shows the
+-- units in it, and the judged phase plays them (#766: vanilla Ch14's (22,17) door unroofs the
+-- corridor that holds Rennac and his squad, and every plan that opened it was judged against an
+-- empty corridor). What it leaves out: the change's enabled bit and a wall's trap (read by no
+-- enemy's move). No change at the tile: nothing.
 function M.openMap(api, call, S, x, y)
     local mem = api.mem
+    local unroofed = false
     for _, t in ipairs(M.mapChangeTiles(mem, call, S, x, y) or {}) do
+        local at = cell(mem, S.gBmMapTerrain, t.x, t.y)
+        unroofed = unroofed or (mem.u8(at) == api.Board.TERRAIN_ROOF and t.terrain ~= api.Board.TERRAIN_ROOF)
         -- a u16 grid: `cell`'s row, two bytes a tile
         api.write16(cell(mem, S.gBmMapBaseTiles, 0, t.y) + t.x * 2, t.tile)
-        api.write8(cell(mem, S.gBmMapTerrain, t.x, t.y), t.terrain)
+        api.write8(at, t.terrain)
     end
+    if unroofed then M.unroof(api, call, S) end
+end
+
+-- Inside a sandbox: UpdateRoofedUnits (bmtrick.c), every write journaled. Each unit whose tile
+-- is no roof now comes out (Board.unroofed: US_HIDDEN | US_UNDER_A_ROOF cleared, US_BIT8 set),
+-- and the entity maps are refreshed (M.refresh, which keeps every unit's state word and the map
+-- pools) so it stands on the unit map and the AI plays it. -> the unit ids it brought out (none:
+-- no refresh).
+function M.unroof(api, call, S)
+    local mem, B = api.mem, api.Board
+    local out, all = {}, {}
+    for _, f in ipairs(B.FACTIONS) do
+        for _, u in ipairs(B.leanList(f.name)) do
+            all[#all + 1] = u
+            local new = u.onMap and B.unroofed(u.state, mem.u8(cell(mem, S.gBmMapTerrain, u.x, u.y)))
+            if new then
+                api.write32(u.addr + UNIT_STATE, new)
+                out[#out + 1] = mem.u8(u.addr + UNIT_INDEX)
+            end
+        end
+    end
+    if #out > 0 then M.refresh(api, call, S, all) end
+    return out
 end
 
 -- The tiles the map change at (x, y) writes, { x, y, tile, terrain } row by row: each non-zero

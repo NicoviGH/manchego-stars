@@ -1434,12 +1434,15 @@ function M.plan(Bot, board, sight, style, opts)
         local gone = deadReds(st.gone, st.acts)
         -- the changed tiles: each door's or wall's whole change where the sight says
         -- (sight.mapChange: a gate two tiles deep), else its own tile; each dead enemy's
-        local changed = {}
+        -- `terrainAfter`: the terrain each tile of a door's or wall's change takes (the roof
+        -- read, Board.unroofed: a dead enemy's tile is no map change)
+        local changed, terrainAfter = {}, {}
         for k in pairs(st.opened) do
             changed[k] = true
             local x, y = k:match("^(%d+),(%d+)$")
             for _, t in ipairs(sight.mapChange and sight.mapChange(tonumber(x), tonumber(y)) or {}) do
                 changed[t.x .. "," .. t.y] = true
+                terrainAfter[t.x .. "," .. t.y] = t.terrain
             end
         end
         for id in pairs(gone) do changed[byId[id].x .. "," .. byId[id].y] = true end
@@ -1466,11 +1469,23 @@ function M.plan(Bot, board, sight, style, opts)
             -- their board tiles (ADR 0431: an ally never blocks a march, extend rejects a tile
             -- the plan filled, and the judged phase stages every moved unit where the plan puts
             -- it, so the stale tiles only order a unit's new acts for the PER_UNIT cut)
+            -- A unit hidden under a roof the plan's change removes is on the field on that board
+            -- (TriggerMapChange's UpdateRoofedUnits: Board.unroofed, as sight.unroof applies it):
+            -- the units a door's room holds are targets for the acts past it (#766: vanilla
+            -- Ch14's (22,17) door; the one try that recruited Rennac struck the squad it revealed
+            -- on the door's own turn)
             local b = {}
             for k, v in pairs(board) do b[k] = v end
             b.units = {}
             for _, u in ipairs(board.units) do
-                if not gone[u.id] then b.units[#b.units + 1] = u end
+                if not gone[u.id] then
+                    local out = u.onMap and Board.unroofed(u.state, terrainAfter[u.x .. "," .. u.y])
+                    if out then
+                        u = copy(u)
+                        u.state, u.onField = out, Board.onFieldState(out, u.x, u.y)
+                    end
+                    b.units[#b.units + 1] = u
+                end
             end
             -- what each act of this read needs of the plan: all of its changes
             local needs = { opened = copy(st.opened), gone = gone }
@@ -3336,6 +3351,23 @@ function M.plan(Bot, board, sight, style, opts)
         best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
+    -- every job the strategy layer priced this decision (bot.lua notePrice), and which unit's
+    -- chain took it (`chosen`: its place in the chain, ctx.jobs)
+    local chosen = {}
+    for uid, c in pairs(ctx.jobs or {}) do
+        for i, j in ipairs(c) do chosen[Bot.jobKey(uid, j.t.id, j.t.x, j.t.y)] = i end
+    end
+    best.jobs = {}
+    for _, p in pairs(ctx.jobPrices or {}) do
+        local row = copy(p)
+        row.chosen = chosen[Bot.jobKey(p.id, p.goal, p.x, p.y)]
+        best.jobs[#best.jobs + 1] = row
+    end
+    table.sort(best.jobs, function(a, b)
+        if a.id ~= b.id then return a.id < b.id end
+        if a.x ~= b.x then return a.x < b.x end
+        return a.y < b.y
+    end)
     -- the enemies the plan was made against: in sight, and those a retry remembers (ctx.threats,
     -- ADR 0399), so a death by a remembered one is never graded `fog` (botrun.grade)
     best.enemies = {}
