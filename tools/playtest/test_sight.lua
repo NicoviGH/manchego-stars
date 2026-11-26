@@ -2290,6 +2290,8 @@ do
     check(Sight.opensChests({ { id = 0x69 } }, 0, Board.ITEM_COUNT), true, "opensChests: a Chest Key")
     check(Sight.opensChests({ { id = 0x6B } }, 0, Board.ITEM_COUNT), false, "opensChests: a Lockpick, no CA_STEAL")
     check(Sight.opensChests({ { id = 0x6B } }, 4, Board.ITEM_COUNT), true, "opensChests: a Lockpick on a thief")
+    check(Sight.dropsLoot(Board.US_DROP_ITEM, Board), true, "dropsLoot: a thief with the drop flag gives its loot back")
+    check(Sight.dropsLoot(0, Board), false, "dropsLoot: a thief without it keeps its loot")
     check(Sight.opensChests({ { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 0x69 } }, 0, Board.ITEM_COUNT),
         false, "opensChests: a full bag takes no loot")
 end

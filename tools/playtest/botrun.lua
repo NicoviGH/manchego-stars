@@ -167,6 +167,29 @@
 
 local M = {}
 
+-- The spoiling thefts (t.spoils, ADR 0379) whose item the army has not got back: a drop the game
+-- gave a player unit later (`drops`: { from = the dropper's charId, item, turn }) of the same
+-- item from the thief's charId (an AI thief that holds the drop flag puts its loot last, and the
+-- last item is the drop: ActionSteal's UnitAddItem, bmmind.c) recovers one theft, each drop once.
+-- A clean clear is the state at the chapter's end (ADR 0475): a Knight Crest stolen and dropped
+-- back is no loss. Each recovered theft is marked `recovered`. -> the thefts still lost
+function M.unrecovered(thefts, drops)
+    local used, out = {}, {}
+    for _, t in ipairs(thefts or {}) do
+        if t.spoils then
+            for i, d in ipairs(drops or {}) do
+                if not used[i] and d.item == t.item and d.from == t.thief
+                        and (d.turn or 0) >= (t.turn or 0) then
+                    used[i], t.recovered = true, true
+                    break
+                end
+            end
+            if not t.recovered then out[#out + 1] = t end
+        end
+    end
+    return out
+end
+
 M.PREFIX = "BOTRUN "
 M.DIAG_PREFIX = "DIAG "
 M.PINNED_PREFIX = "PINNED "
@@ -825,7 +848,7 @@ function M.run(api)
                   dice_advanced = api.info.dice_advanced,
                   bench = api.bench,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
-                  deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
+                  deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {}, drops = {},
                   -- unsplit: the counter kills the judged phases left unsplit (sight's
                   -- M.phaseWays); floored: the ways of a plan's uncertain kills left unsplit
                   -- (the planner's, ADR 0415); unjoined: per decision, the most Talked
@@ -1103,6 +1126,7 @@ function M.run(api)
         end
         for _, d in ipairs(api.drops and api.drops() or {}) do
             explore.dropped(d)
+            rec.drops[#rec.drops + 1] = { from = d.from, to = d.to, item = d.item, turn = turn }
             trace({ t = "drop", from = d.from, to = d.to, item = d.item })
         end
         for _, t in ipairs(api.thefts and api.thefts() or {}) do
@@ -1394,12 +1418,10 @@ function M.run(api)
                 list[#list + 1] = c
             end
         end
-        -- a theft spoils the clear only above the stat boosters (ADR 0379); the rest are kept
-        -- in rec.thefts
-        local stolen = {}
-        for _, t in ipairs(rec.thefts) do
-            if t.spoils then stolen[#stolen + 1] = t end
-        end
+        -- a theft spoils the clear only above the stat boosters (ADR 0379), and only if the item
+        -- is still lost when the chapter ends: a clean clear is the end state (ADR 0475). The
+        -- rest are kept in rec.thefts, each recovered one marked
+        local stolen = M.unrecovered(rec.thefts, rec.drops)
         rec.clear = { won = outcome == "won", lost = rec.deaths, recruits_missing = missing,
                       rewards_missing = explore.missing(), stolen = stolen }
         local held = rec.clear.won and #rec.deaths == 0 and #rec.clear.rewards_missing == 0

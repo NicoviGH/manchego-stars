@@ -2806,7 +2806,8 @@ end
 -- enemy decides on the board it leaves and a second thief finds the item gone. -> { thief,
 -- target, item, lock = true when the target opened a chest before and no longer does, spoils =
 -- true when the game ranks the item above the stat boosters, so the theft costs the clean
--- clear (M.stealSpoils, the record's own line) }
+-- clear (M.stealSpoils, the record's own line), drops = true when the thief holds the drop flag,
+-- so its death gives the item back (M.dropsLoot) }
 function M.pilfer(api, call, S, Board, standOn, e, act)
     local addr = api.mem.u32(S.gUnitLookup + act.target * 4)
     local chests = M.LOCK_TERRAIN.chests
@@ -2815,8 +2816,14 @@ function M.pilfer(api, call, S, Board, standOn, e, act)
     local item = M.moveItem(api, call, S, Board, addr, act.slot, e.addr)
     local _, spoils = M.stealSpoils(call, S, item)
     return { thief = e.id, target = act.target, item = item,
-             lock = was and not M.opensAt(call, S, addr, chests), spoils = spoils }
+             lock = was and not M.opensAt(call, S, addr, chests), spoils = spoils,
+             drops = M.dropsLoot(api.mem.u32(e.addr + UNIT_STATE), Board) }
 end
+-- Whether a thief with unit state `state` gives back what it stole when it dies: it holds
+-- US_DROP_ITEM, so its last item drops, and ActionSteal's UnitAddItem put the loot last (bmmind.c).
+-- A clean clear is the end state (ADR 0475): such a theft is lost only if the thief outlives the
+-- chapter, which the record reads (botrun's unrecovered), not a forfeit of the plan.
+function M.dropsLoot(state, Board) return (state & Board.US_DROP_ITEM) ~= 0 end
 -- What an enemy's decision is, and which handler plays it: a steal (M.stealAct) before a staff
 -- (M.staffAct), each an act of its own; else a strike when the AI named a target; else none. The
 -- one dispatch of enemyPhase's ways and nextPhase's first phase, so a new act is added once.
