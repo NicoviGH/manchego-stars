@@ -19,7 +19,7 @@ had no Trade, so a key in a teammate's bag opened nothing for anyone else.
 ## The rule
 
 - **A source of a key** (`keyWay`) is an enemy whose fall gives it (`keySources`) or a teammate
-  that spares one (`Goals.spareKey`, the one test, read by `keyWay` and `Goals.list`'s takers
+  that spares one (`Goals.spareKey`, the one test; `Goals.spareKeys` lists them for `keyWay`, the pairing's `sure` and `Goals.list`'s takers
   alike). A teammate spares its key for a chest only once its own trip to that chest has stalled
   (`ctx.tried`: the units a stalled chest was taken from), and never for a door. A holder opens
   its own chest itself and the job matcher already weighs it there; a door's holder opens it and

@@ -4809,6 +4809,19 @@ do
     check(#tradesOf(cands, 0x01) + #tradesOf(cands, 0x02), 0, "trade: none where the game lists no Trade")
 end
 
+-- test_a_spare_key_is_read_after_a_stuck_recheck (#783 re-review): a stuck record on A's chest is
+-- tested again before exploring (opts.stuck), while `tried` is still empty, so that read finds no
+-- spare key. The decision reads the price again once `tried` is seeded: A's way runs through K's
+-- key and the Trade is offered, as with no stuck record.
+do
+    local A, K, E, o = tradeFixture()
+    local opts = { tried = STALLED.tried, quietGoals = STALLED.quietGoals,
+                   stuck = { [B.jobKey(0x01, nil, 4, 0)] = { id = 0x01, x = 4, y = 0, since = 1 } } }
+    local cands, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), opts)
+    check(ctx.turnsTo(A, { x = 4, y = 0 }) ~= nil, true, "stuck recheck: the price sees the spare key")
+    check(#tradesOf(cands, 0x01), 1, "stuck recheck: and A's Trade is offered")
+end
+
 -- test_a_spare_key_taker_pairs_with_the_openers (#688, replay t688c, vanilla Ch21 s4009): once
 -- K's trip to the chest stalled, A (beside K, 1.2 turns by Trade) and G (its own key, 3.8 turns
 -- off) are both sure to open it, and the trip's worth decides: A is sent. With the teammate's key

@@ -245,6 +245,17 @@ function M.spareKey(sight, ctx, u, m, lock, tile)
     return sight.bagKey(u, m, lock)
 end
 
+-- Each of `units` that spares `u` the key for the chest at `tile` (M.spareKey), with that key:
+-- { { unit, key } }, in `units`' order. The one list Bot's bagHolders and Goals.list's takers read.
+function M.spareKeys(sight, ctx, u, lock, tile, units)
+    local out = {}
+    for _, m in ipairs(units or {}) do
+        local k = M.spareKey(sight, ctx, u, m, lock, tile)
+        if k then out[#out + 1] = { unit = m, key = k } end
+    end
+    return out
+end
+
 -- The villages and chests still open, each with its worth in gold and when it closes:
 -- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
 -- is sent where by it.
@@ -383,10 +394,7 @@ function M.list(board, sight, style, ctx)
             if sight.keySources ~= nil and #sight.keySources(u, lock) > 0 then return true end
             -- or whose key a teammate spares (M.spareKey): the game's Trade hands it over
             -- (Bot's trades, #688; vanilla Ch21's Chest Key on Eirika, who held back, R4 #768)
-            for _, m in ipairs(blues) do
-                if M.spareKey(sight, ctx, u, m, lock, g.tile) then return true end
-            end
-            return false
+            return #M.spareKeys(sight, ctx, u, lock, g.tile, blues) > 0
         end)
         goals[#goals + 1] = g
     end

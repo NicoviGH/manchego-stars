@@ -513,9 +513,8 @@ do
     function sight.keySources() return {} end
     function sight.isChestLock(lock) return lock == "chest" end
     local key = { id = 0x69, uses = 1, slot = 0 }
-    function sight.bagKey(u, m, lock)
-        return u.id == 1 and m.id == 2 and lock == "chest" and key or nil
-    end
+    -- teammate 2's bag opens any lock for anyone: only Goals.spareKey's own rule refuses one
+    function sight.bagKey(_, m) return m.id == 2 and key or nil end
     local board = { units = { blue(1, 0, 0), blue(2, 5, 5) }, turn = 1 }
     local stalled = { tried = { ["chest:2,0"] = { [2] = true } } }
     local g = find(Goals.list(board, sight, {}, stalled), "chest:2,0")

@@ -1645,11 +1645,9 @@ local function bagHolders(ctx, u, lock, tile)
     local k = u.id .. ":" .. tostring(lock) .. "@" .. tileKey(tile.x, tile.y)
     if ctx.bagSrc[k] == nil then
         local out = {}
-        for _, m in ipairs(ctx.blues or {}) do
-            local key = Goals.spareKey(ctx.sight, ctx, u, m, lock, tile)
-            if key then
-                out[#out + 1] = { x = m.x, y = m.y, id = m.id, holder = m, lock = lock, key = key }
-            end
+        for _, s in ipairs(Goals.spareKeys(ctx.sight, ctx, u, lock, tile, ctx.blues)) do
+            local m = s.unit
+            out[#out + 1] = { x = m.x, y = m.y, id = m.id, holder = m, lock = lock, key = s.key }
         end
         ctx.bagSrc[k] = out
     end
@@ -3319,10 +3317,7 @@ local function exploring(ctx, sent, barred, triedIn)
     local function sure(u, t)
         if ownOpener(u, t) then return true end
         local lock = t.kind == "chest" and lockAt(ctx, u, t.x, t.y)
-        for _, m in ipairs(lock and ctx.blues or {}) do
-            if Goals.spareKey(ctx.sight, ctx, u, m, lock, t) then return true end
-        end
-        return false
+        return lock and #bagHolders(ctx, u, lock, t) > 0 or false
     end
     local function reaches(u, t)
         if ownOpener(u, t) then return marchLength(ctx, u, t) end
@@ -3461,6 +3456,9 @@ local function exploring(ctx, sent, barred, triedIn)
     for id in pairs(triedIn or {}) do
         if quiet[id] then triedOn(id) end
     end
+    -- a spare key (Goals.spareKey) reads `tried`, which was empty for every price read before
+    -- this decision's exploring (stepsToward, releasesOf): those prices are read again
+    if next(tried) then ctx.keyTurns, ctx.bagSrc, ctx.tradeNeed = {}, nil, nil end
     for _, keyless in ipairs({ false, true }) do
         for _, g in ipairs(sent or {}) do
             local t, u = open[tileKey(g.x, g.y)], blues[g.id]
@@ -3478,9 +3476,9 @@ local function exploring(ctx, sent, barred, triedIn)
     -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
     -- slow one would lose), the nearer on a tie; the units sure to open the tile (sure: their
     -- own key, or a teammate's spare one) first, then the keyless ones take what is left (a
-    -- chest only an enemy's key opens for
-    -- them goes to an opener, but two chests still go to two units while one opener is
-    -- free for one: ch23's win took its chests in parallel that way), and last the unit a
+    -- chest only an enemy's key opens for them goes to an opener, but two chests still go to
+    -- two units while one opener is free for one: ch23's win took its chests in parallel that
+    -- way), and last the unit a
     -- stalled pair just dropped, when no other is left to take its goal
     local byOpen = { {}, {}, {} }
     for _, t in ipairs(openTiles(ctx)) do
