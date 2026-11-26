@@ -362,7 +362,14 @@ function M.list(board, sight, style, ctx)
             -- a chest whose key an enemy drops (sight.keySources): its turns run by way of
             -- that enemy (Bot's turnsTo), so its chance says whether that way is worth it
             local lock = g.kind == "chest" and sight.locked and sight.locked(u, g.tile.x, g.tile.y)
-            return lock and sight.keySources ~= nil and #sight.keySources(u, lock) > 0 or false
+            if not lock then return false end
+            if sight.keySources ~= nil and #sight.keySources(u, lock) > 0 then return true end
+            -- or whose key a teammate holds (sight.bagKey): the game's Trade hands it over
+            -- (Bot's trades, #688; vanilla Ch21's spare Chest Key sat on Eirika, R4 #768)
+            for _, m in ipairs(sight.bagKey and blues or {}) do
+                if m.id ~= u.id and sight.bagKey(u, m, lock) then return true end
+            end
+            return false
         end)
         goals[#goals + 1] = g
     end

@@ -578,6 +578,8 @@ local CALLBACK_NAMES = {
     [SYM.BattleForecast_LoopDisplay] = "battle_forecast_display",
     [SYM.sub_8091AEC] = "unit_list_input",
     [SYM.PrepItemSupply_Loop_GiveTakeKeyHandler] = "supply_input",
+    [SYM.TradeMenu_OnLoopUnselected] = "trade_pick_input",
+    [SYM.TradeMenu_OnLoopSelected] = "trade_place_input",
     [SYM.StatScreen_OnIdle] = "stat_screen_input",
     [SYM.HbMoveCtrl_OnIdle] = "help_box_input",
     [SYM.Shop_Loop_BuyKeyHandler] = "shop_buy_input",
@@ -688,6 +690,7 @@ local function observeTarget(observation)
     elseif routines == SYM.gSelectInfo_Rescue then kind = "rescue"
     elseif routines == SYM.gSelectInfo_Drop then kind = "drop"
     elseif routines == SYM.gSelectInfo_Heal then kind = "heal"
+    elseif routines == SYM.gSelectInfo_Trade then kind = "trade"
     else kind = string.format("0x%08X", routines) end
     observation.target = {
         kind = kind,
@@ -803,6 +806,14 @@ local function observeController()
         }
     end
     put("supply_screen", observedProc(SYM.ProcScr_BmSupplyScreen))
+    -- the Trade screen (#688): TradeMenuProc +41 hoverColumn, +42 hoverRow (bmtrade.h); a
+    -- cell is held in TradeMenu_OnLoopSelected
+    local tradeProc = observedProc(SYM.ProcScr_TradeMenu)
+    put("trade_menu", tradeProc)
+    if tradeProc then
+        observation.trade = { column = ru8(tradeProc.addr + 0x41), row = ru8(tradeProc.addr + 0x42),
+                              holding = tradeProc.idle == "trade_place_input" }
+    end
     local shop = observedProc(SYM.gProcScr_Shop)
     put("shop", shop)
     if shop then
@@ -1367,6 +1378,89 @@ INSPECT.commitTarget = function(actorAddr, stopWhen, what)
         return after.procs.battle ~= nil or controllerState(after) ~= "target_selection"
     end, 300) then return false end
     return INSPECT.awaitActed(actorAddr, stopWhen)
+end
+
+-- One Trade (bot.lua tradeAct, #688) on the real Trade screen, from the unit command menu of
+-- `actor` (BOARD.find's) moved to its tile: Trade, the ally chosen in its selector, then the
+-- screen's own hand (StartTradeMenu(gActiveUnit, target): the actor's bag is the left one).
+-- The holder's item (a.item at a.uses: the target's, or the actor's own with a.gives) is
+-- picked, then the taker's first empty cell (TradeMenu_OnInitSelected's extra cell), or with a
+-- full bag the item it gives back (a.back), and A swaps the two (TradeMenu_ApplyItemSwap). The
+-- bags are read after: the item is the taker's and the given-back one the holder's, or the act
+-- failed. B ends the screen back to the unit menu (UNIT_ACTION_TRADED); the caller then Waits.
+-- Every Trade made is kept in INSPECT.tradeLog for the run's record.
+INSPECT.tradeLog = {}
+INSPECT.trade = function(a, actor)
+    local other = BOARD.find("blue", a.target)
+    if not other then return false, "the Trade's other unit is not on the board" end
+    local holder, taker = other, actor
+    if a.gives then holder, taker = actor, other end
+    local hcol, tcol = a.gives and 0 or 1, a.gives and 1 or 0
+    local hslot = INSPECT.slotOf(holder.addr, a.item, a.uses)
+    if not hslot then return false, "the holder no longer holds the Trade's item" end
+    local takerWas, holderWas = BOARD.items(taker.addr), BOARD.items(holder.addr)
+    local tslot
+    if a.back then
+        tslot = INSPECT.slotOf(taker.addr, a.back.id, a.back.uses)
+        if not tslot then return false, "the taker no longer holds the item it gives back" end
+    elseif #takerWas >= BOARD.ITEM_COUNT then
+        return false, "the taker's bag is full and gives nothing back"
+    else
+        tslot = #takerWas
+    end
+    if not selectSemantic("trade", "Trade opens its ally selector", function(after)
+        return controllerState(after) == "target_selection"
+            and after.target and after.target.kind == "trade"
+    end, 300) then return false, "the game offers no Trade on this tile" end
+    local opened, why = INSPECT.stepThen(a.targetId, nil, function()
+        return guardedInput("confirm_target", "A", "the Trade screen opens on the ally", function(after)
+            return controllerState(after) == "trade_menu"
+        end, 300), "the Trade screen never opened"
+    end)
+    if not opened then return false, why end
+    local KEYS = { trade_left = "LEFT", trade_right = "RIGHT", trade_up = "UP", trade_down = "DOWN" }
+    -- the hand to (col, row): across, then up or down, one key the screen offers at a time
+    local function handTo(col, row)
+        for _ = 1, 2 * BOARD.ITEM_COUNT + 2 do
+            local t = observeController().trade
+            if not t then return false end
+            if t.column == col and t.row == row then return true end
+            local intent = (t.column ~= col and (col == 0 and "trade_left" or "trade_right"))
+                or (t.row < row and "trade_down" or "trade_up")
+            if not guardedInput(intent, KEYS[intent], "the Trade hand moves", function(after)
+                return after.trade ~= nil and (after.trade.column ~= t.column or after.trade.row ~= t.row)
+            end, 30) then return false end
+        end
+        return false
+    end
+    if not handTo(hcol, hslot) then return false, "the Trade hand never reached the item" end
+    if not guardedInput("trade_choose", "A", "the item is held", function(after)
+        return after.trade ~= nil and after.trade.holding
+    end, 60) then return false, "the Trade screen never held the item" end
+    if not handTo(tcol, tslot) then return false, "the Trade hand never reached the taker's cell" end
+    if not guardedInput("trade_choose", "A", "the two cells swap", function(after)
+        return controllerState(after) == "trade_menu" and not after.trade.holding
+    end, 60) then return false, "the Trade screen never swapped the cells" end
+    local count = INSPECT.countItem
+    local takerNow, holderNow = BOARD.items(taker.addr), BOARD.items(holder.addr)
+    local moved = count(takerNow, a.item, a.uses) == count(takerWas, a.item, a.uses) + 1
+        and count(holderNow, a.item, a.uses) == count(holderWas, a.item, a.uses) - 1
+    if moved and a.back then
+        moved = count(holderNow, a.back.id, a.back.uses) == count(holderWas, a.back.id, a.back.uses) + 1
+    end
+    if not moved then
+        return false, string.format("the Trade moved the wrong items (taker %s -> %s; holder %s -> %s)",
+            INSPECT.itemsLine(takerWas), INSPECT.itemsLine(takerNow),
+            INSPECT.itemsLine(holderWas), INSPECT.itemsLine(holderNow))
+    end
+    if not guardedInput("trade_close", "B", "the Trade screen ends to the unit menu", function(after)
+        return controllerState(after) == "unit_command_menu"
+    end, 300) then return false, "the Trade screen never gave the unit menu back" end
+    INSPECT.tradeLog[#INSPECT.tradeLog + 1] = { turn = turn(), from = holder.charId, to = taker.charId,
+        item = a.item, back = a.back and a.back.id or nil }
+    log(string.format("trade: 0x%02X hands 0x%02X to 0x%02X%s", holder.charId, a.item, taker.charId,
+        a.back and string.format(", gets 0x%02X back", a.back.id) or ""))
+    return true
 end
 
 -- Whether the unit at `addr` is greyed out (US_UNSELECTABLE, read live): the act's own mark.
@@ -3222,6 +3316,9 @@ INSPECT.sightApi = function()
         write32 = function(a, v) emu:write32(a, v) end,
         SYM = SYM,
         Board = BOARD,
+        -- what Bot.fullBag weighs of one item for one unit (sight.bagFacts: a Trade into a
+        -- full bag gives back what the full-bag chooser would send)
+        itemFacts = function(call, addr, it) return INSPECT.unitItemFacts(call, addr, it) end,
         cpu = {
             read = function(r) return raw:readRegister(r) end,
             read32 = function(a) return raw:read32(a) end,
@@ -3738,6 +3835,8 @@ INSPECT.botApi = function(game)
         bag = function() return unread(INSPECT.bagLog) end,
         -- every Talk made since the last call (INSPECT.talkLog)
         talks = function() return unread(INSPECT.talkLog) end,
+        -- every Trade made since the last call (INSPECT.tradeLog, #688)
+        trades = function() return unread(INSPECT.tradeLog) end,
         -- the party's gold, the PlaySt field (a memory read, cheap per decision): botrun offers
         -- an unpaid Talk again once it rises (#679)
         gold = INSPECT.partyGold,
@@ -3913,6 +4012,12 @@ INSPECT.botApi = function(game)
             local took, why = INSPECT.takeFromConvoy({ unit = a.unit, item = a.item, uses = a.uses,
                                                        why = "the way's door key" })
             if not took then return false, why end
+            return chooseWait(function() return won() or lost() end)
+        elseif a.act == "trade" then
+            -- a teammate's key (bot.lua trades): the real Trade screen (INSPECT.trade), then the
+            -- Wait, the game's own next command after a Trade (UNIT_ACTION_TRADED)
+            local traded, why = INSPECT.trade(a, u)
+            if not traded then return false, why end
             return chooseWait(function() return won() or lost() end)
         elseif a.act == "seize" then
             if not Controller.findAction(Controller.legalActions(observeController()), "seize") then

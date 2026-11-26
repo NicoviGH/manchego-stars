@@ -598,6 +598,13 @@ local function score(act, st, W, style, odds, likeliest)
         v = v + W.breach
         fx.took = "convoy:" .. act.item .. "x" .. act.uses
         fx.blocked = st.took[fx.took] == true
+    elseif act.act == "trade" then
+        -- a teammate's key handed over by Trade (bot.lua trades, #688): the act that opens the
+        -- way, as the convoy's Take is. The holder holds that one key: a second Trade of it in
+        -- the plan is no act
+        v = v + W.breach
+        fx.took = "trade:" .. (act.gives and act.unitId or act.targetId) .. ":" .. act.item .. "x" .. act.uses
+        fx.blocked = st.took[fx.took] == true
     elseif act.obstacle or act.act == "door" then
         -- a door keeps `breach` (#658). So does a wall strike with no forecast of its blow: the
         -- goals then cost the wall by the walk alone (bot.lua strikersOf), so the turns can

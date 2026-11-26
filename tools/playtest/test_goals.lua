@@ -502,6 +502,28 @@ do
     check(g and #g.takerUnits, 0, "keys: no key on the board, no taker")
 end
 
+-- TestTeammateKeyMakesTheChestAGoal (#688, vanilla Ch21: the spare Chest Key sat on Eirika): no
+-- enemy drops a key and the unit holds none, but a teammate's bag holds one that opens the chest
+-- for it (sight.bagKey): a Trade hands it over, so the unit is the chest's taker. With no
+-- teammate holding one, the chest has none.
+do
+    local sight = fakeSight({ open = { { x = 2, y = 0, kind = "chest" } } })
+    function sight.canExplore() return false end
+    function sight.locked() return "chest" end
+    function sight.keySources() return {} end
+    local key
+    function sight.bagKey(u, m, lock)
+        return u.id == 1 and m.id == 2 and lock == "chest" and key or nil
+    end
+    local board = { units = { blue(1, 0, 0), blue(2, 5, 5) }, turn = 1 }
+    key = { id = 0x69, uses = 1, slot = 0 }
+    local g = find(Goals.list(board, sight, {}, {}), "chest:2,0")
+    check(g and #g.takerUnits, 1, "teammate key: a chest whose key a teammate holds has a taker")
+    key = nil
+    g = find(Goals.list(board, sight, {}, {}), "chest:2,0")
+    check(g and #g.takerUnits, 0, "teammate key: no teammate holds a key, no taker")
+end
+
 -- TestPendingRecruitGoal (#683, ADR 0436): a recruit not on the board yet that ctx.pendingRecruits
 -- names is a goal at its remembered tile, taken by the talkers; none for one nobody may Talk.
 do
