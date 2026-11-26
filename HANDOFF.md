@@ -30,15 +30,11 @@ unmeasured start at all 12 tries, so its 8-hour refusal (SC-007) trips more ofte
 vanilla Ch2 cleared on tries 1, 1, 2; Manchego Stars ch02 had no clean clear in 12 on 3 starts
 (both chwinga lost every try, the known ch02 block).
 
-**R4 #768 is done (2026-11-26, closed): 8 of 34 starts clean within 3 tries, m740c 7 of 34.**
-Table and blockers by size: #768 comment 7195978281.
-
-1. **Next (#766): Rennac**, the largest blocker (all 5 Ch14 starts). First make the bot write
-   each job's value and route loss to the trace, then replay the Ch14 misses: that gives the
-   cause and #767's count for PR #774 in one run.
-2. Other blockers, by starts each alone keeps from clean: Ch16's thief 4, Amelia killed by our
-   counters in Ch10 3 (main, without PR #774), Ch21's `stalled` chests 2; `stuck` (the quiet
-   bound with immovable bosses) is 11 of R4's tries.
+**R4 #768 is done (closed): 8 of 34 clean within 3 tries, m740c 7 of 34.** Every blocker's
+root cause is on the issue that owns it, and **the work order is #764's body, "After R4"**
+(Nicolas, 2026-11-26: fix them all, one PR each, back to back, then one R4 set over the batch).
+Item 1 is being built now: the planner scores a plan by the record's own clean definition
+(#730, #711).
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
