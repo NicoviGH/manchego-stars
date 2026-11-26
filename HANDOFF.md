@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-26; main is cf4cf3ed + HANDOFF commits)
+## Next session starts here (2026-11-26; main is b522735f + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -45,10 +45,16 @@ give: #688, item 4; findings on #711 and #688). A move-list gate that kept Colm 
 tried and dropped (ADR 0475). Not built: a job that sends the army after a thief that will drop
 a spoiling item (the record judges it at the end).
 
-**Item 2 (next, #698):** the idle rule's march exemption (`planner.lua` ~1995, `marches`)
-must count only a new low. botrun already keeps each goal's best (`lows`, `readNearest`,
-botrun.lua ~1052); pass it to the planner and exempt a plan only when some unit beats its goal's
-low. Change only the exemption, not `rank.progress` (that would rescore every plan).
+**Item 2 is merged: PR #780 (b522735f, ADR 0476, closed #698).** A march under the cap is idle
+unless some goal reads nearer than the army's best so far (botrun's `lows`, passed as
+`opts.lows`; `Goals.nearer` is the one test, shared with botrun's progress count). Replays of
+s4003 a1 (tags `n698a15`, `n698a21`): Ch15 won in 22 turns (R4 24), one death fewer; Ch21 in 33
+(R4 40). Neither was a stuck try. Ch21 s4005 still waits: its only advance is a game-over assault
+on Lyon; striking past the counter-kill refusal is built only if the R4 set shows it is needed.
+
+**Item 3 (next, #766):** stage the talker (L'Arachel) before the bot opens the (22,17) door that
+brings Rennac; first write each job's value and route loss to the trace (#767's count needs it).
+Read #764's body, item 3, and #766's comments first.
 
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
