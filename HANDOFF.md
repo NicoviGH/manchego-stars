@@ -30,15 +30,19 @@ unmeasured start at all 12 tries, so its 8-hour refusal (SC-007) trips more ofte
 vanilla Ch2 cleared on tries 1, 1, 2; Manchego Stars ch02 had no clean clear in 12 on 3 starts
 (both chwinga lost every try, the known ch02 block).
 
-**Order Nicolas set (2026-11-25): #775, #776 and #742 are done; next the R4 runs (#768).**
+**R4 #768 is 27 of 34 starts played (2026-11-25 night, stopped for shutdown, not failed).**
+Partial results and blockers: #768 comment 7181703632. Clean within 3 tries: Ch10 2/5, Ch13
+4/5, Ch14 0/5, Ch15 1/5, Ch16 1/5, Ch19 0/2. Ch15's `stuck` games are old (m740c had 4 of 13),
+not a regression; cause in that comment.
 
-1. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
-   --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
-   b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
-   comment 7093112364). Run in the background. Report each start's tries to a clean clear,
-   read from `resume-runs.jsonl` with `montecarlo.first_clean` (`resume` does not print it). Note this set's cap is 3, not the verdict's
-   12: "none within 3" is not ADR 0474's "none within the cap". Also count the misses #767's
-   comment asks for.
+1. **Finish R4:** Ch19 on b640e-cs-s4003,s4005,s4009 with tag `r768b19`, and Ch21 on
+   s4003/5/7/9 with tag `r768a21`; same flags (`resume --game vanilla --chapter N --last N
+   --attempts 3 --scout --route 1 --seal-at 10 --jobs 5`). Then read Ch19/21's blockers and
+   post the full table on #768.
+2. **#767's count needs a trace line:** the bot never writes a job's value or route loss, so
+   "misses whose way our units cleared" cannot be counted. Log them, replay Ch14's misses.
+3. Leads from R4 for Nicolas: Amelia (Ch10) dies to Seth's/Franz's counter on main without
+   PR #774; Rennac (Ch14) was recruited once (s4005 a3); Ch16's thief blocks 4 starts.
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
