@@ -2725,7 +2725,8 @@ end
 -- test_a_door_memory_says_brings_reds_waits_for_its_strikers (#766): an earlier attempt opened the
 -- door at (2,0), which brought a Fighter onto (3,0), and that Fighter looted the chest at (3,0)
 -- (Timeline.releases). (3,0) is under the room's roof: the shut map's field does not reach it,
--- the opened map's does (sight.changed). A, the opener, has no weapon: no one could strike the
+-- the opened map's does (sight.changed). A, the one unit holding a key for the door (S lacks
+-- one: sight.locked), has no weapon: no one could strike the
 -- Fighter the turn the door opens, so every plan that opens it forfeits the chest, and the door
 -- waits; S is sent to the door (the stage job). With S already one move from the door the
 -- release is staged, and the door opens. An armed A beside the door is no striker of its own:
@@ -2736,7 +2737,8 @@ end
 do
     local function case(sx, opt)
         opt = opt or {}
-        local A = blue(0x01, 0, 0, 0, opt.armedA and {} or { minRange = false })
+        local A = blue(0x01, 0, opt.farA and 7 or 0, opt.farA and 3 or 0,
+                       opt.armedA and {} or { minRange = false })
         local S = blue(0x02, 1, sx, 1, { weapons = { { slot = 0, min = 1, max = 1 } } })
         local T = blue(0x03, 2, 7, 3, { weapons = { { slot = 0, min = 1, max = 1 } } })
         local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
@@ -2781,6 +2783,8 @@ do
                       [0x03] = tiles({ 7, 3 }) },
             field = fields(false),
             obstacles = {}, doors = doors, openers = { [0x01] = true },
+            -- S holds no key for the door (sight.locked): A alone opens it
+            locked = { [0x02] = { ["2,0"] = "door" } },
             explorable = explorable, canExplore = canExplore,
             change = function(c)
                 if c.opened and c.opened["2,0"] then return { field = fields(true) } end
@@ -2820,6 +2824,12 @@ do
     r = ctx.releases and ctx.releases[1]
     check(r and tostring(r.staged) .. " " .. r.ready, "false 0",
           "release: the opener beside the door, armed, is no striker of its own")
+    -- A, the one key holder, is far from the door: no one opens it this turn, so the keyless S
+    -- beside it is a striker of its own
+    _, ctx = case(1, { farA = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.ready, "true 1",
+          "release: a keyless striker beside the door is no opener")
     _, ctx = case(7, { lord = true })
     check(ctx.exploreGoal[0x02] == nil or not ctx.exploreGoal[0x02].stage, true,
           "release: a unit whose loss ends the game is never sent")

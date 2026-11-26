@@ -3041,8 +3041,8 @@ end
 
 -- How far `u` is from striking the release `r`'s front this turn once its door is open: the
 -- march cost from the door to u and from the door to the nearest front tile (one field from the
--- door reads both sides: GenerateMovementMap floods from its origin whatever the origin's
--- terrain, units not blocking), less u's MOV and longest reach. 0 or less: u can strike a red
+-- door reads both sides: GenerateExtendedMovementMap's flood, GenerateMovementMap, sets its
+-- origin to 0 and spreads from it whatever the origin's own terrain, units not blocking), less u's MOV and longest reach. 0 or less: u can strike a red
 -- the door brings the turn it opens. nil: u has no weapon, or no way there. Read on the map the
 -- door's change leaves (releasesOf): a roofed room's tiles take their floor only then (ADR 0477;
 -- on the shut map vanilla Ch14's corridor is unreached, and no unit ever read as a striker).
@@ -3098,14 +3098,20 @@ local function releasesOf(ctx)
                 if openRecruit[c] then stake.gone[c], any = true, true end
             end
             if any then
-                -- each unit's gap, on the map the door's change leaves (sight.changed)
+                -- each unit's gap, on the map the door's change leaves (sight.changed). Every game
+                -- sight has `changed`; only a test's fake without a change lacks it, and reads its
+                -- own one map
                 local function gaps()
                     local out = {}
                     for _, u in ipairs(ctx.actors) do out[u.id] = strikeGap(ctx, u, r) end
                     return out
                 end
-                local gap = ctx.sight.changed and ctx.sight.changed({ opened = { [key] = true } }, gaps)
-                    or gaps()
+                local gap
+                if ctx.sight.changed then
+                    gap = ctx.sight.changed({ opened = { [key] = true } }, gaps)
+                else
+                    gap = gaps()
+                end
                 -- the door's opening spends its opener's act: a unit that lacks nothing for this
                 -- door (lockAt) and stands about a move from it. When every such unit is among
                 -- the ready, one of them opens it and strikes nothing
@@ -3921,8 +3927,10 @@ function M.candidates(board, sight, style, opts)
     ctx.pending = opts and opts.pending
     ctx.owedRecruits = opts and opts.owedRecruits   -- a set of charIds (botrun's owed), Goals.scriptedCloses'
     ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits, ctx.looseRecruits = recruitsOf(ctx)
-    -- the doors memory says bring reds, still shut, and whether their strikers stand ready (#766)
-    ctx.releases = releasesOf(ctx)
+    -- the doors memory says bring reds, still shut, and whether their strikers stand ready
+    -- (#766); not in the planner's re-listing past a change (opts.only), whose ctx it never
+    -- reads: the plan's forfeit reads the board's own
+    ctx.releases = not (opts and opts.only) and releasesOf(ctx) or {}
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     -- A unit sent where it has had no step nearer since an earlier turn is sent again,
