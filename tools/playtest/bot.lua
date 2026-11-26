@@ -1561,9 +1561,12 @@ local function opener(ctx, u)
     return ctx.openers[u.id]
 end
 
--- A unit and a goal tile as one key, "unit id>x,y": breachFor's cache, and M.candidates'
--- record of the goals units are blocked from.
-local function goalKey(id, t) return id .. ">" .. tileKey(t.x, t.y) end
+-- A unit and a goal as one key, "unit id>goal id", or "unit id>x,y" for a goal known by its tile
+-- alone: the one owner. A job's (notePrice, the planner's `jobs` rows) and, by tile,
+-- breachFor's cache and M.candidates' record of the goals units are blocked from (goalKey).
+local function jobKey(id, goal, x, y) return id .. ">" .. tostring(goal or tileKey(x, y)) end
+M.jobKey = jobKey
+local function goalKey(id, t) return jobKey(id, nil, t.x, t.y) end
 
 -- What `u` lacks to use the tile (x, y): the chest's or door's terrain when the game says it
 -- holds nothing that opens it (sight.locked), else nil.
@@ -2921,6 +2924,23 @@ local function lossOf(ctx, u, tile, from)
     return routeLoss(ctx, u, tile, from) * weightsFor(ctx.style.aggression).death
 end
 
+-- Write one job's price to the decision's record (ctx.jobPrices, the plan's `jobs` in the
+-- trace): unit `u` on goal `t`, `kind` (recruit or tile), its worth at chance 1, the chance it
+-- gets there in time, the expected loss on its way (lossOf), the net the assignment reads, the
+-- turn it arrives on and where (a meeting's tile). `unit` names what worth, loss and net count
+-- in: a Talk job's are the style's points (Goals.worth, talkWorth), a tile's are gold
+-- (sendWorth). #767's count (how often a job dies on its way's danger) reads these; nothing in
+-- the bot does. A unit's first job only (a chain's second, priced `from` the first's tile, is
+-- the search's, many a decision), the latest price of a (unit, goal) standing: a Talk job is
+-- priced at its meetings once its recruit's goal is read.
+local function notePrice(ctx, u, t, kind, unit, worth, c, loss, net, turns, at, from)
+    if from then return end
+    ctx.jobPrices[jobKey(u.id, t.id, t.x, t.y)] = {
+        id = u.id, charId = u.charId, goal = t.id, kind = kind, unit = unit, x = t.x, y = t.y,
+        worth = worth, chance = c, loss = loss, net = net, turns = turns,
+        at = at and { x = at.x, y = at.y } or nil }
+end
+
 -- The Talk job's worth for talker `u` on recruit `t` (#766): the recruit's (Goals.worth) less
 -- what the hire spends, so a free talker outranks a paid one, and a hire dearer than a unit is
 -- worth to the style is not marched on. A ranking, not a ban (ADR 0396): the Talk stays offered,
@@ -2931,32 +2951,17 @@ end
 -- the corridor the enemy held, the job died on it, and nobody went for the safe one at the map's
 -- edge). A talker that cannot meet him before he is removed has no job, which is dropped, not
 -- chased (#764).
--- Write one job's price to the decision's record (ctx.jobPrices, the plan's `jobs` in the
--- trace): unit `u` on goal `t`, `kind` (recruit or tile), its worth at chance 1, the chance it
--- gets there in time, the expected loss on its way (lossOf, in the same points as the worth),
--- the net the assignment reads, the turn it arrives on and where (a meeting's tile). #767's count
--- (how often a job dies on its way's danger) reads these; nothing in the bot does. A unit's
--- first job only (a chain's second, priced `from` the first's tile, is the search's, many a
--- decision), once a (unit, goal): every reader of a job prices it again.
-local function notePrice(ctx, u, t, kind, worth, c, loss, net, turns, at, from)
-    local k = u.id .. ">" .. tostring(t.id or tileKey(t.x, t.y))
-    if from or ctx.jobPrices[k] then return end
-    ctx.jobPrices[k] = { id = u.id, charId = u.charId, goal = t.id, kind = kind,
-                         x = t.x, y = t.y, worth = worth, chance = c, loss = loss, net = net,
-                         turns = turns, at = at and { x = at.x, y = at.y } or nil }
-end
-
 -- -> its net worth (0: no job), the turn it meets him on, and the meeting tile.
 local function talkWorth(ctx, u, t, g)
     local v = Goals.worth({ kind = RECRUIT, gold = -hirePrice(ctx, u, t) },
                           weightsFor(ctx.style.aggression))
     if v <= 0 then
-        notePrice(ctx, u, t, RECRUIT, v, 0, 0, 0)
+        notePrice(ctx, u, t, RECRUIT, "points", v, 0, 0, 0)
         return 0
     end
     if not g then
         local loss = lossOf(ctx, u, t)
-        notePrice(ctx, u, t, RECRUIT, v, 1, loss, v - loss)
+        notePrice(ctx, u, t, RECRUIT, "points", v, 1, loss, v - loss)
         return math.max(v - loss, 0)
     end
     local pos = { x = u.x, y = u.y, acted = u.acted, alive = 1 }
@@ -2969,10 +2974,10 @@ local function talkWorth(ctx, u, t, g)
         end
     end
     if not best then
-        notePrice(ctx, u, t, RECRUIT, v, 0, 0, 0)
+        notePrice(ctx, u, t, RECRUIT, "points", v, 0, 0, 0)
         return 0
     end
-    notePrice(ctx, u, t, RECRUIT, v, best.c, best.loss, best.net, best.turns, best.at)
+    notePrice(ctx, u, t, RECRUIT, "points", v, best.c, best.loss, best.net, best.turns, best.at)
     return math.max(best.net, 0), best.turns, best.at
 end
 
@@ -2983,7 +2988,7 @@ local function sendWorth(ctx, u, t, from)
     local c, turns = Goals.chance(goal, { [u.id] = p }, Goals.GAMMA, ctx.turnsTo)
     -- its gold x the chance, less the loss on the way in gold (the style's points / W.gold)
     local loss = c > 0 and lossOf(ctx, u, t, from) / weightsFor(ctx.style.aggression).gold or 0
-    notePrice(ctx, u, t, t.kind or "tile", t.gold, c, loss, t.gold * c - loss, turns, nil, from)
+    notePrice(ctx, u, t, t.kind or "tile", "gold", t.gold, c, loss, t.gold * c - loss, turns, nil, from)
     return t.gold * c - loss, c, turns
 end
 

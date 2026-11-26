@@ -2744,7 +2744,9 @@ do
                            ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
                                        ["0,1"] = 3, ["1,1"] = 2 } },
         obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
-        changes = { ["2,0"] = { { x = 2, y = 0 }, { x = 2, y = 1 }, { x = 3, y = 1 } } },
+        -- the change's tiles and the terrain each takes (plains: no roof now)
+        changes = { ["2,0"] = { { x = 2, y = 0, terrain = 1 }, { x = 2, y = 1, terrain = 1 },
+                                { x = 3, y = 1, terrain = 1 } } },
         talk = {},
         change = function(c)
             if c.opened["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end

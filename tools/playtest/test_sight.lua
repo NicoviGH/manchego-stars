@@ -311,6 +311,7 @@ do
     local sandbox, api = Sight.batching(outer)
     local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10,
                 gBmMapBaseTiles = 0x20, gBmMapTerrain = 0x30 }
+    api.Board = Board.bind(outer.mem, S)   -- the harness's api carries the bound reader
     -- row pointers (one row each for y = 0..1), the lookup table, the change: 1x1 at (2,1)
     bytes[0x20], bytes[0x30], bytes[0x10] = 0x100, 0x200, 0x400
     bytes[0x104], bytes[0x204] = 0x140, 0x240     -- row 1 of each grid
@@ -348,25 +349,27 @@ end
 -- removes comes out, seen and on the unit map. Vanilla Ch14's (22,17) door unroofs the corridor
 -- that holds Rennac and his squad; the judged phase of every plan that opened it played them
 -- hidden. Here red unit 0x81 stands roofed on (1,0), whose roof the change at (1,0) removes, and
--- red unit 0x82 roofed on (0,0), still a roof: only 0x81 comes out, and the entity maps are
--- refreshed (Sight.refresh) once. A change that removes no roof refreshes nothing.
+-- red unit 0x82 roofed on (0,0), still a roof: only 0x81 comes out, the entity maps are refreshed
+-- (Sight.refresh) once, and the sandbox puts its state word back when it returns (the write is
+-- journaled). A change that removes no roof refreshes nothing.
 do
     local bytes = {}
     local mem = bytesMem(bytes)
     mem.s8 = function(a) local v = bytes[a] or 0; return v >= 0x80 and v - 0x100 or v end
-    local B = { FACTIONS = { { name = "red", sym = "gUnitArrayRed", count = 2 } }, UNIT_SIZE = 0x48,
-                US_HIDDEN = 1, US_UNDER_A_ROOF = 1 << 7, US_BIT8 = 1 << 8 }
-    local api = { mem = mem, Board = B, write8 = function(a, v) bytes[a] = v end,
-                  write16 = function(a, v) bytes[a] = v end,
-                  write32 = function(a, v) bytes[a] = v end }
-    local S = { gUnitArrayRed = 0x1000, gBmMapTerrain = 0x30, GetMapChangeIdAt = 1, GetMapChange = 2,
+    local S = { gUnitArrayRed = 0x1000, gUnitArrayBlue = 0x3000, gUnitArrayGreen = 0x5000,
+                gBmMapTerrain = 0x30, GetMapChangeIdAt = 1, GetMapChange = 2,
                 gTilesetTerrainLookup = 0x10, gBmMapBaseTiles = 0x20 }
+    local outer = { cpu = fakeCpu(1), mem = mem, write8 = function(a, v) bytes[a] = v end,
+                    write16 = function(a, v) bytes[a] = v end,
+                    write32 = function(a, v) bytes[a] = v end }
+    local sandbox, api = Sight.batching(outer)
+    api.Board = Board.bind(mem, S)
     bytes[0x20], bytes[0x30], bytes[0x10] = 0x100, 0x200, 0x400   -- each grid's row pointers
     bytes[0x100], bytes[0x200] = 0x140, 0x240                     -- row 0 of each grid
     bytes[0x240], bytes[0x241] = 0x22, 0x22                       -- (0,0), (1,0): roof
-    local roofed = B.US_HIDDEN | B.US_UNDER_A_ROOF
+    local roofed = Board.US_HIDDEN | Board.US_UNDER_A_ROOF
     for i, at in ipairs({ { 0x81, 1 }, { 0x82, 0 } }) do
-        local a = 0x1000 + (i - 1) * 0x48
+        local a = 0x1000 + (i - 1) * Board.UNIT_SIZE
         bytes[a], bytes[a + 0x0B], bytes[a + 0x0C] = 0x9000, at[1], roofed
         bytes[a + 0x10], bytes[a + 0x11] = at[2], 0
     end
@@ -377,17 +380,22 @@ do
         if fn == S.GetMapChangeIdAt then return (args[1] == 1 and args[2] == 0) and 3 or 0xFFFFFFFF end
         return mc
     end
-    local refreshed, real = 0, Sight.refresh
+    local first, second = 0x1000 + 0x0C, 0x1000 + Board.UNIT_SIZE + 0x0C
+    local refreshed, real, seen = 0, Sight.refresh, {}
     Sight.refresh = function() refreshed = refreshed + 1 end
-    Sight.openMap(api, call, S, 1, 0)
+    sandbox(function()
+        sandbox(function()
+            Sight.openMap(api, call, S, 1, 0)
+            seen[1], seen[2] = bytes[first], bytes[second]
+            Sight.openMap(api, call, S, 1, 0)   -- (1,0) is plains now: no roof to remove
+        end)
+        seen[3] = bytes[first]   -- the next judged plan's
+    end)
     Sight.refresh = real
-    check(bytes[0x1000 + 0x0C], B.US_BIT8, "unroof: the unit the change unroofs comes out, seen")
-    check(bytes[0x1048 + 0x0C], roofed, "unroof: one still under a roof stays hidden")
-    check(refreshed, 1, "unroof: the entity maps are refreshed once")
-    Sight.refresh = function() refreshed = refreshed + 1 end
-    Sight.openMap(api, call, S, 1, 0)   -- (1,0) is plains now: no roof to remove
-    Sight.refresh = real
-    check(refreshed, 1, "unroof: a change that removes no roof refreshes nothing")
+    check(seen[1], Board.US_BIT8, "unroof: the unit the change unroofs comes out, seen")
+    check(seen[2], roofed, "unroof: one still under a roof stays hidden")
+    check(refreshed, 1, "unroof: the entity maps are refreshed once; a change that removes no roof, not at all")
+    check(seen[3], roofed, "unroof: the next plan finds him hidden again (the write is journaled)")
 end
 
 -- test_play_pick_opens_what_the_rogue_picked (#775): a Rogue's AI_ACTION_PICK names its door or
@@ -406,6 +414,7 @@ do
     local S = { GetMapChangeIdAt = 1, GetMapChange = 2, gTilesetTerrainLookup = 0x10,
                 gBmMapBaseTiles = 0x20, gBmMapTerrain = 0x30, gAiDecision = 0x700,
                 MakeNewItem = 3, UnitAddItem = 4 }
+    api.Board = Board.bind(mem, S)   -- the harness's api carries the bound reader
     local B = { AI_DEC = Board.AI_DEC, AI_ACTION_PICK = Board.AI_ACTION_PICK,
                 UNIT_ITEMS = Board.UNIT_ITEMS, ITEM_COUNT = Board.ITEM_COUNT }
     local rogue, added = { addr = 0x900 }, {}

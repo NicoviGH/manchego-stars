@@ -297,7 +297,6 @@ M.ISLOT_AUTO = -1            -- include/bmbattle.h BU_ISLOT_AUTO
 M.TILE_COMMAND_SEIZE = 0x11  -- include/eventinfo.h
 M.TILE_COMMAND_VISIT, M.TILE_COMMAND_DOOR, M.TILE_COMMAND_CHEST = 0x10, 0x12, 0x14
 M.TERRAIN_DOOR, M.TERRAIN_CHEST_FULL = 0x1E, 0x21   -- include/constants/terrains.h
-M.TERRAIN_ROOF = 0x22
 M.TERRAIN_VILLAGE_CLOSED, M.TERRAIN_CHEST_EMPTY = 0x04, 0x20
 -- The terrain a demand kind (api.needs' `doors`, `chests`) opens: the one owner of kind -> lock.
 M.LOCK_TERRAIN = { doors = M.TERRAIN_DOOR, chests = M.TERRAIN_CHEST_FULL }
@@ -2439,7 +2438,7 @@ function M.openMap(api, call, S, x, y)
     local unroofed = false
     for _, t in ipairs(M.mapChangeTiles(mem, call, S, x, y) or {}) do
         local at = cell(mem, S.gBmMapTerrain, t.x, t.y)
-        unroofed = unroofed or (mem.u8(at) == M.TERRAIN_ROOF and t.terrain ~= M.TERRAIN_ROOF)
+        unroofed = unroofed or (mem.u8(at) == api.Board.TERRAIN_ROOF and t.terrain ~= api.Board.TERRAIN_ROOF)
         -- a u16 grid: `cell`'s row, two bytes a tile
         api.write16(cell(mem, S.gBmMapBaseTiles, 0, t.y) + t.x * 2, t.tile)
         api.write8(at, t.terrain)
@@ -2447,28 +2446,21 @@ function M.openMap(api, call, S, x, y)
     if unroofed then M.unroof(api, call, S) end
 end
 
--- Inside a sandbox: UpdateRoofedUnits (bmtrick.c), every write journaled. A unit loaded on a roof
--- tile is hidden under it (UnitHideIfUnderRoof: US_HIDDEN | US_UNDER_A_ROOF); one whose tile is
--- no roof now loses both bits and is marked seen (US_BIT8), and the entity maps are refreshed
--- (M.refresh, which keeps every unit's state word and the map pools) so it stands on the unit
--- map and the AI plays it. -> the unit ids it brought out (none: no refresh).
+-- Inside a sandbox: UpdateRoofedUnits (bmtrick.c), every write journaled. Each unit whose tile
+-- is no roof now comes out (Board.unroofed: US_HIDDEN | US_UNDER_A_ROOF cleared, US_BIT8 set),
+-- and the entity maps are refreshed (M.refresh, which keeps every unit's state word and the map
+-- pools) so it stands on the unit map and the AI plays it. -> the unit ids it brought out (none:
+-- no refresh).
 function M.unroof(api, call, S)
     local mem, B = api.mem, api.Board
     local out, all = {}, {}
     for _, f in ipairs(B.FACTIONS) do
-        local base = S[f.sym]
-        for slot = 0, f.count - 1 do
-            local addr = base + slot * B.UNIT_SIZE
-            if mem.u32(addr) ~= 0 then
-                all[#all + 1] = { addr = addr }
-                local st = mem.u32(addr + UNIT_STATE)
-                local ux, uy = mem.s8(addr + UNIT_X), mem.s8(addr + UNIT_Y)
-                if st & B.US_UNDER_A_ROOF ~= 0 and ux >= 0 and uy >= 0
-                    and mem.u8(cell(mem, S.gBmMapTerrain, ux, uy)) ~= M.TERRAIN_ROOF then
-                    api.write32(addr + UNIT_STATE,
-                        (st & ~(B.US_UNDER_A_ROOF | B.US_HIDDEN)) | B.US_BIT8)
-                    out[#out + 1] = mem.u8(addr + UNIT_INDEX)
-                end
+        for _, u in ipairs(B.leanList(f.name)) do
+            all[#all + 1] = u
+            local new = u.onMap and B.unroofed(u.state, mem.u8(cell(mem, S.gBmMapTerrain, u.x, u.y)))
+            if new then
+                api.write32(u.addr + UNIT_STATE, new)
+                out[#out + 1] = mem.u8(u.addr + UNIT_INDEX)
             end
         end
     end
