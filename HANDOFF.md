@@ -24,12 +24,12 @@ he is still missed on s4005: his Talk job dies on the corridor's danger, read as
 until our units clear it, too late (#766 comment 7176696969). R4 is to size that for PR #774's
 merge call (#767 comment).
 
-**Order Nicolas set (2026-11-25): #775 (done, PR #777), then #776, then the R4 runs (#768).**
+**Order Nicolas set (2026-11-25): #775 (done, PR #777), then #776 (answered), then the R4 runs (#768). #742 (the attempts-to-clean verdict) is not built and lands before R4.**
 
-1. **#776: a step safe now that leaves no safe tile next turn** (sub-issue of #743; Tana in Ch14
-   s4002, Amelia in Ch10 s4007). **Answer its question before building:** #743's probe found
-   the second-phase read no guide, so first check on the recorded boards whether a "safe tile
-   next turn" check would flag those deaths at t-1 and not the units that lived.
+1. **#776 answered (2026-11-25, comment 7178440170): a "safe tile next turn" check does not
+   separate deaths from survivors** (probe `s776a`/`s776b`, Ch14 + Ch10, 27 games: 0 of 4 deaths
+   flagged; 7 of 36 over-cap units caught; 26 of 33 flags lived). Not built. Recommended closing
+   it; **Nicolas's call is open.** Amelia's Ch10 case is the clear job's (#767), not this.
 2. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
    --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
    b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
