@@ -1637,8 +1637,9 @@ end
 
 -- The teammates of `u` whose bag holds what opens `lock` for it (sight.bagKey), read once a
 -- decision: the game's Trade hands it over (#688). Each is a key source as keyWay reads one,
--- { x, y, id, holder = the teammate, lock, key = { id, uses, slot } }: `u` walks to it, or it
--- walks to `u`, they Trade (tradeAct), and `u` walks on.
+-- { x, y, id, holder = the teammate, lock, key = { id, uses, slot } }: `u` walks to it, they
+-- Trade (tradeAct), and `u` walks on. The holder's hand-over is offered only where it already
+-- reaches a tile beside `u`; it is never priced (keyWay).
 local function bagHolders(ctx, u, lock)
     if not ctx.sight.bagKey then return {} end
     ctx.bagSrc = ctx.bagSrc or {}
@@ -2322,11 +2323,8 @@ do
         return a
     end
 
-    -- The Trades on the army's key ways (#688): `u` takes the key its own way is fetched by
-    -- (tradeFor), and, holding one, hands it to each teammate whose way is fetched by it -- the two
-    -- meetings keyWay prices.
-    -- each unit's Trade (tradeFor on its goal), read once a decision: every unit's proposals ask
-    -- every teammate's
+    -- Each unit's Trade (tradeFor on its goal), read once a decision: every unit's proposals ask
+    -- every teammate's.
     local function need(ctx, u, objective)
         ctx.tradeNeed = ctx.tradeNeed or {}
         if ctx.tradeNeed[u.id] == nil then
@@ -2335,11 +2333,13 @@ do
         return ctx.tradeNeed[u.id] or nil
     end
 
+    -- The Trades on the army's key ways (#688): `u` takes the key its own way is fetched by
+    -- (tradeFor), and, holding one, hands it to each teammate whose way is fetched by it.
     trades = function(ctx, u, gate, objective)
         local out = {}
         local h = need(ctx, u, objective)
         out[#out + 1] = h and tradeAct(ctx, u, h.holder, h, false, gate)
-        for _, t in ipairs(ctx.blues) do
+        for _, t in ipairs(ctx.blues or {}) do
             local n = t.id ~= u.id and not t.dead and need(ctx, t, objective)
             if n and n.holder.id == u.id then out[#out + 1] = tradeAct(ctx, u, t, n, true, gate) end
         end
