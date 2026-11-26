@@ -1466,11 +1466,23 @@ function M.plan(Bot, board, sight, style, opts)
             -- their board tiles (ADR 0431: an ally never blocks a march, extend rejects a tile
             -- the plan filled, and the judged phase stages every moved unit where the plan puts
             -- it, so the stale tiles only order a unit's new acts for the PER_UNIT cut)
+            -- A unit hidden under a roof the plan's change removes is on the field on that board
+            -- (TriggerMapChange's UpdateRoofedUnits, sight.unroof): the units a door's room
+            -- holds are targets for the acts past it (#766: vanilla Ch14's (22,17) door; the one
+            -- try that recruited Rennac struck the squad it revealed on the door's own turn)
             local b = {}
             for k, v in pairs(board) do b[k] = v end
             b.units = {}
             for _, u in ipairs(board.units) do
-                if not gone[u.id] then b.units[#b.units + 1] = u end
+                if not gone[u.id] then
+                    if u.onMap and (u.state or 0) & Board.US_UNDER_A_ROOF ~= 0
+                        and changed[u.x .. "," .. u.y] then
+                        u = copy(u)
+                        u.onField = (u.state & ~(Board.US_UNDER_A_ROOF | Board.US_HIDDEN)
+                            & (Board.US_DEAD | Board.US_NOT_DEPLOYED | Board.US_RESCUED)) == 0
+                    end
+                    b.units[#b.units + 1] = u
+                end
             end
             -- what each act of this read needs of the plan: all of its changes
             local needs = { opened = copy(st.opened), gone = gone }
@@ -3336,6 +3348,25 @@ function M.plan(Bot, board, sight, style, opts)
         best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
+    -- every job the strategy layer priced this decision (bot.lua notePrice), and which unit's
+    -- chain took it (`chosen`: its place in the chain, ctx.jobs)
+    local function jobKey(uid, goal, x, y) return uid .. ">" .. tostring(goal or (x .. "," .. y)) end
+    local chosen = {}
+    for uid, c in pairs(ctx.jobs or {}) do
+        for i, j in ipairs(c) do chosen[jobKey(uid, j.t.id, j.t.x, j.t.y)] = i end
+    end
+    best.jobs = {}
+    for _, p in pairs(ctx.jobPrices or {}) do
+        local row = {}
+        for k, v in pairs(p) do row[k] = v end
+        row.chosen = chosen[jobKey(p.id, p.goal, p.x, p.y)]
+        best.jobs[#best.jobs + 1] = row
+    end
+    table.sort(best.jobs, function(a, b)
+        if a.id ~= b.id then return a.id < b.id end
+        if a.x ~= b.x then return a.x < b.x end
+        return a.y < b.y
+    end)
     -- the enemies the plan was made against: in sight, and those a retry remembers (ctx.threats,
     -- ADR 0399), so a death by a remembered one is never graded `fog` (botrun.grade)
     best.enemies = {}

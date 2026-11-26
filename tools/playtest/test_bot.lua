@@ -2722,6 +2722,44 @@ do
     check(seen["2,0"], true, "opened: its enemy phase is judged with the door open")
 end
 
+-- test_a_plan_strikes_what_its_door_unroofs (#766): the door at (2,0) opens a roofed room, and
+-- R stands in it on (3,1), hidden under the roof (US_HIDDEN | US_UNDER_A_ROOF, off the field):
+-- the game brings him out when the door's change removes the roof (UpdateRoofedUnits). D, at
+-- (1,1), reaches (2,1) beside him only once the door is open; the boss E holds (3,0) past the
+-- door, as in the doorway case below. A plan that opens the door has D
+-- strike R from (2,1); read on the board as it stood, R was no target and no plan struck him
+-- (vanilla Ch14: the (22,17) door unroofs the corridor that holds Rennac and his squad, and the
+-- one try that recruited him struck the squad on the door's own turn).
+do
+    local K = blue(0x01, 0, 1, 0)
+    local D = blue(0x02, 1, 1, 1)
+    local E = red(0x81, 3, 0, { isBoss = true })
+    local R = red(0x82, 3, 1, { hp = 5 })
+    R.onField, R.state = false, Board.US_HIDDEN | Board.US_UNDER_A_ROOF
+    local shut = { [0x01] = tiles({ 1, 0 }, { 0, 0 }), [0x02] = tiles({ 1, 1 }, { 0, 1 }) }
+    local open = { [0x01] = shut[0x01], [0x02] = tiles({ 1, 1 }, { 0, 1 }, { 2, 0 }, { 2, 1 }) }
+    local o = {
+        objective = { kind = "boss" }, reach = shut,
+        field = fieldsOf { ["3,0"] = { ["3,0"] = 0 },
+                           ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1,
+                                       ["0,1"] = 3, ["1,1"] = 2 } },
+        obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+        changes = { ["2,0"] = { { x = 2, y = 0 }, { x = 2, y = 1 }, { x = 3, y = 1 } } },
+        talk = {},
+        change = function(c)
+            if c.opened["2,0"] then return { reach = open, doors = {}, mapKey = "open" } end
+            return {}
+        end,
+        fc = { [0x02] = { [0x82] = { ["2,1"] = fc { hit = 100, dmg = 9, hits = 1, killsTarget = true } } } },
+    }
+    local _, plan = Planner.plan(B, boardOf(K, D, E, R), sightOf(o), style("careful"))
+    local struck
+    for _, a in ipairs(plan and plan.acts or {}) do
+        if a.unitId == 0x02 and a.act == "attack" and a.targetId == 0x82 then struck = at(a) end
+    end
+    check(struck, "2,1", "unroofed: D strikes the unit the door brings out, from inside the room")
+end
+
 -- test_a_plan_steps_through_the_door_it_opens (#661): K, beside the door at (2,0), holds the
 -- key; the boss E stands behind it at (3,0). D, at (1,1), can reach the doorway only once it is
 -- open. A plan that opens the door and leaves the doorway empty lets E strike K dead; one where
@@ -9144,6 +9182,38 @@ do
                 closings = { ["unit:48"] = 4 }, paths = { [0x30] = { { x = 7, y = 0 }, { x = 0, y = 9 } } } }
     check(talkGoals(boardOf(A, T, E), o)[0x01], "0,9",
           "best meeting: the talker is sent to the safe later meeting, not dropped")
+end
+
+-- test_a_plan_records_each_jobs_price (#766, #767's count): the plan carries every first job the
+-- strategy layer priced (`jobs`), so a trace says what a job was worth, the death on its way and
+-- whether a unit took it. Same board as the best meeting's: A's Talk job on T is met at (0,9),
+-- worth the recruit at its chance there, no loss on a way E never reaches, and A's first job.
+do
+    local T = blue(0x30, 5, 6, 0, { faction = "green" })
+    local E = red(0x81, 5, 2, { minRange = 1, maxRange = 1 })
+    local A = blue(0x01, 0, 0, 0, { minRange = false })
+    local o = { reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 5, 1 }) },
+                talk = { [0x01] = { [0x30] = true } }, danger = { ["5,0"] = 1 },
+                fc = { [0x01] = { [0x81] = { ["5,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } } },
+                closings = { ["unit:48"] = 4 }, paths = { [0x30] = { { x = 7, y = 0 }, { x = 0, y = 9 } } },
+                field = function(goal)
+                    local f = {}
+                    for y = 0, 9 do
+                        f[y] = {}
+                        for x = 0, 14 do f[y][x] = math.abs(x - goal.x) + math.abs(y - goal.y) end
+                    end
+                    return f
+                end }
+    local _, plan = Planner.plan(B, boardOf(A, T, E), sightOf(o), style("careful"))
+    local row
+    for _, j in ipairs(plan and plan.jobs or {}) do
+        if j.id == 0x01 and j.goal == 0x30 then row = j end
+    end
+    check(row and row.kind, "recruit", "job price: A's Talk job on T is recorded")
+    check(row and row.at and (row.at.x .. "," .. row.at.y), "0,9", "job price: at its best meeting")
+    check(row and row.loss, 0, "job price: no death on the way there")
+    check(row and row.net > 0 and row.net <= row.worth, true, "job price: net is its worth at its chance")
+    check(row and row.chosen, 1, "job price: A's first job")
 end
 
 -- test_a_claimed_recruit_is_sent_its_claimed_talker: the style claims T for C (`by`), and A is
