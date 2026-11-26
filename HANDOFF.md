@@ -69,14 +69,18 @@ PR #781 (ADR 0477, roofed rooms in the forecast).
   under #764's item 5.
 - **Plan records carry `releases`** (door, need, ready, staged); a stager's goal row is `stage`.
 
-**Item 4, keys, first half: PR #783 (Trade for keys, ADR 0479), open, reviewed (3 nits fixed),
-awaiting CI and Nicolas's merge.** Ported from `../manchego-stars-wt4` (that worktree's step 1 is
-now superseded; delete it once #783 merges). A teammate's key is a way, priced by the taker's walk
-to the holder only: replay `t688a` priced the holder's walk too and lost Dozla and Gerik at the
-(21,18) chest. Replay `t688b` (Ch21 s4009 a1): won in 19 turns, both chests opened, 2 deaths not
-attributed (R4's try was an older bot). Details on #688's comment of 2026-11-26.
-**Next:** one key per chest (#711 item 1), then items 5, 6, then one R4 set over the batch
-(#764's body). Ch16 s4005's Knight Crest still needs a convoy Give or Steal (#688).
+**Item 4, keys, first half is merged: PR #783 (44b1f008, ADR 0479), Trade for keys.** A Chest
+Key on a teammate is a way only once its holder's own trip to that chest stalled
+(`Goals.spareKey`; never a door's), priced by the taker's walk alone; a unit a teammate spares
+the key pairs with the own-key openers. Replays of Ch21 s4009 a1 against main's control
+`c688m` (30 turns, 0 deaths, (2,18) stalled): `t688d` is main's game to turn 21, then makes real
+Trades; same result. The earlier versions (`t688a`, `t688b`) lost units: table in the PR.
+`../manchego-stars-wt4`'s uncommitted Trade step 1 is superseded (ask Nicolas before deleting it).
+**Next:** (2,18) on that start is missed for causes outside Trade (#688 comment of 2026-11-26):
+Eirika's job reads loss 0 behind a Draco Zombie that one-shots her (lead, untested: `routeLoss`
+returns 0 with no field through the shut (4,18) door), and the chest stalls only on turn 21
+because `goalQuiet` counts only event-free phases. Test the route-loss lead first, then one key
+per chest (#711 item 1), then items 5, 6, then one R4 set over the batch (#764's body).
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
