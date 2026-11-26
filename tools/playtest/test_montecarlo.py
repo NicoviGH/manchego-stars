@@ -2250,7 +2250,8 @@ class Suite(unittest.TestCase):
         d = tempfile.mkdtemp()
         path = os.path.join(d, 'runs.jsonl')
         base = {'suite': {'start_id': 'a'}, 'game': 'vanilla', 'rom_hash': 'h',
-                'instrument': 'i', 'outcome': 'won', 'wall_s': 40.0, 'attempt': 1}
+                'instrument': 'i', 'outcome': 'won', 'wall_s': 40.0, 'attempt': 1,
+                'task_attempt': 1}
         for r in (base, dict(base, wall_s=60.0),
                   dict(base, instrument='old', wall_s=5.0),       # other code
                   dict(base, rom_hash='g', wall_s=5.0),            # another ROM
@@ -2260,6 +2261,13 @@ class Suite(unittest.TestCase):
                   {'seed': 1, 'wall_s': 5.0}):                     # a cell's run
             mc.append_record(path, r)
         self.assertEqual(mc.kept_walls([path], 'i', {'vanilla': 'h'}), {'a': [40.0, 60.0]})
+        # a cell's estimate reads only whole plays: the suite's one-attempt runs are a
+        # fraction of one (ADR 0474)
+        self.assertEqual(mc.kept_walls([path], 'i', {'vanilla': 'h'}, plays=True), {})
+        mc.append_record(path, dict({k: v for k, v in base.items() if k != 'task_attempt'},
+                                    wall_s=400.0))
+        self.assertEqual(mc.kept_walls([path], 'i', {'vanilla': 'h'}, plays=True),
+                         {'a': [400.0]})
 
     def test_two_seeds_of_each_kind(self):
         inst = self.suite()

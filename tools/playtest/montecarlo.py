@@ -1579,7 +1579,7 @@ def pilot_main(args):
         have = side['kept']()
         todo += side['tasks']([s for s in seeds
                                if again(have.get(s), side['chapter'], side['pinned'])])
-    walls = kept_walls(outs, inst, hashes)
+    walls = kept_walls(outs, inst, hashes, plays=True)
     hours = suite_estimate(dict(suite, starts=starts['ours'] + starts['vanilla']), todo,
                            walls, args.jobs, tries=max_attempts())
     print('%d runs to play on %d workers: about %.2f wall-hours' % (len(todo), args.jobs, hours))
@@ -2423,15 +2423,19 @@ def suite_run_of(instrument, rom_hashes, ends=False):
                       and r.get('rom_hash') == rom_hashes.get(r.get('game')))
 
 
-def kept_walls(paths, instrument, rom_hashes):
+def kept_walls(paths, instrument, rom_hashes, plays=False):
     """{start_id: [wall_s]} of the suite runs kept in `paths` (each game's runs file) that this
     instrument played on these ROMs ({game: hash}) to a game result: a run of other code, or
-    one that crashed at boot in seconds, says nothing about what the next will take."""
+    one that crashed at boot in seconds, says nothing about what the next will take. `plays`
+    (a cell's estimate, ADR 0474) reads only runs that played to a clean clear or the cap,
+    never one stamped `task_attempt` (attempt 1 alone, a fraction of a play's wall); without
+    it, only those (the suite's)."""
     mine = suite_run_of(instrument, rom_hashes)
-    # every attempt a cell's run made carries that run's one wall (ADR 0474), so a run is read
-    # once, by its attempt 1
+    # every attempt a cell's run made carries that run's one wall, so a run is read once, by
+    # its attempt 1
     runs = kept(paths, lambda r: mine(r) and r.get('outcome') not in UNUSABLE
-                and r.get('wall_s') is not None and r.get('attempt') == 1,
+                and r.get('wall_s') is not None and r.get('attempt') == 1
+                and ('task_attempt' in r) != plays,
                 lambda r: r['suite']['start_id'])
     return {sid: [r['wall_s'] for r in recs] for sid, recs in runs.items()}
 

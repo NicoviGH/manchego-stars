@@ -88,8 +88,9 @@ the pilot says how many starts are bounded that way. The suite is unchanged: it 
   that every worker on that start reads.
 - A chapter cell keeps each play's campaign end beside its attempts (`suite_run_of(...,
   ends=True)`), and never a run stamped `task_attempt` (attempt 1 alone, whose tries are
-  unknown). A clean clear after an attempt with no game result is unresolved. `records_of` stamps the end with its task's instrument so the filter can take
-  it. `kept_walls` reads a run once, by its attempt 1, since every attempt of a run carries
-  that run's one wall.
+  unknown). A clean clear after an attempt with no game result is unresolved. `records_of`
+  stamps the end with its task's instrument so the filter can take it. `kept_walls` reads a
+  run once, by its attempt 1, since every attempt of a run carries that run's one wall, and a
+  cell's estimate (`plays=True`) reads only whole plays, never the suite's one-attempt runs.
 - `verdict-diff` and its CI comment read `tools/difficulty.py` (ADR 0353), not these cells:
   nothing there changed.
