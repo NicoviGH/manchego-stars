@@ -75,7 +75,6 @@ Key on a teammate is a way only once its holder's own trip to that chest stalled
 the key pairs with the own-key openers. Replays of Ch21 s4009 a1 against main's control
 `c688m` (30 turns, 0 deaths, (2,18) stalled): `t688d` is main's game to turn 21, then makes real
 Trades; same result. The earlier versions (`t688a`, `t688b`) lost units: table in the PR.
-`../manchego-stars-wt4`'s uncommitted Trade step 1 is superseded (ask Nicolas before deleting it).
 **Next:** (2,18) on that start is missed for causes outside Trade (#688 comment of 2026-11-26):
 Eirika's job reads loss 0 behind a Draco Zombie that one-shots her (lead, untested: `routeLoss`
 returns 0 with no field through the shut (4,18) door), and the chest stalls only on turn 21
@@ -94,7 +93,6 @@ b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 R2/R3, #639 on R4. #745 (the recorder misses a thief's drop) stays open.
 
 **Worktrees:**
-- `../manchego-stars-wt4` still holds Trade step 1 (#688), uncommitted.
 - `.claude/worktrees/` holds old reviewer worktrees (untracked, deletable).
 
 ## Parked or owed elsewhere
