@@ -29,10 +29,11 @@ behind Rennac until he was gone. Memory already knew the door brought them (each
 - **`Bot` `releasesOf`**, once a decision on the board before anyone acts: each such door still
   shut whose losses hold something still open here (the `stake`). Its `need` is the front's size.
   A unit is `ready` when it can strike a front tile the turn the door opens (`strikeGap`: the
-  march cost from the door to it plus from the door to the tile, one field from the door's tile,
+  march cost from the door to it plus from the door to the tile, one field from the door's tile
+  read on the map the door's change leaves (a roofed room's tiles are unreached before it),
   units not blocking, against its MOV and the Weapon Select list's longest reach). Opening
-  the door spends its opener's act, so when every unit able to act that opens doors is among the
-  ready, one fewer counts. `staged` = ready >= need.
+  the door spends its opener's act, so when every unit that can open it this turn (lacks nothing
+  for it, `lockAt`, and stands about a move from it) is among the ready, one fewer counts. `staged` = ready >= need.
 - **The planner's forfeit** (`Goals.forfeited`'s `released`, `Goals.released`): a plan that
   opens a door whose release is not staged forfeits the stake: the recruit memory saw walk off
   (by character; recruit goals now carry `charId`) and the tiles its units closed. A ranking,
@@ -47,18 +48,25 @@ behind Rennac until he was gone. Memory already knew the door brought them (each
 Nothing names a unit, a door, a tile or a chapter. A first attempt has no memory and plays as
 before.
 
-## What it did (replay `s766r`, Ch14 s4005, attempts 1-2)
+## What it did (replays of Ch14 s4005, attempts 1-2)
 
-- **Attempt 1** (no memory) played as `q766e` a1: won in 21 turns, L'Arachel lost on turn 14.
-- **Attempt 2:** the door waited from turn 3 to turn 5 (it opened on turn 3 in `q766e` a2). On
-  turn 4 Saleh, Innes and Cormag moved within three tiles of it. Tana opened it on turn 5, and Artur, Innes
-  and Cormag killed three of the four Fighters it brought that turn. L'Arachel went in behind
-  them, and **talked Rennac over on turn 6**, the first recruit in these replays.
-- **Not clean:** L'Arachel died in turn 6's enemy phase (won in 23 turns, 1 death; `q766e` a2:
-  16 turns, 0 deaths, Rennac lost). The Talk plan read her death at 0: it had Rennac, still on
-  (22,9) beside her, take the reds' strikes. Once he joined, his replan judged four moves, all
-  off (22,9), each with her at 0.397. Holding his own tile was never offered: `propose` gives a
-  unit its three safest hold tiles, and its own tile only on a tie. That is the next fix (#766).
+Attempt 1 has no memory and played as `q766e` a1 in every replay: won in 21 turns, L'Arachel
+lost on turn 14.
+
+- **`s766r` and `s766s` (the first version):** no unit ever read as ready (`ready 0` on every
+  record of `s766s`), so no stage job was set. The corridor's tiles are roofed until the door's
+  change, and a field read on the shut map does not reach them. The forfeit alone held the door
+  from turn 3 to turn 5. L'Arachel talked Rennac over on turn 6, then died in that enemy phase:
+  the Talk plan had Rennac stay on (22,9) and read her death at 0, and once he joined, his replan
+  offered him no hold on his own tile (`propose` gives a unit its three safest hold tiles, its own
+  only on a tie). That is a lead for #766, seen once.
+- **`s766t` (this rule, gaps read on the opened map):** the turn-1 record read the door
+  unstaged (ready 1 of 4) and sent four stagers. By turn 2 six units were ready. Colm opened it
+  on turn 3, and **L'Arachel talked Rennac over on turn 4**, and lived through that turn. The
+  game was won in 14 turns (`q766e` a2: 16, Rennac lost). **Not clean:** a red staff user
+  berserked Cormag on turn 7 at (18,3), where the army had not reached by that turn in any earlier
+  replay, and he killed L'Arachel, Artur and Tana on turns 9-11, each in a turn with no plan
+  under the cap (#743's case).
 
 ## Against ADR 0396's five tests
 
@@ -71,4 +79,4 @@ ordering repeats another. (5) No unit, chapter or tile is named in the code.
 - `test_a_door_memory_says_brings_reds_waits_for_its_strikers` (bot) fails without the forfeit
   and the stage job, and its armed-opener and beside-the-door checks fail without those parts;
   the `releases` case in `test_timeline`; the `released` case in `test_goals`.
-- Replay `s766r` above.
+- Replays `s766r`, `s766s` and `s766t` above.
