@@ -1680,6 +1680,15 @@ local function doorMates(ctx, u, chests)
     return out
 end
 
+-- A sort of { [unit] = a unit, [field] = a number } rows: the least number first, slot order on
+-- a tie (the unit nearest a door, a release's nearest striker).
+local function soonestThenSlot(field, unit)
+    return function(a, b)
+        if a[field] ~= b[field] then return a[field] < b[field] end
+        return (a[unit].slot or 0) < (b[unit].slot or 0)
+    end
+end
+
 -- The teammates of `u` (doorMates) that have a way to the door `d`, through what they open on
 -- the way, with their turns there: soonest first, slot order on a tie. A key holder cut off
 -- from the door opens nothing, so it is not listed.
@@ -1689,10 +1698,7 @@ local function matesTo(ctx, u, d)
         local n = obstacleTurns(ctx, m, m)[obstacleKey(d)]
         if n then out[#out + 1] = { m = m, n = n } end
     end
-    table.sort(out, function(a, b)
-        if a.n ~= b.n then return a.n < b.n end
-        return (a.m.slot or 0) < (b.m.slot or 0)
-    end)
+    table.sort(out, soonestThenSlot("n", "m"))
     return out
 end
 
@@ -3039,6 +3045,8 @@ end
 -- less u's MOV and longest reach. 0 or less: u can strike a red the door brings the turn it
 -- opens. nil: u has no weapon, or no way there.
 local function strikeGap(ctx, u, r)
+    -- the Weapon Select list's reach (sight.weapons), not sight.itemReach: that one counts a
+    -- weapon the unit cannot strike with now, and a strike the door's turn needs one it can
     local reach = 0
     for _, w in ipairs(ctx.sight.weapons(u) or {}) do reach = math.max(reach, w.max or 0) end
     if reach == 0 then return nil end
@@ -3060,7 +3068,8 @@ end
 -- killed three of the four Fighters it brought on the door's own turn; every miss had its
 -- strikers 4-8 tiles back. Each: { x, y, key, need = the front's size, stake = { tiles, gone }
 -- (the open part of its losses), strikers = { { u, gap } } nearest first (strikeGap), ready =
--- how many of them can strike its front this turn, staged = ready >= need }. Read once
+-- how many of them can strike its front this turn, less one opener when only a ready unit
+-- can open it, staged = ready >= need }. Read once
 -- a decision, on the board before anyone acts: a striker that moves in this turn has acted.
 local function releasesOf(ctx)
     local out = {}
@@ -3087,18 +3096,22 @@ local function releasesOf(ctx)
                 if openRecruit[c] then stake.gone[c], any = true, true end
             end
             if any then
-                local strikers, ready = {}, 0
+                -- the door's opening spends its opener's act: when every unit able to act that
+                -- opens doors is among the ready, one of them opens it and strikes nothing
+                local strikers, ready, openers, readyOpeners = {}, 0, 0, 0
                 for _, u in ipairs(ctx.actors) do
                     local gap = strikeGap(ctx, u, r)
+                    if opener(ctx, u) then openers = openers + 1 end
                     if gap then
                         strikers[#strikers + 1] = { u = u, gap = gap }
-                        if gap <= 0 then ready = ready + 1 end
+                        if gap <= 0 then
+                            ready = ready + 1
+                            if opener(ctx, u) then readyOpeners = readyOpeners + 1 end
+                        end
                     end
                 end
-                table.sort(strikers, function(a, b)
-                    if a.gap ~= b.gap then return a.gap < b.gap end
-                    return (a.u.slot or 0) < (b.u.slot or 0)
-                end)
+                if openers > 0 and readyOpeners == openers then ready = ready - 1 end
+                table.sort(strikers, soonestThenSlot("gap", "u"))
                 out[#out + 1] = { x = r.x, y = r.y, key = key, need = #r.front, stake = stake,
                                   strikers = strikers, ready = ready,
                                   staged = ready >= #r.front }
@@ -3114,17 +3127,21 @@ M.releasesOf = releasesOf
 -- brings. Never a unit whose loss ends the game (sendOpeners' reason: a lord pulled to a door
 -- leaves the objective). The door's own act waits on the planner's forfeit (Goals.forfeited's
 -- `released`), not on this: this only brings the strikers.
-local function sendStagers(ctx)
+local function sendStagers(ctx, barred)
     local lords = M.gameOver(ctx.sight)
     for _, r in ipairs(ctx.releases or {}) do
         if not r.staged then
+            -- met beside the door, never on it (Goals.beside): a keyless striker marches up to
+            -- it, not off to fetch a key for it
             local n = 0
             for _, s in ipairs(r.strikers) do
                 if n >= r.need then break end
-                if not (ctx.exploreGoal[s.u.id] or lords[s.u.charId]) then
-                    ctx.exploreGoal[s.u.id] = { x = r.x, y = r.y, stage = true }
-                    n = n + 1
-                elseif ctx.exploreGoal[s.u.id] and ctx.exploreGoal[s.u.id].stage then
+                local g = ctx.exploreGoal[s.u.id]
+                if g then
+                    -- already this door's stager: it counts
+                    if g.stage and g.x == r.x and g.y == r.y then n = n + 1 end
+                elseif not (lords[s.u.charId] or isBarred(barred or {}, s.u.id, r)) then
+                    ctx.exploreGoal[s.u.id] = { x = r.x, y = r.y, kind = Goals.STAGE, stage = true }
                     n = n + 1
                 end
             end
@@ -3238,7 +3255,7 @@ local function exploring(ctx, sent, barred, triedIn)
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
     if not ctx.sight.explorable then
-        sendStagers(ctx)
+        sendStagers(ctx, barred)
         return
     end
     local open, blues = {}, {}
@@ -3327,7 +3344,7 @@ local function exploring(ctx, sent, barred, triedIn)
         if t and not g.door and quiet[t.id] then triedOn(t.id)[uid] = true end
     end
     sendOpeners(ctx, barred)
-    sendStagers(ctx)
+    sendStagers(ctx, barred)
 end
 
 function M.explain(board, sight, style)

@@ -30,13 +30,17 @@ behind Rennac until he was gone. Memory already knew the door brought them (each
   shut whose losses hold something still open here (the `stake`). Its `need` is the front's size.
   A unit is `ready` when it can strike a front tile the turn the door opens (`strikeGap`: the
   march cost from the door to it plus from the door to the tile, one field from the door's tile,
-  units not blocking, against its MOV and longest reach). `staged` = ready >= need.
+  units not blocking, against its MOV and the Weapon Select list's longest reach). Opening
+  the door spends its opener's act, so when every unit able to act that opens doors is among the
+  ready, one fewer counts. `staged` = ready >= need.
 - **The planner's forfeit** (`Goals.forfeited`'s `released`, `Goals.released`): a plan that
   opens a door whose release is not staged forfeits the stake: the recruit memory saw walk off
   (by character; recruit goals now carry `charId`) and the tiles its units closed. A ranking,
   not a ban (ADR 0396): the forfeit is the rank's first term, as every forfeit is.
 - **The stage job** (`sendStagers`): each unstaged release sends its `need` nearest strikers
-  with no other job to the door (never a unit whose loss ends the game, `sendOpeners`' reason).
+  with no other job to the door (never a unit whose loss ends the game, `sendOpeners`' reason,
+  nor one the stuck record bars from it). The job is met beside the door (`Goals.STAGE` is a
+  beside kind), so a keyless striker marches up to it rather than off to fetch a key.
 - **The record**: each plan carries `releases` (door, need, ready, staged), and a stager's
   `goals` row is marked `stage`.
 
@@ -65,5 +69,6 @@ ordering repeats another. (5) No unit, chapter or tile is named in the code.
 ## Proof
 
 - `test_a_door_memory_says_brings_reds_waits_for_its_strikers` (bot) fails without the forfeit
-  and the stage job, and passes with them; the `releases` case in `test_timeline`.
+  and the stage job, and its armed-opener and beside-the-door checks fail without those parts;
+  the `releases` case in `test_timeline`; the `released` case in `test_goals`.
 - Replay `s766r` above.

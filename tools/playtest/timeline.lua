@@ -432,9 +432,9 @@ end
 -- brings four Fighters and Rennac into the corridor he leaves by (#766); the one try that got
 -- him had three strikers at the door when it opened.
 --   { act, x, y,
---     front = { { charId, classId, x, y } }: the reds it brought on the act's own board turn,
---             less any that left the map or turned (a recruit is a goal, not a foe), from the
---             latest attempt that made the act
+--     front = { { charId, classId, x, y } }: the foes it brought on the first board turn it
+--             brought any (the act's own), a foe being a red that neither left the map nor
+--             turned (a recruit is a goal, not a foe), from the latest attempt that made the act
 --     tiles = { ["x,y"] = true }: tiles a unit it brought closed (looted, opened) in any attempt
 --     gone  = { [charId] = true }: units it brought that left the map, unkilled, in any attempt }
 -- In act-tile order. A death is the play's (as deadlines' reads it): no loss.
@@ -466,15 +466,17 @@ function compute.releases(memory)
         end
         -- this attempt made the act: its own turn's reds are the front (the latest attempt's)
         for _, m in pairs(mine) do
+            local function foe(u)
+                return not (u.gone and (u.gone.how == "left" or u.gone.how == "turned"))
+            end
             local first
             for _, u in ipairs(m.units) do
                 local t = u.appeared.boardTurn
-                if not first or t < first then first = t end
+                if foe(u) and (not first or t < first) then first = t end
             end
             local front = {}
             for _, u in ipairs(m.units) do
-                local foe = not (u.gone and (u.gone.how == "left" or u.gone.how == "turned"))
-                if u.appeared.boardTurn == first and foe then
+                if u.appeared.boardTurn == first and foe(u) then
                     front[#front + 1] = { charId = u.charId, classId = u.classId,
                                           x = u.appeared.x, y = u.appeared.y }
                 end

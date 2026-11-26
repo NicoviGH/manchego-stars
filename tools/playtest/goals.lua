@@ -438,7 +438,7 @@ function M.released(g, stakes)
     for _, s in ipairs(stakes or {}) do
         if g.kind == "recruit" then
             if g.charId ~= nil and s.gone[g.charId] then return true end
-        elseif g.tile and s.tiles[g.tile.x .. "," .. g.tile.y] then
+        elseif g.tile and s.tiles[key(g.tile.x, g.tile.y)] then
             return true
         end
     end
@@ -493,7 +493,10 @@ end
 -- chance, the planner's nearest and advance reads, the march's talk assignment). A Talk is made
 -- from a tile beside the recruit, so a lock on the tile he stands on (vanilla Ch14's Rennac walks
 -- over two unopened chests) is no cost of meeting him (#710).
-local BESIDE = { recruit = true }
+-- A stage job (#766, bot.lua sendStagers) is had beside the door it waits at: the door is shut,
+-- and a striker that holds no key for it is not sent to fetch one.
+M.STAGE = "stage"
+local BESIDE = { recruit = true, [M.STAGE] = true }
 function M.beside(kind) return BESIDE[kind] or false end
 
 function M.worth(goal, W)

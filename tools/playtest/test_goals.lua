@@ -670,5 +670,22 @@ do
           "on-field recruit: one that never leaves the peaks is no chance")
 end
 
+-- released: a goal an unstaged release loses (#766): a recruit by the character memory saw its
+-- door's units walk off with, a tile goal by the tile they closed; a recruit's own tile is no
+-- tile loss
+do
+    local stakes = { { gone = { [0x1C] = true }, tiles = { ["22,5"] = true } } }
+    check(Goals.released({ kind = "recruit", charId = 0x1C, tile = { x = 22, y = 12 } }, stakes), true,
+          "released: the recruit who left, by character")
+    check(Goals.released({ kind = "recruit", charId = 0x1D, tile = { x = 22, y = 5 } }, stakes), false,
+          "released: another recruit, though on a closed tile")
+    check(Goals.released({ kind = "chest", tile = { x = 22, y = 5 } }, stakes), true,
+          "released: the tile its units closed")
+    check(Goals.released({ kind = "chest", tile = { x = 22, y = 3 } }, stakes), false,
+          "released: another tile")
+    check(Goals.released({ kind = "chest", tile = { x = 22, y = 5 } }, nil), false,
+          "released: no release made, nothing lost")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
