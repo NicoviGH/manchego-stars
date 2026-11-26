@@ -5714,6 +5714,142 @@ do
     local robs = { thefts = { { thief = 0x81, target = 0x01, item = 0x6B, lock = true } } }
     check(after({ { p = 0.5, strikes = robs }, { p = 0.5, strikes = { kill } } }), 0,
           "theft: robbed in one way and dead in the other, the chest is kept in none")
+
+    -- A theft the game ranks above the stat boosters (sight.pilfer's `spoils`, the record's own
+    -- line, ADR 0379) costs the clean clear whatever it opens (ADR 0475; vanilla Ch16: a Knight
+    -- Crest stolen from Colm, 0x09, was the only spoiler of 4 R4 tries, and cost the plan nothing
+    -- on main). With no chest to keep, A steps off the tile the thief steals from, and the plan
+    -- that stays forfeits "stolen:1"; a theft that does not spoil costs nothing (A stays)
+    local function off(spoils, drops)
+        local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+                    enemyPhase = function(plan)
+                        for _, b in ipairs(plan.blues) do
+                            if b.x == 0 and b.y == 1 then
+                                return { thefts = { { thief = 0x81, target = b.unit.id,
+                                                      item = 0x6D, lock = false,
+                                                      spoils = spoils, drops = drops } } }
+                            end
+                        end
+                        return {}
+                    end }
+        local a, plan = Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))
+        return at(a), plan
+    end
+    local base = off(false)
+    check(base, "0,1", "theft: a theft that does not spoil leaves A where it stands")
+    -- a thief that drops its loot gives it back when it dies, and clean is the end state (ADR
+    -- 0475): its theft is no forfeit, and A is not moved for it
+    local kept, keptPlan = off(true, true)
+    check(kept == "0,1" and #(keptPlan and keptPlan.forfeited or { 1 }) == 0, true,
+          "theft: a spoiling theft by a thief that drops its loot forfeits nothing")
+    local moved, plan = off(true)
+    check(moved ~= "0,1" and #(plan and plan.forfeited or { 1 }) == 0, true,
+          "theft: a spoiling theft moves A off the thief's tile, forfeiting nothing")
+    check(Goals.forfeited({}, {}, { stolen = { [0x01] = true } })[1], "stolen:1",
+          "theft: a spoiling theft is forfeit by the robbed unit's id")
+    -- ... and the mend tries the robbed unit's other acts, as it does a unit that may die: the
+    -- beam ranks acts by their own score, which never sees a theft, so a beam and a final of one
+    -- keep only A's stay (vanilla Ch16, replay i730f: Colm's careful step was offered, the mend
+    -- tried only units with a chance to die, and every judged plan forfeited "stolen:7")
+    local beam, final = Planner.BEAM, Planner.FINAL
+    Planner.BEAM, Planner.FINAL = 1, 1
+    local narrow, narrowPlan = off(true)
+    Planner.BEAM, Planner.FINAL = beam, final
+    check(narrow ~= "0,1" and #(narrowPlan and narrowPlan.forfeited or { 1 }) == 0, true,
+          "theft: the mend moves the robbed unit off the thief's tile when the beam kept only its stay")
+
+    -- a way that surely kills the holder loses the item with its life: that way's death is the
+    -- cost, not "stolen:1" on top of it (the plan that leaves A on the thief's tile)
+    local doomed = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+                     enemyPhase = function(plan)
+                         for _, b in ipairs(plan.blues) do
+                             if b.x == 0 and b.y == 1 then
+                                 return { { target = b.unit.id, takenHit = 100, takenDmg = 99,
+                                            takenHits = 1, takenCrit = 0 },
+                                          thefts = { { thief = 0x81, target = b.unit.id,
+                                                       item = 0x6D, lock = false, spoils = true } } }
+                             end
+                         end
+                         return {}
+                     end }
+    local _, doomedPlan = Planner.plan(B, boardOf(A, X), sightOf(doomed), gifted("careful", 500))
+    local stayForfeits
+    for _, c in ipairs(doomedPlan and doomedPlan.considered or {}) do
+        if table.concat(c.acts, " ") == "1>wait@0,1>nil" then stayForfeits = c.rank.forfeits end
+    end
+    check(stayForfeits, 0, "theft: a holder the same way surely kills forfeits no theft as well")
+    -- a theft no act undoes (every tile of A's robbed) runs no extra mend round: a round in which
+    -- no mend outranked its base ends the mend (`best == base`), so three rounds cost what one does
+    local function cornered(rounds)
+        local calls, keep = 0, Planner.MEND_ROUNDS
+        Planner.MEND_ROUNDS = rounds
+        local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+                    enemyPhase = function(plan)
+                        calls = calls + 1
+                        return { thefts = { { thief = 0x81, target = 0x01, item = 0x6D,
+                                              lock = false, spoils = true } } }
+                    end }
+        Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))
+        Planner.MEND_ROUNDS = keep
+        return calls
+    end
+    check(cornered(3), cornered(1), "theft: an undoable theft's mend stops when a round changes nothing")
+    -- ... and a mend round that brings the plan under the cap with the theft still in it is not
+    -- the last: C dies on (5,5) and A is robbed on (0,1), and each fix alone leaves the other.
+    -- Round 1 moves C (under the cap, "stolen:1" kept); a second round moves A too (vanilla Ch16,
+    -- replay i730g: Eirika's mend took the plan under the cap with Colm beside the thief, and
+    -- his own mend, from the over-cap base, stayed over it)
+    local C = blue(0x02, 1, 5, 5, { minRange = false })
+    local both = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }),
+                             [0x02] = tiles({ 5, 5 }, { 4, 5 }, { 6, 5 }) },
+                   enemyPhase = function(plan)
+                       local out = {}
+                       for _, b in ipairs(plan.blues) do
+                           if b.x == 0 and b.y == 1 then
+                               out.thefts = { { thief = 0x81, target = b.unit.id, item = 0x6D,
+                                                lock = false, spoils = true } }
+                           end
+                           if b.unit.id == 0x02 and b.x ~= 6 then
+                               out[#out + 1] = { target = b.unit.id, takenHit = 100, takenDmg = 99,
+                                                 takenHits = 1, takenCrit = 0 }
+                           end
+                       end
+                       return out
+                   end }
+    Planner.BEAM, Planner.FINAL = 1, 1
+    local _, bothPlan = Planner.plan(B, boardOf(A, C, X), sightOf(both), gifted("careful", 500))
+    Planner.BEAM, Planner.FINAL = beam, final
+    check(bothPlan and bothPlan.rank and bothPlan.rank.admitted and #(bothPlan.forfeited or { 1 }) == 0, true,
+          "theft: the mend goes on past the cap while the plan is still robbed")
+end
+
+-- A robbed unit with no tile out of the thief's reach: the mend tries every unit's strike on
+-- the thief too, as it tries a green unit's strikers (vanilla Ch16, replay i730h, turn 14: Colm
+-- cornered at (19,1), every act of his robbed). H holds the spoiling item at (5,5), its only
+-- tile. D can kill the thief X (20 HP) from (0,0) or the bigger Y (40 HP) from (0,4); a beam of
+-- one keeps the bigger kill, so only the mend brings X's to the judged phase.
+do
+    local D = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local H = blue(0x02, 1, 5, 5, { minRange = false })
+    local X = red(0x81, 1, 0, { hp = 20, minRange = false })
+    local Y = red(0x82, 1, 4, { hp = 40, minRange = false })
+    local o = {
+        reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 0, 3 }, { 0, 4 }),
+                  [0x02] = tiles({ 5, 5 }) },
+        fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } },
+                          [0x82] = { ["0,4"] = fc { hit = 100, dmg = 50, hits = 1, killsTarget = true } } } },
+        enemyPhase = function(plan)
+            if (plan.gone or {})[0x81] then return {} end
+            return { thefts = { { thief = 0x81, target = 0x02, item = 0x6D, lock = false,
+                                  spoils = true } } }
+        end,
+    }
+    local beam, final = Planner.BEAM, Planner.FINAL
+    Planner.BEAM, Planner.FINAL = 1, 1
+    local a, plan = Planner.plan(B, boardOf(D, H, X, Y), sightOf(o), style("careful"))
+    Planner.BEAM, Planner.FINAL = beam, final
+    check(plan and #(plan.forfeited or { 1 }) == 0 and a and a.act == "attack" and a.targetId == 0x81,
+          true, "theft: a cornered holder's thief is struck down by another unit, through the mend")
 end
 
 -- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with
@@ -11223,6 +11359,17 @@ do
     a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000), owed)
     check(plan and table.concat(plan.forfeited or {}, ","), "recruit:129",
           "owed: with a talker the recruit's row is the forfeit, not a second one")
+    -- the record's clean clear still loses the recruit when its row is not feasible (ADR 0475;
+    -- vanilla Ch10's Amelia, 0x12: every Talk plan over the cap, the row gone, and Seth's or
+    -- Franz's counter killed her as an ordinary red in 7 of 15 R4 tries). A stalled row (no unit
+    -- neared it) forfeited nothing on main: now the death is "owed:129", since the row's id
+    -- ("recruit:129") is not feasible and so counts nothing
+    board, o = counterKillsRecruit(true)
+    a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000),
+                           { owedRecruits = { [0x81] = true },
+                             quietGoals = { ["recruit:129"] = true } })
+    check(plan and table.concat(plan.forfeited or {}, ","), "owed:129",
+          "owed: a recruit whose Talk row stalled is still forfeit by its death")
 end
 
 -- the same price on our own blow (the player phase): A, next to R and Y (the Rout's other enemy),

@@ -3367,7 +3367,8 @@ end
 -- downed it -- caught at its entry: r0 the receiving unit, r1 the item. The fallen one is the
 -- battle's other unit (gBattleActor/gBattleTarget +0x0B). Held only while the battle's
 -- resolution (sProcScr_CombatAction) is live with a US_DROP_ITEM unit in it. -> stop() -> the
--- drops since the watch began, { from = the fallen unit's charId, to = the receiver's, item }.
+-- drops since the watch began, { from = the fallen unit's charId, fromId = its unit id, to = the
+-- receiver's charId, item }.
 INSPECT.watchDrops = function(cpu)
     local drops = {}
     local function unitAt(bu) return ru32(SYM.gUnitLookup + ru8(bu + 0x0B) * 4) end
@@ -3379,8 +3380,8 @@ INSPECT.watchDrops = function(cpu)
         local to = cpu.read("r0")
         local from = unitAt(SYM.gBattleActor)
         if from == to then from = unitAt(SYM.gBattleTarget) end
-        drops[#drops + 1] = { from = ru8(ru32(from) + 4), to = ru8(ru32(to) + 4),
-                              item = cpu.read("r1") & 0xFF }
+        drops[#drops + 1] = { from = ru8(ru32(from) + 4), fromId = ru8(from + 0x0B),
+                              to = ru8(ru32(to) + 4), item = cpu.read("r1") & 0xFF }
     end)
     return function() stop(); return drops end
 end
@@ -3389,7 +3390,7 @@ end
 -- its entry, before it moves the item: gActiveUnit the thief, gAiDecision +06 the unit robbed,
 -- +07 the item's slot. Held only while gAiDecision is a steal (decided frames before it plays:
 -- gProcScr_CpPerform moves the thief and sleeps first). -> stop() -> the thefts since the watch
--- began, { thief, from = charIds, item }.
+-- began, { thief, from = charIds, thiefId = the thief's unit id, item }.
 INSPECT.watchThefts = function(cpu)
     local thefts = {}
     local stop = INSPECT.breakWhile(cpu, SYM.AiStartStealAction, function()
@@ -3398,6 +3399,7 @@ INSPECT.watchThefts = function(cpu)
         local robbed = ru32(SYM.gUnitLookup + ru8(SYM.gAiDecision + BOARD.AI_DEC.TARGET) * 4)
         local slot = ru8(SYM.gAiDecision + BOARD.AI_DEC.SLOT)
         thefts[#thefts + 1] = { thief = ru8(ru32(ru32(SYM.gActiveUnit)) + 4),
+                                thiefId = ru8(ru32(SYM.gActiveUnit) + 0x0B),
                                 from = ru8(ru32(robbed) + 4),
                                 item = ru16(robbed + 0x1E + slot * 2) & 0xFF }
     end)

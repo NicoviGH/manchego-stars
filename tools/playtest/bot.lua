@@ -2386,7 +2386,7 @@ end
 -- (ctx.owedRecruits) that no blue unit may Talk yet (vanilla Ch10's Marisa before Gerik joins).
 -- They are NOT in `out`: no one can Talk them, so the march has nothing to stand beside and a
 -- red keeps its damage and advance credit; only their death is priced (Planner's looseHit,
--- Goals.forfeited's `loose`), with no goal and no row: a row nobody can take would hold the win.
+-- Goals.forfeited's `owed`, ADR 0475), with no goal and no row: a row nobody can take would hold the win.
 local function recruitsOf(ctx)
     local out, talkers, loose = {}, {}, {}
     -- a carried recruit too (ctx.carried): a Drop sets it down to be talked to

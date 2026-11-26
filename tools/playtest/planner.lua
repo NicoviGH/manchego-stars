@@ -93,14 +93,14 @@
 -- chances) },
 -- rank = what plans are compared by (M.outranks): { admitted, idle (opts.idle only: 1 for a plan
 -- that does not advance the level, 0 for one that does; ADR 0439),
--- forfeits (how many ledger goals it closes for good, and owed recruits no one may Talk yet it
--- risks: Goals.forfeited), complete (its chance to end the
+-- forfeits (how many ledger goals it closes for good, every owed recruit with no feasible row it
+-- risks, and every spoiling theft: Goals.forfeited, ADR 0475), complete (its chance to end the
 -- chapter), progress (the turns it cuts from each unit's way to its goal, summed), behind
 -- (whole turns short of the most progress judged), green_die (allied greens' summed death
 -- chance), value (the judged score), game_over (the chance a unit whose death ends the game
 -- dies), max_exceed, sum_exceed, max_die, sum_die, hp_left, fog (the fog read's summed
 -- chance to kill, where the chapter goes on), key }, forfeited = the ids it
--- closes (a row's, or "owed:<unit id>"), ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
+-- closes (a row's, "owed:<unit id>" or "stolen:<unit id>"), ledger = Goals.ledger's rows as the plan leaves them (what it forfeits `closed`),
 -- seizeJudged / seizeAdmitted = whether any plan judged took the Seize, and one within the
 -- cap, stuck = Bot.candidates' record of the goals units are blocked from, fallback =
 -- "FALLBACK_SACRIFICE" when no plan was under the cap, protected = each protected unit's
@@ -180,6 +180,7 @@ M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam trie
                    -- hold and retreat, always: the way out survives the cut)
 M.FINAL = 4        -- complete plans judged against the enemy phase
 M.MEND_ROUNDS = 3  -- the mend's rounds; past the first, only while no plan is under the cap
+                   -- or the best still forfeits a theft ("stolen:<id>", ADR 0475)
 -- the uncertain kills the judge plays both ways (2^n enemy phases), so a protected unit's death
 -- chance is a sum over the ways the phase can go, never read off an average that keeps a
 -- likely kill gone (FR-009). Even an enemy that reaches no one is played both ways: its death
@@ -2363,12 +2364,23 @@ function M.plan(Bot, board, sight, style, opts)
         -- game's own AI decided the theft, sight's pilfer; a plan that moves the holder out of
         -- reach, or kills the thief, reads none). A chest it would have opened is worth that
         -- much of what it was, and a way where the thief also kills the holder counts once.
-        local robbed, keeps = {}, {}
+        -- A theft of an item the game ranks above the stat boosters (th.spoils) by a thief that
+        -- keeps it (not th.drops: its death gives it back, and clean is the end state) costs the
+        -- clean clear whatever else it takes: a forfeit of its own (`spoiled`, robbed id -> its
+        -- thieves' ids, kept as st.thieves for the mend, ADR 0475).
+        local robbed, keeps, spoiled = {}, {}, {}
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             local robbedHere = {}
             for _, th in ipairs(o.strikes.thefts or {}) do
                 if th.lock then robbedHere[th.target], robbed[th.target] = true, true end
+                -- a holder the same way surely kills loses the item with its life: that way's
+                -- death is the plan's cost, not a theft as well
+                local dies = res[th.target] and res[th.target].d >= 1 - M.DUST
+                if th.spoils and not th.drops and not dies and o.p > M.DUST then
+                    spoiled[th.target] = spoiled[th.target] or {}
+                    spoiled[th.target][th.thief] = true
+                end
             end
             for _, u in ipairs(hitOf[o.way]) do
                 local id, r = u.id, res[u.id]
@@ -2519,13 +2531,19 @@ function M.plan(Bot, board, sight, style, opts)
         for _, g in ipairs(greens) do
             if st.recruits[g.id] then lost[g.id] = (lost[g.id] or 0) + (die[g.id] or 0) end
         end
-        local looseHeld = {}   -- the loose recruits whose death is not the win
-        for id in pairs(st.loose) do
-            if not winByDeath(st, id) then looseHeld[id] = true end
+        -- every owed recruit on the field whose death is not the win: a loose one, or one a
+        -- blue may Talk (its feasible row counts it once; without one, its death still costs
+        -- the clean clear, ADR 0475)
+        local owed = {}
+        for _, set in ipairs({ st.loose, st.recruits }) do
+            for id in pairs(set) do
+                if byId[id] and not winByDeath(st, id) then owed[id] = true end
+            end
         end
+        st.thieves = spoiled
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
-                                                       lost = lost, loose = looseHeld,
-                                                       reach = reached(st),
+                                                       lost = lost, owed = owed,
+                                                       stolen = spoiled, reach = reached(st),
                                                        gone = M.GONE })
         local gain = progress(st)
         local greenDie = 0
@@ -2873,11 +2891,22 @@ function M.plan(Bot, board, sight, style, opts)
     -- it tries instead the player acts that could save it, one ending beside it (a block) or
     -- striking an enemy that strikes it. A recruit our counter may kill tries the acts of the
     -- units it strikes.
-    -- With no plan under the cap the mend goes again from the plan it found, up to
+    -- With no plan under the cap, or the best still robbed (below), the mend goes again from the plan it found, up to
     -- M.MEND_ROUNDS rounds, so more than one unit may change (#510 PR A): one round changed one
     -- unit, and two units each over the cap where they stood stayed a fallback.
+    -- whether the plan forfeits a theft the mend can try to undo ("stolen:<id>"): a round that
+    -- took the plan under the cap with the robbed unit left beside its thief is not the last
+    -- (vanilla Ch16, replay i730g: Eirika's mend took the plan under the cap with Colm still
+    -- robbed, and his own mend, tried from the over-cap base, stayed over it)
+    local function robbed(st)
+        for _, f in ipairs(st.forfeited or {}) do
+            if f:match("^stolen:") then return true end
+        end
+        return false
+    end
+    -- (a robbed plan whose round changed nothing still stops: `best == base` below)
     for round = 1, M.MEND_ROUNDS do
-        if not best or (round > 1 and best.rank.admitted) then break end
+        if not best or (round > 1 and best.rank.admitted and not robbed(best)) then break end
         local base, menuOf, risky = best, {}, {}
         -- the menus on the board the plan being mended leaves (menusFor): a unit at risk may
         -- try a doorway or a freed tile its plan's door or kill opens; extend's `needs` check
@@ -2918,6 +2947,23 @@ function M.plan(Bot, board, sight, style, opts)
                 end
                 return entriesOf(talkers)
             end
+            if p.thieves then
+                -- a robbed unit: its own other acts (out of the thief's reach), then every
+                -- unit's strike on a thief that robs it (dead, it steals nothing): vanilla Ch16,
+                -- replay i730h, turn 14: Colm cornered at (19,1), every tile of his robbed
+                local out = {}
+                for _, t in ipairs(menuOf[p.id] or {}) do out[#out + 1] = t end
+                for _, m in ipairs(baseMenus) do
+                    if m.unit.id ~= p.id then
+                        for _, a in ipairs(m.acts) do
+                            if a.act == "attack" and a.targetId and p.thieves[a.targetId] then
+                                out[#out + 1] = { uid = m.unit.id, a = a }
+                            end
+                        end
+                    end
+                end
+                return out
+            end
             if not p.green then return menuOf[p.id] or {} end
             local striker, out = {}, {}
             for _, id in ipairs(p.strikers) do striker[id] = true end
@@ -2933,6 +2979,17 @@ function M.plan(Bot, board, sight, style, opts)
         end
         for _, p in ipairs(base.predict) do
             if p.die > 0 then risky[#risky + 1] = p end
+        end
+        -- a unit a spoiling theft robs in the plan ("stolen:<id>", Goals.forfeited) tries its
+        -- other acts too, first: the forfeit ranks before any death, and the beam ranked its acts
+        -- by their own score, which never sees the theft (vanilla Ch16, replay i730b: every plan
+        -- judged kept Colm and the Knight Crest beside the thief, ADR 0475)
+        for _, f in ipairs(base.forfeited or {}) do
+            local id = tonumber(f:match("^stolen:(%d+)$"))
+            if id then
+                risky[#risky + 1] = { id = id, die = math.huge,
+                                      thieves = (base.thieves or {})[id] or {} }
+            end
         end
         -- a player unit whose counter may end the chapter (the boss striking it and dying)
         -- tries its other acts too: the beam cannot see that counter, so every plan it kept

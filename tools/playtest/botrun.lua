@@ -167,6 +167,33 @@
 
 local M = {}
 
+-- The spoiling thefts (t.spoils, ADR 0379) whose item the army has not got back: a drop the game
+-- gave a player unit later (`drops`: { from = the dropper's charId, fromId = its unit id, item,
+-- turn }; only a player unit gets one, INSPECT.watchDrops) of the same item from the same thief
+-- (its unit id: two thieves may share a charId, as vanilla Ch16's do; the charId when a record
+-- has no ids) recovers one theft, each drop once. An AI thief that holds the drop flag puts its
+-- loot last, and the last item is the drop (ActionSteal's UnitAddItem, bmmind.c). An item is
+-- its id (the low byte; the high one is its uses), so a Knight Crest given back is any Crest.
+-- A clean clear is the state at the chapter's end (ADR 0475): a Knight Crest stolen and dropped
+-- back is no loss. Each recovered theft is marked `recovered`. -> the thefts still lost
+function M.unrecovered(thefts, drops)
+    local used, out = {}, {}
+    for _, t in ipairs(thefts or {}) do
+        if t.spoils then
+            for i, d in ipairs(drops or {}) do
+                local same = (d.fromId and t.thiefId) and d.fromId == t.thiefId
+                    or (not (d.fromId and t.thiefId) and d.from == t.thief)
+                if not used[i] and d.item == t.item and same and (d.turn or 0) >= (t.turn or 0) then
+                    used[i], t.recovered = true, true
+                    break
+                end
+            end
+            if not t.recovered then out[#out + 1] = t end
+        end
+    end
+    return out
+end
+
 M.PREFIX = "BOTRUN "
 M.DIAG_PREFIX = "DIAG "
 M.PINNED_PREFIX = "PINNED "
@@ -825,7 +852,7 @@ function M.run(api)
                   dice_advanced = api.info.dice_advanced,
                   bench = api.bench,
                   claims_played = played, claims_unplayed = unplayed, deaths = {}, kills = {},
-                  deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {},
+                  deployed = {}, bot_faults = {}, watch_faults = {}, thefts = {}, drops = {},
                   -- unsplit: the counter kills the judged phases left unsplit (sight's
                   -- M.phaseWays); floored: the ways of a plan's uncertain kills left unsplit
                   -- (the planner's, ADR 0415); unjoined: per decision, the most Talked
@@ -1103,13 +1130,15 @@ function M.run(api)
         end
         for _, d in ipairs(api.drops and api.drops() or {}) do
             explore.dropped(d)
+            rec.drops[#rec.drops + 1] = { from = d.from, fromId = d.fromId, to = d.to, item = d.item,
+                                          turn = turn }
             trace({ t = "drop", from = d.from, to = d.to, item = d.item })
         end
         for _, t in ipairs(api.thefts and api.thefts() or {}) do
             t.turn = turn
             rec.thefts[#rec.thefts + 1] = t
-            trace({ t = "theft", thief = t.thief, from = t.from, item = t.item, rank = t.rank,
-                    spoils = t.spoils })
+            trace({ t = "theft", thief = t.thief, thiefId = t.thiefId, from = t.from, item = t.item,
+                    rank = t.rank, spoils = t.spoils })
         end
     end
     local lastBoard, actedIn
@@ -1394,12 +1423,10 @@ function M.run(api)
                 list[#list + 1] = c
             end
         end
-        -- a theft spoils the clear only above the stat boosters (ADR 0379); the rest are kept
-        -- in rec.thefts
-        local stolen = {}
-        for _, t in ipairs(rec.thefts) do
-            if t.spoils then stolen[#stolen + 1] = t end
-        end
+        -- a theft spoils the clear only above the stat boosters (ADR 0379), and only if the item
+        -- is still lost when the chapter ends: a clean clear is the end state (ADR 0475). The
+        -- rest are kept in rec.thefts, each recovered one marked
+        local stolen = M.unrecovered(rec.thefts, rec.drops)
         rec.clear = { won = outcome == "won", lost = rec.deaths, recruits_missing = missing,
                       rewards_missing = explore.missing(), stolen = stolen }
         local held = rec.clear.won and #rec.deaths == 0 and #rec.clear.rewards_missing == 0

@@ -3651,5 +3651,31 @@ for _, gave in ipairs({ 30, 7 }) do
     end
 end
 
+-- A clean clear is the end state (ADR 0475): a spoiling theft whose item a later drop from the
+-- same thief gave back spoils nothing; a drop of another item, from another thief, or before the
+-- theft recovers none, and one drop recovers one theft
+do
+    local function thefts()
+        return { { thief = 100, item = 0x65, spoils = true, turn = 13 },
+                 { thief = 100, item = 0x65, spoils = true, turn = 14 },
+                 { thief = 100, item = 0x6C, spoils = false, turn = 14 } }
+    end
+    check(#Botrun.unrecovered(thefts(), {}), 2, "unrecovered: no drop, both spoiling thefts stay lost")
+    local t = thefts()
+    local lost = Botrun.unrecovered(t, { { from = 100, item = 0x65, turn = 16 } })
+    check(#lost, 1, "unrecovered: one drop gives one Knight Crest back")
+    check(t[1].recovered, true, "unrecovered: the first theft is marked recovered")
+    check(#Botrun.unrecovered(thefts(), { { from = 141, item = 0x65, turn = 16 },
+                                          { from = 100, item = 0x29, turn = 16 },
+                                          { from = 100, item = 0x65, turn = 12 } }), 2,
+          "unrecovered: another thief's, another item's or an earlier drop recovers nothing")
+    -- two thieves share a charId (vanilla Ch16's): the drop must come from the thief itself
+    local twin = { { thief = 100, thiefId = 129, item = 0x65, spoils = true, turn = 13 } }
+    check(#Botrun.unrecovered(twin, { { from = 100, fromId = 152, item = 0x65, turn = 16 } }), 1,
+          "unrecovered: a drop from another thief with the same charId recovers nothing")
+    check(#Botrun.unrecovered(twin, { { from = 100, fromId = 129, item = 0x65, turn = 16 } }), 0,
+          "unrecovered: the thief's own drop gives the item back")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

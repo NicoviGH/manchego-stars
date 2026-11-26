@@ -8,6 +8,8 @@ issues: [711, 699, 510]
 
 # A Chest Key opens one chest, and a thief's steal is priced from the simulated enemy phase
 
+**Amended by ADR 0475 (2026-11-26).** A theft the game ranks above the stat boosters is also a forfeit of the plan (`stolen:<id>`), unless the thief drops its loot; a clean clear is the chapter's end state.
+
 **Decided (#711 parts 1 and 3), #510 step 9.** Part 2 (the bot never buys a Chest Key or Lockpick;
 a Lockpick wears out) stays with #693's shopping. Extends ADR 0379 (what a thief takes) and ADR 0369
 (the game's own AI decides).

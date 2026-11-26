@@ -8,6 +8,11 @@ issues: [510]
 
 # A theft spoils a clean clear only when the thief took something it ranks above the stat boosters
 
+**Amended by ADR 0475 (2026-11-26).** A clean clear is the chapter's end state: a theft spoils it
+only if the item is still lost when the chapter ends. "A stolen item never comes back" below holds
+only for a thief without `US_DROP_ITEM`: one with the flag drops its last item, the loot, when a
+blue unit downs it.
+
 **Decided (Nicolas, 2026-10-29), for #510 step 9's clean clear (ADR 0376):** every theft is
 recorded, and only a theft of an item FE8's own AI ranks above the stat boosters spoils the clear.
 
