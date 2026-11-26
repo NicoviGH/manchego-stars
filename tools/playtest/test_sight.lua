@@ -3821,6 +3821,17 @@ do
     setBag(mark, 0x0114, 0x2D6C); setBag(thief, 0)
     th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
     check(th.lock, false, "pilfer: an item that opens nothing costs no chest")
+    -- drops: a thief with the drop flag gives its last item back, and the loot goes last
+    -- (ADR 0475: clean is the end state); a spoiling item it held last before is lost instead
+    setBag(mark, 0x0114, 0x016B); setBag(thief, 0x0101); m.w32(thief + 0x0C, DROP)
+    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    check(tostring(th.spoils) .. "," .. tostring(th.drops), "true,true",
+          "pilfer: a dropper's spoiling loot is given back when it dies")
+    setBag(mark, 0x0114, 0x0169); setBag(thief, 0x0101, 0x016B); m.w32(thief + 0x0C, DROP)
+    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    check(tostring(th.spoils) .. "," .. tostring(th.drops), "true,false",
+          "pilfer: a dropper's earlier spoiling loot, pushed out of its drop slot, is lost")
+    m.w32(thief + 0x0C, 0)
 
     -- stepOf: a steal is chosen before a staff (each an act of its own), a staff before a strike,
     -- a strike when the AI named a target, else none

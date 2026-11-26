@@ -8,6 +8,8 @@ issues: [730, 699, 510]
 
 # An owed recruit no one may Talk yet is a recruit to spare
 
+**Amended by ADR 0475 (2026-11-26).** An owed recruit's death costs the plan whatever its Talk row says: by its row when feasible, else as `owed:<id>`; `loose` is retired into `owed`.
+
 **Decided (#730 fix 2), #510 step 9. Nicolas, 2026-11-22:** "Yes, its the same consequence as when
 Seth counters and kills Joshua before Natasha reaches him." A recruit the game still owes
 (`ctx.owedRecruits`, botrun's: the charIds the chapter's talks would bring over, less the party)

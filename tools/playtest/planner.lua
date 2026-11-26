@@ -2374,7 +2374,10 @@ function M.plan(Bot, board, sight, style, opts)
             local robbedHere = {}
             for _, th in ipairs(o.strikes.thefts or {}) do
                 if th.lock then robbedHere[th.target], robbed[th.target] = true, true end
-                if th.spoils and not th.drops and o.p > M.DUST then
+                -- a holder the same way surely kills loses the item with its life: that way's
+                -- death is the plan's cost, not a theft as well
+                local dies = res[th.target] and res[th.target].d >= 1 - M.DUST
+                if th.spoils and not th.drops and not dies and o.p > M.DUST then
                     spoiled[th.target] = spoiled[th.target] or {}
                     spoiled[th.target][th.thief] = true
                 end
@@ -2901,6 +2904,7 @@ function M.plan(Bot, board, sight, style, opts)
         end
         return false
     end
+    -- (a robbed plan whose round changed nothing still stops: `best == base` below)
     for round = 1, M.MEND_ROUNDS do
         if not best or (round > 1 and best.rank.admitted and not robbed(best)) then break end
         local base, menuOf, risky = best, {}, {}

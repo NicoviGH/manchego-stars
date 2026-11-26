@@ -3669,6 +3669,12 @@ do
                                           { from = 100, item = 0x29, turn = 16 },
                                           { from = 100, item = 0x65, turn = 12 } }), 2,
           "unrecovered: another thief's, another item's or an earlier drop recovers nothing")
+    -- two thieves share a charId (vanilla Ch16's): the drop must come from the thief itself
+    local twin = { { thief = 100, thiefId = 129, item = 0x65, spoils = true, turn = 13 } }
+    check(#Botrun.unrecovered(twin, { { from = 100, fromId = 152, item = 0x65, turn = 16 } }), 1,
+          "unrecovered: a drop from another thief with the same charId recovers nothing")
+    check(#Botrun.unrecovered(twin, { { from = 100, fromId = 129, item = 0x65, turn = 16 } }), 0,
+          "unrecovered: the thief's own drop gives the item back")
 end
 
 print(string.format("%d tests, %d failures", tests, fails))

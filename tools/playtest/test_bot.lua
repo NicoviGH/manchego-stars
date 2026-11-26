@@ -5758,6 +5758,42 @@ do
     check(narrow ~= "0,1" and #(narrowPlan and narrowPlan.forfeited or { 1 }) == 0, true,
           "theft: the mend moves the robbed unit off the thief's tile when the beam kept only its stay")
 
+    -- a way that surely kills the holder loses the item with its life: that way's death is the
+    -- cost, not "stolen:1" on top of it (the plan that leaves A on the thief's tile)
+    local doomed = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+                     enemyPhase = function(plan)
+                         for _, b in ipairs(plan.blues) do
+                             if b.x == 0 and b.y == 1 then
+                                 return { { target = b.unit.id, takenHit = 100, takenDmg = 99,
+                                            takenHits = 1, takenCrit = 0 },
+                                          thefts = { { thief = 0x81, target = b.unit.id,
+                                                       item = 0x6D, lock = false, spoils = true } } }
+                             end
+                         end
+                         return {}
+                     end }
+    local _, doomedPlan = Planner.plan(B, boardOf(A, X), sightOf(doomed), gifted("careful", 500))
+    local stayForfeits
+    for _, c in ipairs(doomedPlan and doomedPlan.considered or {}) do
+        if table.concat(c.acts, " ") == "1>wait@0,1>nil" then stayForfeits = c.rank.forfeits end
+    end
+    check(stayForfeits, 0, "theft: a holder the same way surely kills forfeits no theft as well")
+    -- a theft no act undoes (every tile of A's robbed) runs no extra mend round: a round in which
+    -- no mend outranked its base ends the mend (`best == base`), so three rounds cost what one does
+    local function cornered(rounds)
+        local calls, keep = 0, Planner.MEND_ROUNDS
+        Planner.MEND_ROUNDS = rounds
+        local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+                    enemyPhase = function(plan)
+                        calls = calls + 1
+                        return { thefts = { { thief = 0x81, target = 0x01, item = 0x6D,
+                                              lock = false, spoils = true } } }
+                    end }
+        Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500))
+        Planner.MEND_ROUNDS = keep
+        return calls
+    end
+    check(cornered(3), cornered(1), "theft: an undoable theft's mend stops when a round changes nothing")
     -- ... and a mend round that brings the plan under the cap with the theft still in it is not
     -- the last: C dies on (5,5) and A is robbed on (0,1), and each fix alone leaves the other.
     -- Round 1 moves C (under the cap, "stolen:1" kept); a second round moves A too (vanilla Ch16,
@@ -11326,7 +11362,8 @@ do
     -- the record's clean clear still loses the recruit when its row is not feasible (ADR 0475;
     -- vanilla Ch10's Amelia, 0x12: every Talk plan over the cap, the row gone, and Seth's or
     -- Franz's counter killed her as an ordinary red in 7 of 15 R4 tries). A stalled row (no unit
-    -- neared it) forfeited nothing on main: now the death is "owed:129", the row's id is not
+    -- neared it) forfeited nothing on main: now the death is "owed:129", since the row's id
+    -- ("recruit:129") is not feasible and so counts nothing
     board, o = counterKillsRecruit(true)
     a, plan = Planner.plan(B, board, sightOf(o), gifted("bold", 10000),
                            { owedRecruits = { [0x81] = true },

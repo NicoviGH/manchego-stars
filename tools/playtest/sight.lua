@@ -2806,18 +2806,25 @@ end
 -- enemy decides on the board it leaves and a second thief finds the item gone. -> { thief,
 -- target, item, lock = true when the target opened a chest before and no longer does, spoils =
 -- true when the game ranks the item above the stat boosters, so the theft costs the clean
--- clear (M.stealSpoils, the record's own line), drops = true when the thief holds the drop flag,
--- so its death gives the item back (M.dropsLoot) }
+-- clear (M.stealSpoils, the record's own line), or when it pushes a spoiling item a dropper held
+-- last out of its drop slot; drops = true when the thief holds the drop flag, so its death gives
+-- the item back (M.dropsLoot), and false when that displaced item is lost }
 function M.pilfer(api, call, S, Board, standOn, e, act)
     local addr = api.mem.u32(S.gUnitLookup + act.target * 4)
     local chests = M.LOCK_TERRAIN.chests
     local was = M.opensAt(call, S, addr, chests)
     standOn(e, act.tile.x, act.tile.y)
+    -- a dropper's last item is its drop: the loot goes after it, so what was last (an earlier
+    -- theft's loot) is no longer given back, and a spoiling one is lost by this theft
+    local drops = M.dropsLoot(api.mem.u32(e.addr + UNIT_STATE), Board)
+    local before = drops and Board.items(api.mem, e.addr) or {}
+    local displaced = before[#before]
     local item = M.moveItem(api, call, S, Board, addr, act.slot, e.addr)
     local _, spoils = M.stealSpoils(call, S, item)
+    local lostBefore = displaced ~= nil and select(2, M.stealSpoils(call, S, displaced.id))
     return { thief = e.id, target = act.target, item = item,
-             lock = was and not M.opensAt(call, S, addr, chests), spoils = spoils,
-             drops = M.dropsLoot(api.mem.u32(e.addr + UNIT_STATE), Board) }
+             lock = was and not M.opensAt(call, S, addr, chests),
+             spoils = spoils or lostBefore, drops = drops and not lostBefore }
 end
 -- Whether a thief with unit state `state` gives back what it stole when it dies: it holds
 -- US_DROP_ITEM, so its last item drops, and ActionSteal's UnitAddItem put the loot last (bmmind.c).
