@@ -3311,6 +3311,19 @@ local function exploring(ctx, sent, barred, triedIn)
     local function ownOpener(u, t)
         return u.acted or ctx.sight.canExplore(u, t.x, t.y, t.kind)
     end
+    -- Whether `u` is as sure of opening `t` as an opener: it opens it itself, or a teammate spares
+    -- it the key (Goals.spareKey: a Trade hands it over, #688). A key an enemy's fall gives is not
+    -- sure, so that unit pairs after the openers. Vanilla Ch21 s4009 (`t688c`): once Eirika's
+    -- trip to the (2,18) chest stalled, ten units could take her Chest Key, but Gerik, holding his
+    -- own from turn 3 in the north, five turns off, was paired first and never got there.
+    local function sure(u, t)
+        if ownOpener(u, t) then return true end
+        local lock = t.kind == "chest" and lockAt(ctx, u, t.x, t.y)
+        for _, m in ipairs(lock and ctx.blues or {}) do
+            if Goals.spareKey(ctx.sight, ctx, u, m, lock, t) then return true end
+        end
+        return false
+    end
     local function reaches(u, t)
         if ownOpener(u, t) then return marchLength(ctx, u, t) end
         -- a chest it has no key for: by way of the enemy whose fall gives it one (turnsFor)
@@ -3452,7 +3465,7 @@ local function exploring(ctx, sent, barred, triedIn)
         for _, g in ipairs(sent or {}) do
             local t, u = open[tileKey(g.x, g.y)], blues[g.id]
             if t and u and not taken[tileKey(t.x, t.y)] and not ctx.exploreGoal[u.id]
-                and ownOpener(u, t) ~= keyless and not isBarred(barred, u.id, t) then
+                and sure(u, t) ~= keyless and not isBarred(barred, u.id, t) then
                 if not u.acted and quiet[t.id] and not triedOn(t.id)[u.id] then
                     triedOn(t.id)[u.id] = true
                 elseif reaches(u, t) and worthSending(ctx, u, t)
@@ -3463,8 +3476,9 @@ local function exploring(ctx, sent, barred, triedIn)
         end
     end
     -- each pair by what the trip is worth, the best first (a fast unit wins a race a nearer
-    -- slow one would lose), the nearer on a tie; the units that open the tile themselves
-    -- first, then the keyless ones take what is left (a chest only an enemy's key opens for
+    -- slow one would lose), the nearer on a tie; the units sure to open the tile (sure: their
+    -- own key, or a teammate's spare one) first, then the keyless ones take what is left (a
+    -- chest only an enemy's key opens for
     -- them goes to an opener, but two chests still go to two units while one opener is
     -- free for one: ch23's win took its chests in parallel that way), and last the unit a
     -- stalled pair just dropped, when no other is left to take its goal
@@ -3476,7 +3490,7 @@ local function exploring(ctx, sent, barred, triedIn)
                 local v, c, turns = sendWorth(ctx, u, t)
                 if worthSending(ctx, u, t) then
                     local list = quiet[t.id] and triedOn(t.id)[u.id] and byOpen[3]
-                        or byOpen[ownOpener(u, t) and 1 or 2]
+                        or byOpen[sure(u, t) and 1 or 2]
                     list[#list + 1] = { t = t, u = u, d = d, v = v, turns = turns }
                 end
             end

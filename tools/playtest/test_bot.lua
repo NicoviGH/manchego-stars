@@ -4809,6 +4809,22 @@ do
     check(#tradesOf(cands, 0x01) + #tradesOf(cands, 0x02), 0, "trade: none where the game lists no Trade")
 end
 
+-- test_a_spare_key_taker_pairs_with_the_openers (#688, replay t688c, vanilla Ch21 s4009): once
+-- K's trip to the chest stalled, A (beside K, 1.2 turns by Trade) and G (its own key, 3.8 turns
+-- off) are both sure to open it, and the trip's worth decides: A is sent. With the teammate's key
+-- ranked after every opener, G was sent from five turns off and never got there.
+do
+    local A, K, E, o = tradeFixture()
+    local G = blue(0x03, 2, 14, 9)
+    o.reach[0x03] = tiles({ 14, 9 })
+    o.canExplore[0x03] = { ["4,0"] = "chest" }
+    o.field = fieldsOf { ["4,0"] = { ["14,9"] = 19, ["1,1"] = 4, ["0,0"] = 4, ["1,0"] = 3, ["4,0"] = 0 } }
+    local _, ctx = B.candidates(boardOf(A, K, G, E), sightOf(o), style("careful"), STALLED)
+    check(ctx.exploreGoal[0x01] and (ctx.exploreGoal[0x01].x .. "," .. ctx.exploreGoal[0x01].y), "4,0",
+          "spare taker: A, by Trade from beside K, is sent before the far opener G")
+    check(ctx.exploreGoal[0x03] == nil, true, "spare taker: and G is not sent to it")
+end
+
 -- test_a_teammates_key_is_priced_by_the_takers_walk (#688, replay t688a: Dozla was priced 1 turn
 -- from the (21,18) chest through Gerik's Chest Key, with Gerik walking to him; nothing sent Gerik,
 -- who held back and died). K, at (14,0), spares the key. The way is A's own walk to K (14 tiles,
