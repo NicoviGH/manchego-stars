@@ -33,8 +33,22 @@ vanilla Ch2 cleared on tries 1, 1, 2; Manchego Stars ch02 had no clean clear in 
 **R4 #768 is done (closed): 8 of 34 clean within 3 tries, m740c 7 of 34.** Every blocker's
 root cause is on the issue that owns it, and **the work order is #764's body, "After R4"**
 (Nicolas, 2026-11-26: fix them all, one PR each, back to back, then one R4 set over the batch).
-Item 1 is being built now: the planner scores a plan by the record's own clean definition
-(#730, #711).
+**Item 1 is built, not yet a PR:** branch `feat/730-forfeit-what-clean-loses`, commit fcf18766
+(ADR 0475): the planner forfeits what the record's clean clear loses (a theft the game's
+`AiGetItemStealRank` ranks as spoiling; an owed recruit's death whatever its Talk row). Unit
+tests green; the 5 new checks fail on the old code. To finish it:
+1. Read the two proof replays (started 2026-11-26, one try each, on the branch): tags
+   `f475a16` (Ch16 s4005: a theft was the only spoiler there in R4) and `f475a10` (Ch10 s4003:
+   Amelia killed in all 3 R4 tries). Records in `resume-runs.jsonl`; R4's are `r768a16`/`r768a10`.
+   Log: the session scratchpad's `proof.log` (gone after a reboot; the records are what count).
+2. Open the PR (Part of #730, #711; not Closes: #711's key items and #730's Marisa stay),
+   `/code-review <PR> medium`, fix every finding, merge on CI for the head sha.
+
+**Item 2 (next, #698):** the idle rule's march exemption (`planner.lua` ~1995, `marches`)
+must count only a new low. botrun already keeps each goal's best (`lows`, `readNearest`,
+botrun.lua ~1052); pass it to the planner and exempt a plan only when some unit beats its goal's
+low. Change only the exemption, not `rank.progress` (that would rescore every plan).
+
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
