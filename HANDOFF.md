@@ -37,10 +37,14 @@ root cause is on the issue that owns it, and **the work order is #764's body, "A
 (ADR 0475): the planner forfeits what the record's clean clear loses (a theft the game's
 `AiGetItemStealRank` ranks as spoiling; an owed recruit's death whatever its Talk row). Unit
 tests green; the 5 new checks fail on the old code. To finish it:
-1. Read the two proof replays (started 2026-11-26, one try each, on the branch): tags
-   `f475a16` (Ch16 s4005: a theft was the only spoiler there in R4) and `f475a10` (Ch10 s4003:
-   Amelia killed in all 3 R4 tries). Records in `resume-runs.jsonl`; R4's are `r768a16`/`r768a10`.
-   Log: the session scratchpad's `proof.log` (gone after a reboot; the records are what count).
+1. **Proof replays read (2026-11-26), half a result:**
+   - `f475a10` (Ch10 s4003): **Amelia no longer killed** (R4: `killed_before_talk`; now
+     `left_map`, the turn-12 script). Still not recruited: every Talk plan is over the cap.
+   - `f475a16` (Ch16 s4005): **the Knight Crest (0x65) is still stolen from Colm** on turn 13.
+     No plan in the trace forfeited `stolen:`, so the forecast never predicted that steal: Colm
+     moved (19,6) -> (17,10) and the thief (129, seen in the plans) stepped (20,8) -> (18,10)
+     and stole. **Root-cause that first:** why the judged enemy phase has no theft there (one
+     instrumented replay of `f475a16` turn 13). The fix may belong in this PR.
 2. Open the PR (Part of #730, #711; not Closes: #711's key items and #730's Marisa stay),
    `/code-review <PR> medium`, fix every finding, merge on CI for the head sha.
 
