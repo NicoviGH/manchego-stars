@@ -1111,8 +1111,10 @@ def protected_deaths(rec):
 
 def plays(recs):
     """A replicate's records split into its plays, oldest first: a play ends at its campaign's
-    end record, or at a worker's record with no chapter (it died before its campaign said
-    anything); records after the last end are one more play."""
+    end record, or at a worker's record with no chapter. That one is always a whole play: the
+    Pool writes it alone for a worker that died, and records_of alone for a worker that left
+    no line, and a worker's records are appended together. Records after the last end are one
+    more play."""
     out, cur = [], []
     for r in recs:
         cur.append(r)
@@ -1143,6 +1145,10 @@ def play_result(play, chapter, pinned=False):
     broken = next((r for r in here if r.get('outcome') in UNUSABLE), None)
     first = here[0] if here[0].get('attempt') == 1 and broken is not here[0] else None
     clean_at = first_clean(here)
+    # an attempt with no game result before the clean one could have been the first clean
+    # clear (campaign.lua stops at one, so this guards a record it never writes)
+    if broken is not None and clean_at is not None and (broken.get('attempt') or 0) < clean_at:
+        clean_at = None
     if first is not None and (clean_at is not None or (
             broken is None and end is not None and end.get('outcome') in NO_CLEAN)):
         return {'status': 'played', 'clean_at': clean_at, 'died': bool(protected_deaths(first)),
@@ -1369,7 +1375,10 @@ def chapter_side(suite, envs, instrument, starts, kind, store, rom_hash, bench=N
     return {'chapter': starts[0]['chapter'], 'store': store, 'vanilla': game == 'vanilla',
             'starts': starts, 'pinned': True, 'dealt': dealt,
             'tasks': tasks,
-            'kept': lambda: kept([store], lambda r: mine(r)
+            # a run stamped `task_attempt` played attempt 1 alone (the suite's, or a cell's
+            # before ADR 0474): its tries are not known, and read as a play it would merge
+            # into the next play of its seed
+            'kept': lambda: kept([store], lambda r: mine(r) and 'task_attempt' not in r
                                  and r['suite'].get('set') == kind
                                  and r.get('seed') is not None
                                  and r['suite'].get('start_id') == dealt(r['seed'])['start_id'],
@@ -1572,14 +1581,12 @@ def pilot_main(args):
                                if again(have.get(s), side['chapter'], side['pinned'])])
     walls = kept_walls(outs, inst, hashes)
     hours = suite_estimate(dict(suite, starts=starts['ours'] + starts['vanilla']), todo,
-                           walls, args.jobs)
+                           walls, args.jobs, tries=max_attempts())
     print('%d runs to play on %d workers: about %.2f wall-hours' % (len(todo), args.jobs, hours))
-    floor = sum(1 for t in todo if not walls.get(t['stamp']['suite']['start_id']))
-    if floor:
-        # ADR 0474: a run plays up to the cap's tries, and a start no run of this instrument
-        # has measured is estimated at the manifest's one attempt
-        print('  %d of them on starts with no kept run, estimated at one attempt: up to %d '
-              'attempts each, so the estimate is a floor' % (floor, max_attempts()))
+    unmeasured = sum(1 for t in todo if not walls.get(t['stamp']['suite']['start_id']))
+    if unmeasured:
+        print('  %d of them on starts no run of this instrument measured, each estimated at '
+              'all %d attempts: a bound' % (unmeasured, max_attempts()))
     if hours > MAX_WALL_H:
         print('refused: the estimate is over the %g wall-hours one job may take (SC-007); '
               'split it' % MAX_WALL_H)
@@ -2429,16 +2436,17 @@ def kept_walls(paths, instrument, rom_hashes):
     return {sid: [r['wall_s'] for r in recs] for sid, recs in runs.items()}
 
 
-def suite_estimate(suite, tasks, kept, jobs):
+def suite_estimate(suite, tasks, kept, jobs, tries=1):
     """The wall-hours `tasks` would take on `jobs` workers: each start's mean measured wall
-    time a run where a kept run has one (`kept`, kept_walls'), its manifest estimate where
-    none has."""
+    time a run where a kept run has one (`kept`, kept_walls'), its manifest estimate (one
+    attempt's) times `tries` where none has: a cell's run plays up to the cap's attempts, so
+    its unmeasured starts are estimated at the cap, a bound (ADR 0474)."""
     by_id = {st['start_id']: st for st in suite['starts']}
     total = 0.0
     for t in tasks:
         sid = t['stamp']['suite']['start_id']
         walls = kept.get(sid)
-        total += sum(walls) / len(walls) if walls else by_id[sid]['estimate_wall_s']
+        total += sum(walls) / len(walls) if walls else by_id[sid]['estimate_wall_s'] * tries
     return total / max(1, min(jobs, len(tasks))) / 3600
 
 

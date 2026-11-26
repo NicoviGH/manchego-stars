@@ -66,10 +66,11 @@ room to read HARDER.
 ## 5. What it costs
 
 A replicate costs its tries in attempts, and 12 when it never clears. A cell's CPU is the old
-cell's times the mean tries. `pilot` still refuses a job over 8 wall-hours. It now says when its
-estimate rests on starts that no run of this instrument has measured, because those are
-estimated at the manifest's one attempt, so the estimate is a floor. The suite is unchanged:
-it plays attempt 1 only.
+cell's times the mean tries. `pilot` still refuses a job over 8 wall-hours (SC-007). A start
+that a run of this instrument has measured is estimated at its measured whole-play wall. One
+that no run has measured is estimated at the manifest's one attempt times the cap, a bound, and
+the pilot says how many starts are bounded that way. The suite is unchanged: it plays attempt
+1 only.
 
 ## Built (#742)
 
@@ -86,7 +87,8 @@ it plays attempt 1 only.
   then keeps the start in memory only, so the retries load it without writing the pinned file
   that every worker on that start reads.
 - A chapter cell keeps each play's campaign end beside its attempts (`suite_run_of(...,
-  ends=True)`). `records_of` stamps the end with its task's instrument so the filter can take
+  ends=True)`), and never a run stamped `task_attempt` (attempt 1 alone, whose tries are
+  unknown). A clean clear after an attempt with no game result is unresolved. `records_of` stamps the end with its task's instrument so the filter can take
   it. `kept_walls` reads a run once, by its attempt 1, since every attempt of a run carries
   that run's one wall.
 - `verdict-diff` and its CI comment read `tools/difficulty.py` (ADR 0353), not these cells:

@@ -910,6 +910,11 @@ class Cell(unittest.TestCase):
                                            {'kind': 'campaign', 'outcome': 'crashed'}]
         r = mc.chapter_result(crash, 3)
         self.assertEqual((r['status'], r['lo'], r['why']), ('unresolved', 3, 'boom'))
+        # a clean clear after an attempt with no game result is not known to be the first
+        late = self.tries(3, 3)
+        late[1] = dict(late[1], outcome='crashed')
+        r = mc.chapter_result(late, 3)
+        self.assertEqual((r['status'], r['lo']), ('unresolved', 2))
         # its same-seed retry replays the whole play, and the first play known is the reading
         r = mc.chapter_result(crash + self.tries(4, 3), 3)
         self.assertEqual((r['status'], r['clean_at'], r['tries']), ('played', 4, 1))
@@ -1298,6 +1303,11 @@ class Suite(unittest.TestCase):
                                      suite={'start_id': 'cs-s4001/3', 'set': 'pilot',
                                             'version': 1}))
         self.assertEqual([r.get('kind') for r in side['kept']()[3001]], [None, 'campaign'])
+        # a run that played attempt 1 alone (stamped task_attempt) is never read as a play
+        mc.append_record(store, dict(base, seed=3002, task_attempt=1,
+                                     suite={'start_id': 'cs-s4002/3', 'set': 'pilot',
+                                            'version': 1}))
+        self.assertEqual(len(side['kept']()[3002]), 1)
         got = side['tasks']([3009, 3002, 3001])
         self.assertTrue(all(t['campaign']['shared_start'] for t in got), 'a cell plays tries')
         self.assertEqual(sorted((t['seed'], t['stamp']['suite']['start_id'], t['campaign']['id'])
@@ -1969,6 +1979,10 @@ class Suite(unittest.TestCase):
         kept = {'vanilla-ch3': [30.0, 50.0]}   # measured: 40 s a run; ours-ch02 is not
         hours = mc.suite_estimate(suite, tasks, kept, jobs=2)
         self.assertAlmostEqual(hours, (4 * 40 + 4 * 600) / 2 / 3600)
+        # a cell's run plays up to the cap: an unmeasured start is bounded at every attempt,
+        # a measured one keeps its measure (a whole play's wall, ADR 0474)
+        hours = mc.suite_estimate(suite, tasks, kept, jobs=2, tries=12)
+        self.assertAlmostEqual(hours, (4 * 40 + 4 * 600 * 12) / 2 / 3600)
         self.assertGreater(mc.suite_estimate(suite, tasks * 30, {}, jobs=1), mc.MAX_WALL_H)
 
     def suite_lines(self, play, held_out=True, jobs=4, **kw):
