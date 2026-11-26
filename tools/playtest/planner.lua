@@ -2593,10 +2593,17 @@ function M.plan(Bot, board, sight, style, opts)
             end
         end
         st.thieves = spoiled
+        -- each door the plan opens that memory says brings reds, before the strikers its front
+        -- needs stand ready (Bot's releasesOf): what that door's units lost before is lost again
+        -- (#766: vanilla Ch14's (22,17) door, Rennac and the two chests he loots)
+        local released = {}
+        for _, r in ipairs(ctx.releases or {}) do
+            if not r.staged and st.opened[r.key] then released[#released + 1] = r.stake end
+        end
         st.forfeited = Goals.forfeited(ledger, goals, { win = winOf(st, fell), took = st.took,
                                                        lost = lost, owed = owed,
                                                        stolen = spoiled, reach = reached(st),
-                                                       gone = M.GONE })
+                                                       gone = M.GONE, released = released })
         local gain = progress(st)
         local greenDie = 0
         for _, g in ipairs(greens) do
@@ -3348,9 +3355,16 @@ function M.plan(Bot, board, sight, style, opts)
     -- the recruit, village or chest each unit was sent to (Bot.candidates' exploring), by unit id
     best.goals = {}
     for id, t in pairs(ctx.exploreGoal or {}) do
-        best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y }
+        best.goals[#best.goals + 1] = { id = id, x = t.x, y = t.y, stage = t.stage }
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
+    -- each door memory says brings reds (Bot's releasesOf, #766): how many strikers its front
+    -- needs, how many stand ready, and whether a plan that opens it forfeits its stake
+    best.releases = {}
+    for _, r in ipairs(ctx.releases or {}) do
+        best.releases[#best.releases + 1] = { x = r.x, y = r.y, need = r.need, ready = r.ready,
+                                              staged = r.staged }
+    end
     -- every job the strategy layer priced this decision (bot.lua notePrice), and which unit's
     -- chain took it (`chosen`: its place in the chain, ctx.jobs)
     local chosen = {}

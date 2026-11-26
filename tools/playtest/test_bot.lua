@@ -2722,6 +2722,141 @@ do
     check(seen["2,0"], true, "opened: its enemy phase is judged with the door open")
 end
 
+-- test_a_door_memory_says_brings_reds_waits_for_its_strikers (#766): an earlier attempt opened the
+-- door at (2,0), which brought a Fighter onto (3,0), and that Fighter looted the chest at (3,0)
+-- (Timeline.releases). (3,0) is under the room's roof: the shut map's field does not reach it,
+-- the opened map's does (sight.changed). A, the one unit holding a key for the door (S lacks
+-- one: sight.locked), has no weapon: no one could strike the
+-- Fighter the turn the door opens, so every plan that opens it forfeits the chest, and the door
+-- waits; S is sent to the door (the stage job). With S already one move from the door the
+-- release is staged, and the door opens. An armed A beside the door is no striker of its own:
+-- opening spends its act. A lord is never sent, nor a unit that has a job already, nor one the
+-- stuck record bars from the door; a unit sent to one door is not counted as another's. Vanilla
+-- Ch14: the (22,17) door brings four Fighters and Rennac; the one try that got him had three
+-- strikers at the door when it opened.
+do
+    local function case(sx, opt)
+        opt = opt or {}
+        local A = blue(0x01, 0, opt.farA and 7 or 0, opt.farA and 3 or 0,
+                       opt.armedA and {} or { minRange = false })
+        local S = blue(0x02, 1, sx, 1, { weapons = { { slot = 0, min = 1, max = 1 } } })
+        local T = blue(0x03, 2, 7, 3, { weapons = { { slot = 0, min = 1, max = 1 } } })
+        local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+        local door, door2 = { act = "door", x = 2, y = 0 }, { act = "door", x = 2, y = 4 }
+        local st = style("careful")
+        local arrivals = { { charId = 0x90, classId = 9, x = 3, y = 0, turn = 2, by = door, timed = false } }
+        if opt.bigFront then
+            -- two more Fighters the same turn: three to strike, and S is the one striker
+            arrivals[2] = { charId = 0x92, classId = 10, x = 3, y = 0, turn = 2, by = door, timed = false }
+            arrivals[3] = { charId = 0x93, classId = 11, x = 3, y = 0, turn = 2, by = door, timed = false }
+        end
+        local closings = { { x = 3, y = 0, phase = 3, closerKey = "a:144:9:2" } }
+        if opt.twoDoors then
+            arrivals[2] = { charId = 0x91, classId = 9, x = 3, y = 4, turn = 2, by = door2, timed = false }
+            closings[2] = { x = 3, y = 4, phase = 3, closerKey = "a:145:9:2" }
+        end
+        st.memory = Fakeline.memory({ arrivals = arrivals, closings = closings })
+        -- the door's field on the shut map: the roofed room past it unreached
+        local shutField = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["1,1"] = 2, ["7,1"] = 8,
+                            ["7,2"] = 9, ["7,3"] = 10 }
+        local openField = {}
+        for k, v in pairs(shutField) do openField[k] = v end
+        openField["3,0"], openField["4,0"] = 1, 2
+        local door2Field = { ["2,4"] = 0, ["3,4"] = 1, ["7,1"] = 6, ["7,3"] = 7 }
+        local explorable = { { x = 3, y = 0, kind = "chest" } }
+        local canExplore = { [0x01] = { ["3,0"] = "chest" } }
+        local function fields(open)
+            local f = { ["4,0"] = BOSS_SIDE, ["2,0"] = open and openField or shutField,
+                        ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 } }
+            if opt.twoDoors then f["2,4"] = door2Field end
+            if opt.village then f["8,1"] = { ["8,1"] = 0, ["7,1"] = 1 } end
+            return fieldsOf(f)
+        end
+        if opt.village then
+            explorable[#explorable + 1] = { x = 8, y = 1, kind = "visit" }
+            canExplore[0x02] = { ["8,1"] = "visit" }
+        end
+        local doors = { { x = 2, y = 0 } }
+        if opt.twoDoors then
+            explorable[#explorable + 1] = { x = 3, y = 4, kind = "chest" }
+            doors[2] = { x = 2, y = 4 }
+        end
+        local o = {
+            objective = { kind = "boss", gameOver = opt.lord and { 0x02 } or nil },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
+                      [0x02] = opt.stuck and tiles({ sx, 1 }, { sx, 2 }) or tiles({ sx, 1 }),
+                      [0x03] = tiles({ 7, 3 }) },
+            field = fields(false),
+            obstacles = {}, doors = doors, openers = { [0x01] = true },
+            -- S holds no key for the door (sight.locked): A alone opens it
+            locked = { [0x02] = { ["2,0"] = "door" } },
+            explorable = explorable, canExplore = canExplore,
+            change = function(c)
+                if c.opened and c.opened["2,0"] then return { field = fields(true) } end
+                return {}
+            end,
+        }
+        local units = { A, S, E }
+        if opt.twoDoors then units[#units + 1] = T end
+        local copts = opt.stuck and { stuck = { [B.jobKey(0x02, nil, 2, 0)] = { id = 0x02, x = 2, y = 0, since = 0 } } }
+        local board = boardOf(table.unpack(units))
+        board.turn = 2
+        local _, ctx = B.candidates(board, sightOf(o), st, copts)
+        local a, plan = Planner.plan(B, board, sightOf(o), st, copts)
+        return a, ctx, plan
+    end
+    local _, far = B.candidates(boardOf(blue(0x01, 0, 0, 0)), sightOf { objective = { kind = "boss" } },
+                                style("careful"))
+    check(far and #(far.releases or {}), 0, "release: no memory, no release")
+    local a, ctx, plan = case(7)
+    local r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.need .. " " .. r.ready, "false 1 0", "release: read, not staged")
+    -- S: 8 from the door, the door 1 from the Fighter's tile on the opened map, MOV 5, reach 1
+    check(r and r.strikers[1] and r.strikers[1].gap, 3, "release: S's gap, read on the opened map")
+    check(a and a.act ~= "door", true, "release: unstaged (S 8 from the door), the door waits")
+    local doorForfeits
+    for _, c in ipairs(plan and plan.considered or {}) do
+        for _, x in ipairs(c.acts or {}) do
+            if tostring(x):find(">door@") then doorForfeits = c.rank and c.rank.forfeits end
+        end
+    end
+    check(doorForfeits, 1, "release: the plan that opens it forfeits the chest")
+    local g = ctx.exploreGoal[0x02]
+    check(g and g.stage and g.kind, Goals.STAGE, "release: S is sent to the door, met beside it")
+    a = case(1)
+    check(a and a.act, "door", "release: staged (S one move from the door), the door opens")
+    _, ctx = case(7, { armedA = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.ready, "false 0",
+          "release: the opener beside the door, armed, is no striker of its own")
+    -- A, the one key holder, is far from the door: no one opens it this turn, so the keyless S
+    -- beside it is a striker of its own
+    _, ctx = case(1, { farA = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.ready, "true 1",
+          "release: a keyless striker beside the door is no opener")
+    -- three reds to strike and S the only striker: staged once S is ready (none still on its
+    -- way), so the door is not held for good
+    _, ctx = case(7, { bigFront = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.need, "false 3", "release: S still on its way, the door waits")
+    a = case(1, { bigFront = true })
+    check(a and a.act, "door", "release: every striker that can come is ready, the door opens")
+    _, ctx = case(7, { lord = true })
+    check(ctx.exploreGoal[0x02] == nil or not ctx.exploreGoal[0x02].stage, true,
+          "release: a unit whose loss ends the game is never sent")
+    _, ctx = case(7, { village = true })
+    g = ctx.exploreGoal[0x02]
+    check(g and g.x .. "," .. g.y, "8,1", "release: a unit with a job keeps it")
+    _, ctx = case(7, { stuck = true })
+    g = ctx.exploreGoal[0x02]
+    check(g == nil or not g.stage, true, "release: a unit the stuck record bars from the door is not sent")
+    _, ctx = case(7, { twoDoors = true })
+    local s2, t2 = ctx.exploreGoal[0x02], ctx.exploreGoal[0x03]
+    check((s2 and s2.x .. "," .. s2.y or "-") .. " " .. (t2 and t2.x .. "," .. t2.y or "-"), "2,0 2,4",
+          "release: S stages the first door; the second sends its own striker, T")
+end
+
 -- test_a_plan_strikes_what_its_door_unroofs (#766): the door at (2,0) opens a roofed room, and
 -- R stands in it on (3,1), hidden under the roof (US_HIDDEN | US_UNDER_A_ROOF, off the field):
 -- the game brings him out when the door's change removes the roof (UpdateRoofedUnits). D, at
