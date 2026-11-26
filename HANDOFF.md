@@ -28,8 +28,8 @@ merge call (#767 comment).
 
 1. **#776 answered (2026-11-25, comment 7178440170): a "safe tile next turn" check does not
    separate deaths from survivors** (probe `s776a`/`s776b`, Ch14 + Ch10, 27 games: 0 of 4 deaths
-   flagged; 7 of 36 over-cap units caught; 26 of 33 flags lived). Not built. Recommended closing
-   it; **Nicolas's call is open.** Amelia's Ch10 case is the clear job's (#767), not this.
+   flagged; 7 of 36 over-cap units caught; 26 of 33 flags lived). Not built; **closed** on Nicolas's call.
+   **Next: build #742** (Nicolas, 2026-11-25), then R4. Amelia's Ch10 case is the clear job's (#767), not this.
 2. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
    --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
    b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
