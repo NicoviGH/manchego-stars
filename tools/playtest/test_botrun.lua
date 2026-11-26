@@ -3264,6 +3264,13 @@ do
                     g.quietAt[board.turn] = table.concat(ids, " ")
                 end
                 if g.triedAt[board.turn] == nil then g.triedAt[board.turn] = opts.tried or false end
+                g.lowsAt = g.lowsAt or {}
+                if g.lowsAt[board.turn] == nil then
+                    local ids = {}
+                    for id, t in pairs(opts.lows or {}) do ids[#ids + 1] = id .. "=" .. t end
+                    table.sort(ids)
+                    g.lowsAt[board.turn] = table.concat(ids, " ")
+                end
                 local st = steps[board.turn] or {}
                 local a = { unit = 0x01, unitId = 0x01, act = st.act or "wait",
                             move = st.move or { x = 0, y = 0 }, target = st.target,
@@ -3320,8 +3327,13 @@ do
     -- (b) a new low resets and is named; a first reading of an id is not progress
     local near = function(o, v) return { nearest = { { id = "objective", turns = o },
                                                       v and { id = "visit:3,3", turns = v } or nil } } end
-    r, ls = shadow(4, { near(4), near(4), near(3), near(3, 2.5) })
+    local g
+    r, ls, _, g = shadow(4, { near(4), near(4), near(3), near(3, 2.5) })
     check(lines(ls), "1:||1 2:|objective|0 3:||1 4:||2", "progress: a new low resets; a first reading does not")
+    -- the planner is given the lows read before its call: the idle rule's march exemption
+    -- counts a march only below them (#698)
+    check(g.lowsAt[1] .. "|" .. g.lowsAt[3] .. "|" .. g.lowsAt[4], "|objective=4|objective=3",
+          "progress: each plan call is given the army's best so far (opts.lows, #698)")
     check(r.progress.quiet_max, 2, "progress: the longest run")
     check(r.progress.events_quiet_max, 4, "progress: events alone never reset it")
     -- a reading that is no lower, or a higher one, is no new low

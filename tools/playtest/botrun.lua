@@ -1821,6 +1821,7 @@ function M.run(api)
                             -- `quiet` the stuck abort reads, so the bot's two readings agree
                             return { stalled = stalled, sent = sent, stuck = stuck, tried = tried,
                                      idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
+                                     lows = lows,
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(sight),
