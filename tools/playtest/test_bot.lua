@@ -7571,6 +7571,43 @@ do
     check(play(20), "1,0 FALLBACK_SACRIFICE", "idle: with no march, the kill is played as before")
 end
 
+-- test_planner_idle_march_needs_a_new_low (#698): the fixture above with the march to (0,1)
+-- (field 10), and botrun's lows (opts.lows) saying how near the army has ever had the
+-- objective. A march that only gets back to a reading the army already had is a shuffle: idle,
+-- and the over-cap kill is the fallback. One that beats every earlier reading still marches.
+do
+    local function play(lows)
+        local A = blue(0x01, 0, 0, 0)
+        local E = red(0x81, 2, 0, { minRange = false, hp = 10 })
+        local J = red(0x82, 9, 9, { minRange = false })
+        local o = {
+            objective = { kind = "rout" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 0, 1 }) },
+            field = function() return { [0] = { [0] = 20, [1] = 20 }, [1] = { [0] = 10 } } end,
+            fc = { [0x01] = { [0x81] = { ["1,0"] = fc { hit = 100, dmg = 10, hits = 1 } } } },
+            enemyPhase = function(plan)
+                for _, b in ipairs(plan.blues) do
+                    if b.unit.id == 0x01 and b.x == 1 then
+                        return { { enemy = 0x82, target = 0x01, takenHit = 40, takenDmg = 99,
+                                   takenHits = 1, takenCrit = 0, targetHp = 20 } }
+                    end
+                end
+                return {}
+            end,
+        }
+        local a, plan = Planner.plan(B, boardOf(A, E, J), sightOf(o), style("careful"),
+                                     { idle = true, lows = lows })
+        return at(a) .. " " .. tostring(plan and plan.fallback)
+    end
+    -- sightOf's turnsTo is the field over MOV 5: the hold reads 20 / 5 = 4 turns, the march
+    -- to (0,1) 10 / 5 = 2
+    local reached = 10 / 5
+    check(play({ objective = reached }), "1,0 FALLBACK_SACRIFICE",
+          "idle: a march no nearer than the army's best is a shuffle, the kill is played (#698)")
+    check(play({ objective = reached + 0.5 }), "0,1 nil",
+          "idle: a march past the army's best is still no idle plan (#698)")
+end
+
 -- test_planner_advances (ADR 0439): which plans advance the level under opts.idle. Each fixture
 -- puts A on (0,0) holding or on (1,0) doing the thing; the plan's `rank.idle` says whether the
 -- planner read it as advancing (0) or not (1). With no plan that advances, idleOn stays off and

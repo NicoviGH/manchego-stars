@@ -120,7 +120,8 @@
 -- { seen, fogged } (the red units on the field), budget = { exhausted (the lookahead skipped),
 -- averaged } }, branched
 -- = the uncertain kills its judged phase played both ways, averaged = the ones past BRANCH left
--- to the likeliest way, opts = { stalled = bool, idle (botrun's quiet reached M.GOAL_QUIET), sent,
+-- to the likeliest way, opts = { stalled = bool, idle (botrun's quiet reached M.GOAL_QUIET), lows
+-- (botrun's least turns read per goal id this attempt: the idle rule's march exemption, #698), sent,
 -- tried, explored (all Bot.candidates'), quietGoals = the ledger ids
 -- no unit has neared for M.GOAL_QUIET readings (botrun's rule 1, ADR 0403) } | nil,
 -- explore = every Visit and Chest offered: { id, charId, x, y, kind, die (its standing chance
@@ -304,6 +305,16 @@ function M.admits(d, cap) return d <= cap + M.DUST end
 -- HP left, and the acts as a stable key.
 local ADMITTED = { { "forfeits", 1 }, { "complete", -1 }, { "behind", 1 },
                    { "green_die", 1 }, { "progress", -1 }, { "value", -1 } }
+-- Whether readings `near` (goal id -> turns) set a new low against `best` (the army's best so
+-- far, same ids; Goals.nearer, botrun's own test): some goal strictly nearer than ever. A goal
+-- `best` has no reading for (no way to it on the board the plan starts from) sets none (#698).
+function M.setsLow(near, best)
+    for id, t in pairs(near) do
+        if Goals.nearer(t, best[id]) then return true end
+    end
+    return false
+end
+
 function M.outranks(a, b)
     if a.admitted ~= b.admitted then return a.admitted end
     local order = { { "fog", 1 }, { "max_die", 1 }, { "sum_die", 1 }, { "hp_left", -1 },
@@ -1048,33 +1059,44 @@ function M.plan(Bot, board, sight, style, opts)
     -- asked turnsTo for these very (unit, tile, from, beside) above (a unit's own tile is the
     -- start position, so the memo key matches turnsTo(u, tile)): no new path search. `beside`
     -- is the goal's own (Goals.beside), so the read and the chance never disagree on a recruit.
-    local nearest = {}
-    do
+    -- `nearOn(read, pos)` takes the same readings with `read` from `pos` (a plan's end board,
+    -- turnsOn's read): the idle rule's march exemption asks it whether a plan sets a new low
+    -- (admit(), #698). -> goal id -> turns
+    local goalById = {}
+    for _, g in ipairs(goals) do goalById[g.id] = g end
+    local function nearOn(read, pos)
         local function least(g)
             local n
             for _, u in ipairs(g.takerUnits) do
-                local t = turnsTo(u, g.tile, nil, Goals.beside(g.kind))
+                local t = read(u, g.tile, pos and pos[u.id], Goals.beside(g.kind))
                 if t and (not n or t < n) then n = t end
             end
             return n
         end
-        local goalById, obj = {}, nil
+        local out = {}
         for _, g in ipairs(goals) do
-            goalById[g.id] = g
             if g.kind == "objective" then
                 local t = least(g)
-                if t and (not obj or t < obj) then obj = t end
+                if t and (not out.objective or t < out.objective) then out.objective = t end
             end
         end
-        if obj then nearest[#nearest + 1] = { id = "objective", turns = obj } end
         for _, r in ipairs(ledger) do
             local g = (r.status == "feasible" or r.status == "stalled") and goalById[r.id]
             if g and g.tile and (r.kind == "visit" or r.kind == "chest" or r.kind == "recruit") then
-                local t = least(g)
-                if t then nearest[#nearest + 1] = { id = r.id, turns = t } end
+                out[r.id] = least(g)
             end
         end
-        table.sort(nearest, function(x, y) return x.id < y.id end)
+        return out
+    end
+    local nearest, nearNow = {}, nearOn(turnsTo)
+    for id, t in pairs(nearNow) do nearest[#nearest + 1] = { id = id, turns = t } end
+    table.sort(nearest, function(x, y) return x.id < y.id end)
+    -- the army's best so far per goal: the least of botrun's lows (opts.lows, every earlier
+    -- phase's reading this attempt) and this board's; a goal no earlier phase read is measured
+    -- against this board alone. A plan marches only below it (#698)
+    local bestNear = {}
+    for id, t in pairs(nearNow) do
+        bestNear[id] = Goals.lowest(opts and opts.lows and opts.lows[id], t)
     end
     -- each unit's assigned goal as the decision starts (FR-016): the recruit, village or chest
     -- it was sent to, else its way to the objective, and its turns there now. Progress is what a
@@ -1091,6 +1113,9 @@ function M.plan(Bot, board, sight, style, opts)
             goalOf[u.id] = assigned[#assigned]
         end
     end
+    -- Not nearOn: progress sums what each unit cuts from its OWN assigned way (a unit's march
+    -- counts though another is nearer the same goal), nearOn takes each goal's least over its
+    -- takers. The rank scores the first, the idle rule's new low reads the second (#698)
     local function progress(st)
         local pos, out = positions(st), 0
         local read = turnsOn(st, pos)
@@ -1161,8 +1186,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- rescue), may end the chapter, or wounds a unit the win needs (the boss of a Defeat-boss
     -- chapter, any red of a Rout). A kill, counter-kill or win chance counts only above
     -- M.ADVANCE_MIN (ADR 0458, #744). A march nearer a goal does not advance: nearing is what
-    -- the stall reading found idle (an under-cap march is still no idle plan: admit(), ADR
-    -- 0458), and a blow that deals nothing wounds nothing. `counters`: each red
+    -- the stall reading found idle (an under-cap march that sets a new low is still no idle
+    -- plan: admit(), ADRs 0458 and 0476), and a blow that deals nothing wounds nothing. `counters`: each red
     -- enemy's chance our counters kill it in the judged phase. A wound counts only as far as it
     -- outlasts the tile's heal (M.healed, #709): a boss on a fort regains it before it acts.
     -- -> advances, woundOnly: `woundOnly` when a wound that outlasts the heal is all it has. A
@@ -1968,6 +1993,14 @@ function M.plan(Bot, board, sight, style, opts)
     -- break ties (M.outranks): over 300 stored runs the second phase's readings of 0.05 or more
     -- summed to 345 deaths where 54 units died, and admitting by them marked plans safe on the
     -- next phase as over the cap.
+    -- the goals' readings on the board plan `st` leaves (nearOn), read once per plan
+    local function nearOf(st)
+        if not st.nearRead then
+            local pos = positions(st)
+            st.nearRead = nearOn(turnsOn(st, pos), pos)
+        end
+        return st.nearRead
+    end
     local function admit(st)
         local rank = st.rank
         local firstCall = rank.first_game_over == nil
@@ -1990,11 +2023,15 @@ function M.plan(Bot, board, sight, style, opts)
         if firstCall then rank.first_max_exceed, rank.first_sum_exceed = rank.max_exceed, rank.sum_exceed end
         st.capExceed = capExceed
         -- a plan that does not advance is no plan once the stall reading fired (ADR 0439); one
-        -- under the cap that brings a unit nearer its goal is not idle (#744): the cap already
-        -- keeps it safe, and idling it handed the turn to a 0.93-death bait. `idleOn` still turns
-        -- on only for a real advance (pick()), so a march never switches the rule on.
-        local marches = capExceed == 0 and rank.progress > M.DUST
-        rank.idle = (idleOn and not advancing(st) and not marches) and 1 or 0
+        -- under the cap that brings a goal nearer than the army has ever had it is not idle
+        -- (#744, #698): the cap already keeps it safe, and idling it handed the turn to a
+        -- 0.93-death bait. Against the best so far, not this board: a shuffle always nears
+        -- something, and read against this turn it played the all-wait plan over every boss
+        -- wound for 30 turns (Ch15, Ch21). `idleOn` still turns on only for a real advance
+        -- (pick()), so a march never switches the rule on.
+        local idle = idleOn and not advancing(st)
+            and not (capExceed == 0 and M.setsLow(nearOf(st), bestNear))
+        rank.idle = idle and 1 or 0
         rank.admitted = rank.admitted and rank.idle ~= 1
     end
     -- One enemy phase outcome's strikes on `units` ({ id, charId, hp, maxhp?, back?, fought?,

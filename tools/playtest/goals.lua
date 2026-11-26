@@ -383,6 +383,12 @@ end
 -- a chance this small is none: sums of branch products leave float dust (planner.lua's DUST)
 M.DUST = 1e-9
 
+-- The one reading of "a new low" in turns to a goal, which botrun's progress count and the
+-- planner's idle rule both take (#698): `t` strictly below `low`, past float dust; no low yet
+-- is no new low. `lowest` folds a reading into the low it is compared with.
+function M.nearer(t, low) return low ~= nil and t < low - M.DUST end
+function M.lowest(low, t) return low and math.min(low, t) or t end
+
 function M.ledger(goals, sight, style, ctx, chances)
     local reads = sight.canExplore ~= nil and sight.closings ~= nil
     local rows, byId = {}, {}
