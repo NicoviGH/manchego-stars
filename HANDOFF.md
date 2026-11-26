@@ -69,10 +69,14 @@ PR #781 (ADR 0477, roofed rooms in the forecast).
   under #764's item 5.
 - **Plan records carry `releases`** (door, need, ready, staged); a stager's goal row is `stage`.
 
-**Next: item 4, keys.** Trade first (#688: Ch21's spare key on Eirika; Ch16
-s4005's Knight Crest needs a hand-off before turn 14), starting from the uncommitted Trade step 1
-in `../manchego-stars-wt4`; then one key per chest (#711 item 1). One PR each, then item 5, 6,
-then one R4 set over the batch (#764's body).
+**Item 4, keys, first half: PR #783 (Trade for keys, ADR 0479), open, reviewed (3 nits fixed),
+awaiting CI and Nicolas's merge.** Ported from `../manchego-stars-wt4` (that worktree's step 1 is
+now superseded; delete it once #783 merges). A teammate's key is a way, priced by the taker's walk
+to the holder only: replay `t688a` priced the holder's walk too and lost Dozla and Gerik at the
+(21,18) chest. Replay `t688b` (Ch21 s4009 a1): won in 19 turns, both chests opened, 2 deaths not
+attributed (R4's try was an older bot). Details on #688's comment of 2026-11-26.
+**Next:** one key per chest (#711 item 1), then items 5, 6, then one R4 set over the batch
+(#764's body). Ch16 s4005's Knight Crest still needs a convoy Give or Steal (#688).
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
