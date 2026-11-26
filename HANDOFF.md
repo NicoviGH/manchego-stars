@@ -52,8 +52,10 @@ s4003 a1 (tags `n698a15`, `n698a21`): Ch15 won in 22 turns (R4 24), one death fe
 (R4 40). Neither was a stuck try. Ch21 s4005 still waits: its only advance is a game-over assault
 on Lyon; striking past the counter-kill refusal is built only if the R4 set shows it is needed.
 
-**Item 3 (#766, Rennac): PR #782 is open, CI green on eac9a149, waiting on Nicolas's "merge"
-(ADR 0478; reviewed, re-reviewed, and its last commit reviewed on his say-so).** It builds on
+**Item 3 (#766, Rennac): PR #782 is open, CI green on 64e40edd, waiting on Nicolas's "merge"
+(ADR 0478; reviewed, re-reviewed, and its last commit reviewed on his say-so). 64e40edd adds the
+way out he asked for: a release is staged once every striker the job can send is ready, so a
+door that brings more reds than the army can gather never holds for good.** It builds on
 PR #781 (ADR 0477, roofed rooms in the forecast).
 - **The rule:** memory lists each door that brought reds (`Timeline.releases`, an arrival's
   `by`) and what its units lost. A plan that opens one before enough units can strike its front
