@@ -13,27 +13,32 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-25, late night; main is d0e6f8e7 + HANDOFF commits)
+## Next session starts here (2026-11-25, night; main is 1f9d7068 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
-R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773).
+R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
+PR #777 (ADR 0473, closed #775) added the best-meeting Talk job and the Rogue's locks in the
+forecast. Rennac is still missed on s4005: his Talk job dies on the corridor's danger (#766
+comment 7176696969). R4 is to size that for PR #774's merge call (#767 comment).
 
-**PR #777 merged (2026-11-25, ADR 0473, closed #775):** the best-meeting Talk job, and the
-forecast now plays a Rogue's door and chests. Rennac's forecast walk matches his real one, but
-he is still missed on s4005: his Talk job dies on the corridor's danger, read as it stands,
-until our units clear it, too late (#766 comment 7176696969). R4 is to size that for PR #774's
-merge call (#767 comment).
+**PR #778 merged (2026-11-25, ADR 0474, closed #742): the verdict now compares tries to the
+first clean clear.** A chapter cell replays each start with memory up to the cap (12); the
+verdict bounds the share of pairs where Manchego Stars needed more tries minus the share where
+the twin did (ADR 0385's bounds, looks, N and margin unchanged). First-try deaths are a
+reported column. Cells now cost the old cost times the mean tries; `pilot` estimates an
+unmeasured start at all 12 tries, so its 8-hour refusal (SC-007) trips more often. Proof run:
+vanilla Ch2 cleared on tries 1, 1, 2; Manchego Stars ch02 had no clean clear in 12 on 3 starts
+(both chwinga lost every try, the known ch02 block).
 
-**Order Nicolas set (2026-11-25): #775 (done, PR #777), then #776 (answered), then the R4 runs (#768). #742 (the attempts-to-clean verdict) is not built and lands before R4.**
+**Order Nicolas set (2026-11-25): #775, #776 and #742 are done; next the R4 runs (#768).**
 
-1. **#776 answered (2026-11-25, comment 7178440170): a "safe tile next turn" check does not
-   separate deaths from survivors** (probe `s776a`/`s776b`, Ch14 + Ch10, 27 games: 0 of 4 deaths
-   flagged; 7 of 36 over-cap units caught; 26 of 33 flags lived). Not built; **closed** on Nicolas's call.
-   **Next: build #742** (Nicolas, 2026-11-25), then R4. Amelia's Ch10 case is the clear job's (#767), not this.
-2. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
+1. **R4 #768:** one attempts set repeating `m740c` exactly: `resume --chapter N --last N
    --attempts 3 --scout --route 1 --seal-at 10`, Ch10, 13, 14, 15, 16, 19 on
    b640e-cs-s4002/3/5/7/9 and Ch21 on s4003/5/7/9 (34 starts; `m740c`: 7 of 34 clean; #699
-   comment 7093112364). Run in the background. Also count the misses #767's comment asks for.
+   comment 7093112364). Run in the background. Report each start's tries to a clean clear,
+   read from `resume-runs.jsonl` with `montecarlo.first_clean` (`resume` does not print it). Note this set's cap is 3, not the verdict's
+   12: "none within 3" is not ADR 0474's "none within the cap". Also count the misses #767's
+   comment asks for.
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
@@ -44,7 +49,7 @@ replays), `h775a`-`h775c` (Ch14 s4005 replays of the forecast fix). Replay a sta
 b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
 **Holds to revisit:** #569 waited on R1 (read its hold comment: does it reopen?). #727 waits on
-R2/R3, #639 on R4. #742 lands before R4. #745 (the recorder misses a thief's drop) stays open.
+R2/R3, #639 on R4. #745 (the recorder misses a thief's drop) stays open.
 
 **Worktrees:**
 - `../manchego-stars-wt4` still holds Trade step 1 (#688), uncommitted.
