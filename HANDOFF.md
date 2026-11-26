@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-26; main is 59140fe2 + HANDOFF commits)
+## Next session starts here (2026-11-26; main is 59140fe2 + HANDOFF commits; PR #782 open)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -52,32 +52,32 @@ s4003 a1 (tags `n698a15`, `n698a21`): Ch15 won in 22 turns (R4 24), one death fe
 (R4 40). Neither was a stuck try. Ch21 s4005 still waits: its only advance is a game-over assault
 on Lyon; striking past the counter-kill refusal is built only if the R4 set shows it is needed.
 
-**Item 3 (#766, Rennac) is in progress. PR #781 merged (59140fe2, ADR 0477): a general
-forecast fix, not yet the recruit.** Read #766's last three comments first (2026-11-26).
-- **Found:** Rennac and ~10 reds start Ch14 hidden under a roof past the (22,17) door (state
-  `0x81`). The door's change unroofs them (`UpdateRoofedUnits`). The sandbox skipped that, so
-  every door plan was judged against an empty corridor and no plan could strike the squad.
-  Fixed for any roofed room (`sight.unroof`, `Board.unroofed`, the planner's re-listing).
-- **Effect (s4005 a1-a2, `q766e`):** a2 opens the door on turn 3 and strikes a revealed red the
-  same turn; 16 turns, 0 deaths (18 before). a1: 21 turns, L'Arachel lost on turn 14 in a
-  `FALLBACK_SACRIFICE` turn (#743's case).
-- **Still lost: Rennac.** The one recruit (`r768a14` a3) had three strikers beside the door
-  when it opened (3 kills that turn). In the `q766` replays the army is 4-8 tiles back then.
-- **Next, keep iterating on item 3 (Nicolas, 2026-11-26: "continue iterating"):** the bot must
-  gather strikers at an act memory says releases a squad before making it: multi-turn staging,
-  general, no Rennac or door case (#767's stage/clear; Nicolas rejected a striker rule written
-  for this door). Two measured leads on #766: the Talk job's route loss overprices a walk with
-  the army around (death 0.995-1.0, 0 of 4 died; counting this turn's stop alone kept the job a
-  turn longer, `q766f`), and the dropped door-waits-for-talker rule.
-- **Cheap replay:** `montecarlo.py resume --game vanilla --tag <new> --campaigns b640e-cs-s4005
-  --chapter 14 --last 14 --attempts 2 --scout --route 1 --seal-at 10 --jobs 1` (~15 min). Plan
-  records now carry `jobs` (each job's worth, chance, loss, net, chosen).
+**Item 3 (#766, Rennac): PR #782 is open, CI green on eac9a149, waiting on Nicolas's "merge"
+(ADR 0478; reviewed, re-reviewed, and its last commit reviewed on his say-so).** It builds on
+PR #781 (ADR 0477, roofed rooms in the forecast).
+- **The rule:** memory lists each door that brought reds (`Timeline.releases`, an arrival's
+  `by`) and what its units lost. A plan that opens one before enough units can strike its front
+  that turn forfeits that loss; the nearest free strikers are sent to the door meanwhile. The
+  reach is read on the map the door's change leaves (roofed tiles are unreached before it).
+- **Replay `s766t` (Ch14 s4005 a2):** staged by turn 2, door opened turn 3, **L'Arachel talked
+  Rennac over on turn 4**, won in 14 turns (`q766e` a2: 16, Rennac lost). **Not clean:** a red
+  staff user berserked Cormag on turn 7, and he killed L'Arachel, Artur and Tana on turns 9-11
+  in turns with no plan under the cap (line on #743).
+- `s766r`/`s766s` were the first version, which read no unit as ready (shut-map fields); their
+  turn-6 recruit came from the forfeit's hold alone. They showed the own-tile hold lead, now
+  under #764's item 5.
+- **Plan records carry `releases`** (door, need, ready, staged); a stager's goal row is `stage`.
+
+**Next, once #782 merges: item 4, keys.** Trade first (#688: Ch21's spare key on Eirika; Ch16
+s4005's Knight Crest needs a hand-off before turn 14), starting from the uncommitted Trade step 1
+in `../manchego-stars-wt4`; then one key per chest (#711 item 1). One PR each, then item 5, 6,
+then one R4 set over the batch (#764's body).
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
-Recent tags: `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
+Recent tags: `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
 `i730b`-`i730j` (Ch16 s4005 theft replays, ADR 0475). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
 b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
