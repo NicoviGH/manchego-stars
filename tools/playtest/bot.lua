@@ -3033,6 +3033,105 @@ local function sendOpeners(ctx, barred)
     end
 end
 
+-- How far `u` is from striking the release `r`'s front this turn once its door is open: the
+-- march cost from the door to u and from the door to the nearest front tile (one field from the
+-- door reads both sides: GenerateExtendedMovementMap from the door's tile, units not blocking),
+-- less u's MOV and longest reach. 0 or less: u can strike a red the door brings the turn it
+-- opens. nil: u has no weapon, or no way there.
+local function strikeGap(ctx, u, r)
+    local reach = 0
+    for _, w in ipairs(ctx.sight.weapons(u) or {}) do reach = math.max(reach, w.max or 0) end
+    if reach == 0 then return nil end
+    local door = { x = r.x, y = r.y }
+    local here = walkFrom(ctx, door, u.x, u.y, u)
+    if not here then return nil end
+    local best
+    for _, f in ipairs(r.front) do
+        local d = walkFrom(ctx, door, f.x, f.y, u)
+        if d and (not best or d < best) then best = d end
+    end
+    return best and here + best - ctx.sight.mov(u) - reach
+end
+
+-- The releases this board can still make (Timeline.releases, #766): a door an earlier attempt
+-- opened onto reds, still shut here, whose units lost something still open here (a tile they
+-- closed, a recruit who left). A person who lost those by opening it with the army back opens
+-- it with strikers at the door: the one vanilla Ch14 try that got Rennac had three there, and
+-- killed three of the four Fighters it brought on the door's own turn; every miss had its
+-- strikers 4-8 tiles back. Each: { x, y, key, need = the front's size, stake = { tiles, gone }
+-- (the open part of its losses), strikers = { { u, gap } } nearest first (strikeGap), ready =
+-- how many of them can strike its front this turn, staged = ready >= need }. Read once
+-- a decision, on the board before anyone acts: a striker that moves in this turn has acted.
+local function releasesOf(ctx)
+    local out = {}
+    local memory = ctx.style and ctx.style.memory
+    if not (memory and ctx.sight.doors and ctx.sight.march) then return out end
+    local shut = {}
+    for _, d in ipairs(ctx.sight.doors()) do shut[tileKey(d.x, d.y)] = true end
+    local openRecruit, openTile = {}, {}
+    for _, t in pairs(ctx.pendingRecruits or {}) do openRecruit[t.charId] = true end
+    for _, u in ipairs(ctx.onField or {}) do
+        if (ctx.recruitTalkers or {})[u.id] then openRecruit[u.charId] = true end
+    end
+    if ctx.sight.explorable then
+        for _, t in ipairs(openTiles(ctx)) do openTile[tileKey(t.x, t.y)] = true end
+    end
+    for _, r in ipairs(Timeline.releases(memory)) do
+        local key = tileKey(r.x, r.y)
+        if r.act == "door" and shut[key] and #r.front > 0 then
+            local stake, any = { tiles = {}, gone = {} }, false
+            for k in pairs(r.tiles) do
+                if openTile[k] then stake.tiles[k], any = true, true end
+            end
+            for c in pairs(r.gone) do
+                if openRecruit[c] then stake.gone[c], any = true, true end
+            end
+            if any then
+                local strikers, ready = {}, 0
+                for _, u in ipairs(ctx.actors) do
+                    local gap = strikeGap(ctx, u, r)
+                    if gap then
+                        strikers[#strikers + 1] = { u = u, gap = gap }
+                        if gap <= 0 then ready = ready + 1 end
+                    end
+                end
+                table.sort(strikers, function(a, b)
+                    if a.gap ~= b.gap then return a.gap < b.gap end
+                    return (a.u.slot or 0) < (b.u.slot or 0)
+                end)
+                out[#out + 1] = { x = r.x, y = r.y, key = key, need = #r.front, stake = stake,
+                                  strikers = strikers, ready = ready,
+                                  staged = ready >= #r.front }
+            end
+        end
+    end
+    return out
+end
+M.releasesOf = releasesOf
+
+-- The stage job (#764 R2, #766): each release not yet staged (ctx.releases) gets its `need`
+-- nearest strikers that have no job, sent to its door, so the turn it opens they strike what it
+-- brings. Never a unit whose loss ends the game (sendOpeners' reason: a lord pulled to a door
+-- leaves the objective). The door's own act waits on the planner's forfeit (Goals.forfeited's
+-- `released`), not on this: this only brings the strikers.
+local function sendStagers(ctx)
+    local lords = M.gameOver(ctx.sight)
+    for _, r in ipairs(ctx.releases or {}) do
+        if not r.staged then
+            local n = 0
+            for _, s in ipairs(r.strikers) do
+                if n >= r.need then break end
+                if not (ctx.exploreGoal[s.u.id] or lords[s.u.charId]) then
+                    ctx.exploreGoal[s.u.id] = { x = r.x, y = r.y, stage = true }
+                    n = n + 1
+                elseif ctx.exploreGoal[s.u.id] and ctx.exploreGoal[s.u.id].stage then
+                    n = n + 1
+                end
+            end
+        end
+    end
+end
+
 local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
     -- each unit's chain of goals (jobs.lua), the first its exploreGoal: written for R3 (#767),
@@ -3138,7 +3237,10 @@ local function exploring(ctx, sent, barred, triedIn)
         end
     end
     assign(talkPairs, function(t) return "talk>" .. t.id end, RECRUIT)
-    if not ctx.sight.explorable then return end
+    if not ctx.sight.explorable then
+        sendStagers(ctx)
+        return
+    end
     local open, blues = {}, {}
     for _, t in ipairs(openTiles(ctx)) do open[tileKey(t.x, t.y)] = t end
     for _, u in ipairs(ctx.blues) do blues[u.id] = u end
@@ -3225,6 +3327,7 @@ local function exploring(ctx, sent, barred, triedIn)
         if t and not g.door and quiet[t.id] then triedOn(t.id)[uid] = true end
     end
     sendOpeners(ctx, barred)
+    sendStagers(ctx)
 end
 
 function M.explain(board, sight, style)
@@ -3786,6 +3889,8 @@ function M.candidates(board, sight, style, opts)
     ctx.pending = opts and opts.pending
     ctx.owedRecruits = opts and opts.owedRecruits   -- a set of charIds (botrun's owed), Goals.scriptedCloses'
     ctx.recruits, ctx.recruitTalkers, ctx.pendingRecruits, ctx.looseRecruits = recruitsOf(ctx)
+    -- the doors memory says bring reds, still shut, and whether their strikers stand ready (#766)
+    ctx.releases = releasesOf(ctx)
     -- each unit's way to the objective, for the goals (goals.lua)
     ctx.objectiveTile = function(u) return objectiveTile(ctx, u, sight.objective) end
     -- A unit sent where it has had no step nearer since an earlier turn is sent again,

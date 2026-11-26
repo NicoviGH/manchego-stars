@@ -2722,6 +2722,50 @@ do
     check(seen["2,0"], true, "opened: its enemy phase is judged with the door open")
 end
 
+-- test_a_door_memory_says_brings_reds_waits_for_its_strikers (#766): an earlier attempt opened the
+-- door at (2,0), which brought a Fighter onto (3,0), and that Fighter looted the chest at (3,0)
+-- (Timeline.releases). A, the opener, has no weapon: no one could strike the Fighter the turn the
+-- door opens, so every plan that opens it forfeits the chest, and the door waits; S is sent to
+-- the door (the stage job). With S already one move from the door the release is staged, and
+-- the door opens. Vanilla Ch14: the (22,17) door brings four Fighters and Rennac; the one try
+-- that got him had three strikers at the door when it opened.
+do
+    local function case(sx)
+        local A = blue(0x01, 0, 0, 0, { minRange = false })
+        local S = blue(0x02, 1, sx, 1, { weapons = { { slot = 0, min = 1, max = 1 } } })
+        local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
+        local door = { act = "door", x = 2, y = 0 }
+        local st = style("careful")
+        st.memory = Fakeline.memory({
+            arrivals = { { charId = 0x90, classId = 9, x = 3, y = 0, turn = 2, by = door, timed = false } },
+            closings = { { x = 3, y = 0, phase = 3, closerKey = "a:144:9:2" } } })
+        local doorField = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1, ["4,0"] = 2,
+                            ["1,1"] = 2, ["7,1"] = 8 }
+        local o = {
+            objective = { kind = "boss" },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ sx, 1 }) },
+            field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = doorField,
+                               ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 } },
+            obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+            explorable = { { x = 3, y = 0, kind = "chest" } },
+            canExplore = { [0x01] = { ["3,0"] = "chest" } },
+        }
+        local _, ctx = B.candidates(boardOf(A, S, E), sightOf(o), st)
+        local a = Planner.plan(B, boardOf(A, S, E), sightOf(o), st)
+        return a, ctx
+    end
+    local _, far = B.candidates(boardOf(blue(0x01, 0, 0, 0)), sightOf { objective = { kind = "boss" } },
+                                  style("careful"))
+    check(far and #(far.releases or {}), 0, "release: no memory, no release")
+    local a, ctx = case(7)
+    local r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. r.need, "false 1", "release: read, not staged")
+    check(a and a.act ~= "door", true, "release: unstaged (S 8 from the door), the door waits")
+    check(ctx.exploreGoal[0x02] and ctx.exploreGoal[0x02].stage, true, "release: S is sent to the door")
+    a = case(1)
+    check(a and a.act, "door", "release: staged (S one move from the door), the door opens")
+end
+
 -- test_a_plan_strikes_what_its_door_unroofs (#766): the door at (2,0) opens a roofed room, and
 -- R stands in it on (3,1), hidden under the roof (US_HIDDEN | US_UNDER_A_ROOF, off the field):
 -- the game brings him out when the door's change removes the roof (UpdateRoofedUnits). D, at

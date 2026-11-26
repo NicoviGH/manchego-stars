@@ -302,6 +302,7 @@ local function recruitGoals(byId, closings, paths, cost, style, ctx)
                 if byId[uid] then us[#us + 1] = byId[uid] end
             end
             out[#out + 1] = { id = "recruit:" .. id, kind = "recruit", unitId = id,
+                              charId = t.charId,
                               tile = { x = t.x, y = t.y }, gold = gold, takerUnits = us,
                               closes = closings["unit:" .. id],
                               path = runOn(paths[id], closings["unit:" .. id], t, style.memory, ctx) }
@@ -430,6 +431,20 @@ function M.ledger(goals, sight, style, ctx, chances)
     return rows
 end
 
+-- Whether goal `g` is one an unstaged release the plan makes loses (closes.released: the
+-- stakes of the doors it opens before their strikers stand ready, Bot's releasesOf, #766): a
+-- recruit memory saw that door's units walk off with (by character), or a tile they closed.
+function M.released(g, stakes)
+    for _, s in ipairs(stakes or {}) do
+        if g.kind == "recruit" then
+            if g.charId ~= nil and s.gone[g.charId] then return true end
+        elseif g.tile and s.tiles[g.tile.x .. "," .. g.tile.y] then
+            return true
+        end
+    end
+    return false
+end
+
 function M.forfeited(ledger, goals, closes)
     local took, lost, shut = closes.took or {}, closes.lost or {}, {}
     local wins = (closes.win or 0) > M.DUST
@@ -442,6 +457,7 @@ function M.forfeited(ledger, goals, closes)
                 or (g.closes ~= nil and g.closes <= 1)
                 or (g.closes ~= nil and reach[g.id] ~= nil and reach[g.id].before >= closes.gone
                     and reach[g.id].after <= M.DUST)
+                or M.released(g, closes.released)
         end
     end
     local out = {}

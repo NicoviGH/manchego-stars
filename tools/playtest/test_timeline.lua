@@ -234,5 +234,32 @@ do
     check(Timeline.routeOf(nil, 0x80, 5), nil, "routeOf: no memory, no route")
 end
 
+-- releases: an act by our army that brought reds, its front (its own turn's reds, foes only) and what
+-- the units it brought lost (#766: vanilla Ch14's (22,17) door brings four Fighters and Rennac,
+-- who loots two chests and leaves)
+do
+    local door = { act = "door", x = 22, y = 17 }
+    local mem = Fakeline.memory(
+        { arrivals = { { charId = 0x80, classId = 9, x = 22, y = 16, turn = 4, by = door, timed = false },
+                       { charId = 0x80, classId = 63, x = 21, y = 14, turn = 4, by = door, timed = false },
+                       { charId = 0x1C, classId = 51, x = 22, y = 12, turn = 4, by = door, timed = false,
+                         gone = { how = "left", boardTurn = 12 } },
+                       { charId = 0x80, classId = 19, x = 22, y = 7, turn = 5, by = door, timed = false },
+                       { charId = 0x80, classId = 5, x = 7, y = 18, turn = 5, timed = true } },
+          closings = { { x = 22, y = 5, phase = 5, closerKey = "a:28:51:4" },
+                       { x = 11, y = 15, phase = 6 } } })
+    local r = Timeline.releases(mem)
+    check(#r, 1, "releases: one act brought reds (a timed arrival is no release)")
+    local fr = {}
+    for _, u in ipairs(r[1] and r[1].front or {}) do fr[#fr + 1] = u.x .. "," .. u.y end
+    table.sort(fr)
+    check(r[1] and r[1].act .. " " .. r[1].x .. "," .. r[1].y, "door 22,17", "releases: the act and its tile")
+    check(table.concat(fr, " "), "21,14 22,16", "releases: its own turn's foes; not the recruit who left, nor a later arrival")
+    check(r[1] and r[1].gone[0x1C], true, "releases: the unit it brought that left")
+    check(r[1] and r[1].tiles["22,5"], true, "releases: the tile its unit closed")
+    check(r[1] and r[1].tiles["11,15"], nil, "releases: not a tile someone else closed")
+    check(#Timeline.releases(nil), 0, "releases: no memory, none")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end

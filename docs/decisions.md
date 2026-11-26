@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-474 decisions. Read this index, then open the two or three you need — the whole
+475 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -317,6 +317,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0475` | [The planner forfeits what the record's clean clear loses: a spoiling theft, and an owed recruit's death whatever its row](decisions/0475-the-planner-forfeits-what-the-records-clean-clear-loses.md) | 2026-11-26 | #730 #711 #764 #510 |
 | `0476` | [An under-cap march is idle unless it sets a new low](decisions/0476-an-under-cap-march-is-idle-unless-it-sets-a-new-low.md) | 2026-11-26 | #698 #764 #510 |
 | `0477` | [A door that unroofs a room brings its units out in the forecast](decisions/0477-a-door-that-unroofs-a-room-brings-its-units-out-in-the-forecast.md) | 2026-11-26 | #766 #764 #767 #510 |
+| `0478` | [A door memory says brings reds waits for its strikers](decisions/0478-a-door-memory-says-brings-reds-waits-for-its-strikers.md) | 2026-11-26 | #766 #764 #767 #510 |
 
 ---
 

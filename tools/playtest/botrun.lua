@@ -2013,6 +2013,7 @@ function M.run(api)
                                 predict = plan and plan.predict,
                                 explore = plan and plan.explore, goals = plan and plan.goals,
                                 jobs = plan and plan.jobs,
+                                releases = plan and plan.releases,
                                 worth = plan and plan.goalWorth,
                                 ledger = plan and plan.ledger,
                                 nearest = plan and plan.nearest,

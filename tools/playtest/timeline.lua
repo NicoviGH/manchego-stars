@@ -427,6 +427,67 @@ function M.routeOf(memory, charId, classId)
     return out, arrival
 end
 
+-- Each act by our army that brought reds, by the act and its tile (an arrival's `by`, botrun's
+-- triggerOf): what a person who opened that door before knows. Vanilla Ch14's (22,17) door
+-- brings four Fighters and Rennac into the corridor he leaves by (#766); the one try that got
+-- him had three strikers at the door when it opened.
+--   { act, x, y,
+--     front = { { charId, classId, x, y } }: the reds it brought on the act's own board turn,
+--             less any that left the map or turned (a recruit is a goal, not a foe), from the
+--             latest attempt that made the act
+--     tiles = { ["x,y"] = true }: tiles a unit it brought closed (looted, opened) in any attempt
+--     gone  = { [charId] = true }: units it brought that left the map, unkilled, in any attempt }
+-- In act-tile order. A death is the play's (as deadlines' reads it): no loss.
+function M.releases(memory) return memo("releases", memory, compute.releases) end
+function compute.releases(memory)
+    local byAct, order = {}, {}
+    for _, tl in ipairs(attempts(memory)) do
+        local byKey, mine = {}, {}
+        for _, u in ipairs(tl.units or {}) do
+            byKey[u.key] = u
+            local by = u.appeared and u.appeared.by
+            if by and u.faction == "red" then
+                local k = by.act .. ":" .. tileKey(by.x, by.y)
+                local r = byAct[k]
+                if not r then
+                    r = { act = by.act, x = by.x, y = by.y, front = {}, tiles = {}, gone = {} }
+                    byAct[k], order[#order + 1] = r, k
+                end
+                mine[k] = mine[k] or { r = r, units = {} }
+                table.insert(mine[k].units, u)
+                if u.gone and u.gone.how == "left" then r.gone[u.charId] = true end
+            end
+        end
+        for _, c in ipairs(tl.closings or {}) do
+            local u = c.closerKey and byKey[c.closerKey]
+            local by = u and u.appeared and u.appeared.by
+            local r = by and byAct[by.act .. ":" .. tileKey(by.x, by.y)]
+            if r then r.tiles[tileKey(c.x, c.y)] = true end
+        end
+        -- this attempt made the act: its own turn's reds are the front (the latest attempt's)
+        for _, m in pairs(mine) do
+            local first
+            for _, u in ipairs(m.units) do
+                local t = u.appeared.boardTurn
+                if not first or t < first then first = t end
+            end
+            local front = {}
+            for _, u in ipairs(m.units) do
+                local foe = not (u.gone and (u.gone.how == "left" or u.gone.how == "turned"))
+                if u.appeared.boardTurn == first and foe then
+                    front[#front + 1] = { charId = u.charId, classId = u.classId,
+                                          x = u.appeared.x, y = u.appeared.y }
+                end
+            end
+            m.r.front = front
+        end
+    end
+    table.sort(order)
+    local out = {}
+    for _, k in ipairs(order) do out[#out + 1] = byAct[k] end
+    return out
+end
+
 -- Who killed whom, from where, on which turn, over every earlier attempt, oldest first: each
 -- death as M.recorder's `deaths` has it, with its `attempt`.
 function M.threats(memory) return memo("threats", memory, compute.threats) end
