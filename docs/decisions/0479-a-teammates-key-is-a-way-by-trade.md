@@ -19,15 +19,25 @@ had no Trade, so a key in a teammate's bag opened nothing for anyone else.
 ## The rule
 
 - **A source of a key** (`keyWay`) is an enemy whose fall gives it (`keySources`) or a teammate
-  whose bag holds one that opens the lock for the taker (`sight.bagKey`: the game's own key check,
-  `GetUnitKeyItemSlotForTerrain`, as the taker; a thief's Lockpick opens nothing for anyone else).
-  A teammate's key is priced by the taker's own walk: to the holder, then on from there. Never by
-  the holder's walk to the taker: nothing sends the holder, so that price counts a meeting no one
-  walks. Replay `t688a` (Ch21 s4009 a1, both meetings priced) priced Dozla 1 turn from the (21,18)
-  chest through Gerik's Chest Key for four turns while Gerik held back under the risk cap; both
-  died (won in 18 turns, 5 deaths, against R4's 0). The holder's hand-over is still an act it is
-  offered when it stands by the taker.
-- **A chest whose key a teammate holds has a taker** (`Goals.list`'s takers), so it is a goal.
+  that spares one (`Goals.spareKey`, the one test, read by `keyWay` and `Goals.list`'s takers
+  alike). A teammate spares its key for a chest only once its own trip to that chest has stalled
+  (`ctx.tried`: the units a stalled chest was taken from), and never for a door. A holder opens
+  its own chest itself and the job matcher already weighs it there; a door's holder opens it and
+  its escort is already every unit's way (`doorMates`). The key must open the lock for the taker
+  (`sight.bagKey`: the game's own key check, `GetUnitKeyItemSlotForTerrain`, as the taker; a
+  thief's Lockpick opens nothing for anyone else). A chest whose key a teammate spares has a
+  taker, so it is a goal.
+- **The price** is the taker's own walk: to the holder, then on from there. Never the holder's
+  walk to the taker: nothing sends the holder, so that price counts a meeting no one walks.
+- **Why both limits, from two replays of vanilla Ch21 s4009 a1** (control on main, `c688m`: won
+  in 30 turns, no deaths, the (2,18) chest stalled):
+  - `t688a` priced both meetings: Dozla stood by the (21,18) chest four turns, priced 1 turn
+    through Gerik's Chest Key while Gerik held back under the risk cap; both died (18 turns, 5
+    deaths).
+  - `t688b` priced every holder's key as every teammate's way: the only two Chest Keys were
+    Eirika's and Dozla's, the two chest jobs' own takers, yet every unit's way to a chest read
+    2-5 turns nearer (Marisa's to (2,18): 9 turns to 5). The game left main's on turn 1 and lost
+    two units (19 turns, 2 deaths).
 - **The act** `trade` (`tradeAct`): from the safest wait tile the gate allows where the game's
   Trade lists the other unit (`ItemSubMenu_IsTradeAvailable`), the actor takes the key, or, with
   `gives`, the holder hands it over. A taker with a full bag gives back what the game's full-bag

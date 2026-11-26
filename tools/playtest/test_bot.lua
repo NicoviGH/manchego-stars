@@ -4744,22 +4744,22 @@ do
     check(goals[0x02] and goals[0x02].door, true, "door mate: unbarred, the same G is sent")
 end
 
--- The trade fixture (#687, #688; vanilla Ch21: the chests sit behind doors whose keys the lords
--- hold): A holds the chest key, the chest at (4,0) is behind the door at (2,0) locked to A, and
--- K opens doors, marching for an enemy away from the door. A reaches (0,0) and (1,0); K stands
--- at (1,1), beside (1,0).
+-- The trade fixture (#688, ADR 0479; vanilla Ch21: the Chest Keys sat on units that held back):
+-- the chest at (4,0) is locked to A, and K's bag holds a Chest Key that opens it for A. A
+-- reaches (0,0) and (1,0); K stands at (1,1), beside (1,0). STALLED is the board where K was
+-- sent to that chest and it stalled (Bot's exploring: quietGoals and the units tried on it).
+local STALLED = { tried = { ["chest:4,0"] = { [0x02] = true } }, quietGoals = { ["chest:4,0"] = true } }
 local function tradeFixture()
-    local A = blue(0x01, 0, 0, 0, { items = { { id = 0x69, uses = 1 } } })
-    local K = blue(0x02, 1, 1, 1, { items = { { id = 0x6A, uses = 1 } } })
+    local A = blue(0x01, 0, 0, 0)
+    local K = blue(0x02, 1, 1, 1, { items = { { id = 0x69, uses = 1 } } })
     local E = red(0x81, 0, 9, { minRange = false })
     local o = {
         reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ 1, 1 }) },
-        field = fieldsOf { ["4,0"] = BOSS_SIDE, ["2,0"] = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0,
-                                                             ["1,1"] = 1, ["3,0"] = 1 } },
-        doors = { { x = 2, y = 0 } }, obstacles = {}, openers = { [0x02] = true },
-        locked = { [0x01] = { ["2,0"] = "door" } },
+        doors = {}, obstacles = {},
+        locked = { [0x01] = { ["4,0"] = "chest" } },
         explorable = { { x = 4, y = 0, kind = "chest" } },
-        canExplore = { [0x01] = { ["4,0"] = "chest" } },
+        canExplore = { [0x02] = { ["4,0"] = "chest" } },
+        bagKey = { [0x01] = { [0x02] = { chest = { id = 0x69, uses = 1, slot = 0 } } } },
     }
     return A, K, E, o
 end
@@ -4775,49 +4775,49 @@ local function tradesOf(cands, id)
     return out
 end
 
--- test_a_teammates_door_key_is_a_way_by_trade (#688): K's bag holds a Door Key A can use. A's
--- way runs to K, a Trade, through the door to the chest; from (1,0), beside K, the Trade is
--- offered (the game's Trade lists K), and K, which can reach no tile beside A, offers none.
--- Where the game's Trade lists no one (a Phantom: o.noTrade), none is offered.
+-- test_a_holders_own_chest_key_is_no_teammates_way (#688, replay t688b): K opens the chest
+-- itself and its trip has not stalled, so its key is no way for A: no Trade, and A has no way
+-- to the chest (pricing it as A's too put every chest 2-5 turns nearer for the whole army).
 do
     local A, K, E, o = tradeFixture()
-    o.bagKey = { [0x01] = { [0x02] = { door = { id = 0x6A, uses = 1, slot = 0 } } } }
     local cands, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
-    check(ctx.turnsTo(A, { x = 4, y = 0 }) ~= nil, true, "trade: the chest has a way (K opens the door, or hands A its key)")
+    check(ctx.turnsTo(A, { x = 4, y = 0 }), nil, "not spare: K's own chest key is no way for A")
+    check(#tradesOf(cands, 0x01) + #tradesOf(cands, 0x02), 0, "not spare: and no Trade is offered")
+end
+
+-- test_a_stalled_holders_key_is_a_way_by_trade (#688): once K's trip to the chest stalled, its
+-- key is A's way: A takes it from (1,0), beside K, and K, which reaches no tile beside A, hands
+-- nothing. When K reaches a tile beside A it hands the key over. Where the game's Trade lists no
+-- one (a Phantom: o.noTrade), none is offered.
+do
+    local A, K, E, o = tradeFixture()
+    local cands, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
+    check(ctx.turnsTo(A, { x = 4, y = 0 }) ~= nil, true, "spare: the chest has a way through K's key")
     local t = tradesOf(cands, 0x01)[1]
     check(t and string.format("%d,%d>%d %dx%d %s", t.move.x, t.move.y, t.targetId, t.item, t.uses,
-        tostring(t.gives)), "1,0>2 106x1 nil", "trade: A takes K's Door Key from beside K")
+        tostring(t.gives)), "1,0>2 105x1 nil", "trade: A takes K's Chest Key from beside K")
     check(t and t.back, nil, "trade: with room in its bag A gives nothing back")
     check(#tradesOf(cands, 0x02), 0, "trade: K reaches no tile beside A, so it hands nothing")
-    -- the holder walks to meet the taker: K reaches (1,0), beside A
     o.reach[0x02] = tiles({ 1, 1 }, { 1, 0 })
     o.reach[0x01] = tiles({ 0, 0 })
-    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
     local g = tradesOf(cands, 0x02)[1]
     check(g and string.format("%d,%d>%d %d %s", g.move.x, g.move.y, g.targetId, g.item, tostring(g.gives)),
-          "1,0>1 106 true", "trade: K walks to A and hands its key over")
+          "1,0>1 105 true", "trade: K walks to A and hands its key over")
     o.noTrade = { [0x01] = true, [0x02] = true }
-    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
     check(#tradesOf(cands, 0x01) + #tradesOf(cands, 0x02), 0, "trade: none where the game lists no Trade")
 end
 
 -- test_a_teammates_key_is_priced_by_the_takers_walk (#688, replay t688a: Dozla was priced 1 turn
 -- from the (21,18) chest through Gerik's Chest Key, with Gerik walking to him; nothing sent Gerik,
--- who held back and died). A's chest at (4,0) is locked to it and K, at (14,0), holds the key.
--- The way is A's own walk to K (14 tiles, MOV 5: 2.8 turns) and on to the chest (10: 2), never
--- K's walk to A (2.8) plus A's to the chest (0.8).
+-- who held back and died). K, at (14,0), spares the key. The way is A's own walk to K (14 tiles,
+-- MOV 5: 2.8 turns) and on to the chest (10: 2), never K's walk to A (2.8) plus A's (0.8).
 do
-    local A = blue(0x01, 0, 0, 0)
-    local K = blue(0x02, 1, 14, 0, { items = { { id = 0x69, uses = 1 } } })
-    local E = red(0x81, 0, 9, { minRange = false })
-    local o = {
-        reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ 14, 0 }) },
-        doors = {}, obstacles = {},
-        locked = { [0x01] = { ["4,0"] = "chest" } },
-        explorable = { { x = 4, y = 0, kind = "chest" } }, canExplore = {},
-        bagKey = { [0x01] = { [0x02] = { chest = { id = 0x69, uses = 1, slot = 0 } } } },
-    }
-    local _, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    local A, K, E, o = tradeFixture()
+    K.x, K.y = 14, 0
+    o.reach[0x02] = tiles({ 14, 0 })
+    local _, ctx = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
     local n = ctx.turnsTo(A, { x = 4, y = 0 })
     check(n and string.format("%.1f", n), "4.8", "trade price: the taker walks to the holder and on")
 end
@@ -4827,18 +4827,17 @@ end
 -- no Trade is offered.
 do
     local A, K, E, o = tradeFixture()
-    o.bagKey = { [0x01] = { [0x02] = { door = { id = 0x6A, uses = 1, slot = 0 } } } }
-    A.items = { { id = 0x69, uses = 1 }, { id = 0x01, uses = 40 }, { id = 0x7F, uses = 1 },
+    A.items = { { id = 0x6A, uses = 1 }, { id = 0x01, uses = 40 }, { id = 0x7F, uses = 1 },
                 { id = 0x6C, uses = 3 }, { id = 0x02, uses = 30 } }
     local key = { kind = "key" }
     o.bagFacts = { [0x01] = { key, { kind = "weapon", usable = true, type = "sword", rank = 1 },
                               { kind = "money" }, { kind = "heal", uses = 3 },
                               { kind = "weapon", usable = true, type = "lance", rank = 1 } } }
-    local cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    local cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
     local t = tradesOf(cands, 0x01)[1]
     check(t and t.back and (t.back.id .. "x" .. t.back.uses), "127x1", "full bag: A gives back its money")
     o.bagFacts[0x01][3] = { kind = "passive" }
-    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"))
+    cands = B.candidates(boardOf(A, K, E), sightOf(o), style("careful"), STALLED)
     check(#tradesOf(cands, 0x01), 0, "full bag: everything carried is needed, no Trade")
 end
 

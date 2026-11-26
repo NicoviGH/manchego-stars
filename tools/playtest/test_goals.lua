@@ -502,26 +502,30 @@ do
     check(g and #g.takerUnits, 0, "keys: no key on the board, no taker")
 end
 
--- TestTeammateKeyMakesTheChestAGoal (#688, vanilla Ch21: the spare Chest Key sat on Eirika): no
--- enemy drops a key and the unit holds none, but a teammate's bag holds one that opens the chest
--- for it (sight.bagKey): a Trade hands it over, so the unit is the chest's taker. With no
--- teammate holding one, the chest has none.
+-- TestTeammateKeyMakesTheChestAGoal (#688, ADR 0479): no enemy drops a key and the unit holds
+-- none, but teammate 2's bag holds one that opens the chest for it (sight.bagKey). Only once 2's
+-- own trip to the chest stalled (ctx.tried) is the key spare: then a Trade hands it over and the
+-- unit is the chest's taker. Before that, and for a door's lock, the key is no one else's way.
 do
     local sight = fakeSight({ open = { { x = 2, y = 0, kind = "chest" } } })
     function sight.canExplore() return false end
     function sight.locked() return "chest" end
     function sight.keySources() return {} end
-    local key
+    function sight.isChestLock(lock) return lock == "chest" end
+    local key = { id = 0x69, uses = 1, slot = 0 }
     function sight.bagKey(u, m, lock)
         return u.id == 1 and m.id == 2 and lock == "chest" and key or nil
     end
     local board = { units = { blue(1, 0, 0), blue(2, 5, 5) }, turn = 1 }
-    key = { id = 0x69, uses = 1, slot = 0 }
-    local g = find(Goals.list(board, sight, {}, {}), "chest:2,0")
-    check(g and #g.takerUnits, 1, "teammate key: a chest whose key a teammate holds has a taker")
-    key = nil
+    local stalled = { tried = { ["chest:2,0"] = { [2] = true } } }
+    local g = find(Goals.list(board, sight, {}, stalled), "chest:2,0")
+    check(g and #g.takerUnits, 1, "teammate key: a stalled holder's key makes the chest a taker's")
     g = find(Goals.list(board, sight, {}, {}), "chest:2,0")
-    check(g and #g.takerUnits, 0, "teammate key: no teammate holds a key, no taker")
+    check(g and #g.takerUnits, 0, "teammate key: a holder not yet stalled keeps its key")
+    local u, m, tile = board.units[1], board.units[2], { x = 2, y = 0 }
+    check(Goals.spareKey(sight, stalled, u, m, "chest", tile), key, "spareKey: the stalled holder's key")
+    check(Goals.spareKey(sight, stalled, u, m, "door", tile), nil, "spareKey: never a door's")
+    check(Goals.spareKey(sight, stalled, m, m, "chest", tile), nil, "spareKey: never the unit's own")
 end
 
 -- TestPendingRecruitGoal (#683, ADR 0436): a recruit not on the board yet that ctx.pendingRecruits

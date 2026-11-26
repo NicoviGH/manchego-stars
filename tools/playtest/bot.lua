@@ -1635,19 +1635,18 @@ local function convoyChestKey(ctx, u, tile)
     return ctx.sight.convoyKey(u, lock)
 end
 
--- The teammates of `u` whose bag holds what opens `lock` for it (sight.bagKey), read once a
--- decision: the game's Trade hands it over (#688). Each is a key source as keyWay reads one,
--- { x, y, id, holder = the teammate, lock, key = { id, uses, slot } }: `u` walks to it, they
--- Trade (tradeAct), and `u` walks on. The holder's hand-over is offered only where it already
--- reaches a tile beside `u`; it is never priced (keyWay).
-local function bagHolders(ctx, u, lock)
-    if not ctx.sight.bagKey then return {} end
+-- The teammates whose key `u` could take by Trade for the chest at `tile` (Goals.spareKey: a
+-- holder's key counts only once its own trip to that chest stalled), read once a decision
+-- (#688). Each is a key source as keyWay reads one, { x, y, id, holder = the teammate, lock, key
+-- = { id, uses, slot } }: `u` walks to it, they Trade (tradeAct), and `u` walks on. The holder's
+-- hand-over is offered only where it already reaches a tile beside `u`; it is never priced.
+local function bagHolders(ctx, u, lock, tile)
     ctx.bagSrc = ctx.bagSrc or {}
-    local k = u.id .. ":" .. tostring(lock)
+    local k = u.id .. ":" .. tostring(lock) .. "@" .. tileKey(tile.x, tile.y)
     if ctx.bagSrc[k] == nil then
         local out = {}
         for _, m in ipairs(ctx.blues or {}) do
-            local key = m.id ~= u.id and not m.dead and ctx.sight.bagKey(u, m, lock)
+            local key = Goals.spareKey(ctx.sight, ctx, u, m, lock, tile)
             if key then
                 out[#out + 1] = { x = m.x, y = m.y, id = m.id, holder = m, lock = lock, key = key }
             end
@@ -2048,7 +2047,7 @@ keyWay = function(ctx, u, tile, from, lock, seeking)
     -- meeting no one walks (vanilla Ch21 s4009, replay t688a: Dozla stood by the (21,18) chest
     -- four turns, priced 1 turn through Gerik's Chest Key, while Gerik held back and died). The
     -- holder's hand-over (tradeAct's `gives`) is still offered when it stands beside the taker.
-    for _, h in ipairs(bagHolders(ctx, u, lock)) do
+    for _, h in ipairs(bagHolders(ctx, u, lock, tile)) do
         local a = turnsFor(ctx, u, h, from, fetching)
         local b = a and turnsFor(ctx, u, tile, h, seeking, true)
         if b and (not bestN or a + b < bestN) then best, bestN = h, a + b end
