@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-26; main is 59140fe2 + HANDOFF commits; PR #782 open)
+## Next session starts here (2026-11-26; main is 8b2f0180 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -52,10 +52,9 @@ s4003 a1 (tags `n698a15`, `n698a21`): Ch15 won in 22 turns (R4 24), one death fe
 (R4 40). Neither was a stuck try. Ch21 s4005 still waits: its only advance is a game-over assault
 on Lyon; striking past the counter-kill refusal is built only if the R4 set shows it is needed.
 
-**Item 3 (#766, Rennac): PR #782 is open, CI green on 64e40edd, waiting on Nicolas's "merge"
-(ADR 0478; reviewed, re-reviewed, and its last commit reviewed on his say-so). 64e40edd adds the
-way out he asked for: a release is staged once every striker the job can send is ready, so a
-door that brings more reds than the army can gather never holds for good.** It builds on
+**Item 3 (#766, Rennac) is merged: PR #782 (8b2f0180, ADR 0478).** A release is staged once
+every striker the job can send is ready, so a door that brings more reds than the army can
+gather never holds for good. It builds on
 PR #781 (ADR 0477, roofed rooms in the forecast).
 - **The rule:** memory lists each door that brought reds (`Timeline.releases`, an arrival's
   `by`) and what its units lost. A plan that opens one before enough units can strike its front
@@ -70,7 +69,7 @@ PR #781 (ADR 0477, roofed rooms in the forecast).
   under #764's item 5.
 - **Plan records carry `releases`** (door, need, ready, staged); a stager's goal row is `stage`.
 
-**Next, once #782 merges: item 4, keys.** Trade first (#688: Ch21's spare key on Eirika; Ch16
+**Next: item 4, keys.** Trade first (#688: Ch21's spare key on Eirika; Ch16
 s4005's Knight Crest needs a hand-off before turn 14), starting from the uncommitted Trade step 1
 in `../manchego-stars-wt4`; then one key per chest (#711 item 1). One PR each, then item 5, 6,
 then one R4 set over the batch (#764's body).
