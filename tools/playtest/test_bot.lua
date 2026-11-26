@@ -2724,43 +2724,76 @@ end
 
 -- test_a_door_memory_says_brings_reds_waits_for_its_strikers (#766): an earlier attempt opened the
 -- door at (2,0), which brought a Fighter onto (3,0), and that Fighter looted the chest at (3,0)
--- (Timeline.releases). A, the opener, has no weapon: no one could strike the Fighter the turn the
--- door opens, so every plan that opens it forfeits the chest, and the door waits; S is sent to
--- the door (the stage job). With S already one move from the door the release is staged, and
--- the door opens. An armed A beside the door is no striker of its own: opening spends its act.
--- A lord is never sent, nor a unit that has a job already. Vanilla Ch14: the (22,17) door brings
--- four Fighters and Rennac; the one try that got him had three strikers at the door when it opened.
+-- (Timeline.releases). (3,0) is under the room's roof: the shut map's field does not reach it,
+-- the opened map's does (sight.changed). A, the opener, has no weapon: no one could strike the
+-- Fighter the turn the door opens, so every plan that opens it forfeits the chest, and the door
+-- waits; S is sent to the door (the stage job). With S already one move from the door the
+-- release is staged, and the door opens. An armed A beside the door is no striker of its own:
+-- opening spends its act. A lord is never sent, nor a unit that has a job already, nor one the
+-- stuck record bars from the door; a unit sent to one door is not counted as another's. Vanilla
+-- Ch14: the (22,17) door brings four Fighters and Rennac; the one try that got him had three
+-- strikers at the door when it opened.
 do
     local function case(sx, opt)
         opt = opt or {}
         local A = blue(0x01, 0, 0, 0, opt.armedA and {} or { minRange = false })
         local S = blue(0x02, 1, sx, 1, { weapons = { { slot = 0, min = 1, max = 1 } } })
+        local T = blue(0x03, 2, 7, 3, { weapons = { { slot = 0, min = 1, max = 1 } } })
         local E = red(0x81, 4, 0, { isBoss = true, minRange = false })
-        local door = { act = "door", x = 2, y = 0 }
+        local door, door2 = { act = "door", x = 2, y = 0 }, { act = "door", x = 2, y = 4 }
         local st = style("careful")
-        st.memory = Fakeline.memory({
-            arrivals = { { charId = 0x90, classId = 9, x = 3, y = 0, turn = 2, by = door, timed = false } },
-            closings = { { x = 3, y = 0, phase = 3, closerKey = "a:144:9:2" } } })
-        local doorField = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["3,0"] = 1, ["4,0"] = 2,
-                            ["1,1"] = 2, ["7,1"] = 8 }
+        local arrivals = { { charId = 0x90, classId = 9, x = 3, y = 0, turn = 2, by = door, timed = false } }
+        local closings = { { x = 3, y = 0, phase = 3, closerKey = "a:144:9:2" } }
+        if opt.twoDoors then
+            arrivals[2] = { charId = 0x91, classId = 9, x = 3, y = 4, turn = 2, by = door2, timed = false }
+            closings[2] = { x = 3, y = 4, phase = 3, closerKey = "a:145:9:2" }
+        end
+        st.memory = Fakeline.memory({ arrivals = arrivals, closings = closings })
+        -- the door's field on the shut map: the roofed room past it unreached
+        local shutField = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["1,1"] = 2, ["7,1"] = 8,
+                            ["7,2"] = 9, ["7,3"] = 10 }
+        local openField = {}
+        for k, v in pairs(shutField) do openField[k] = v end
+        openField["3,0"], openField["4,0"] = 1, 2
+        local door2Field = { ["2,4"] = 0, ["3,4"] = 1, ["7,1"] = 6, ["7,3"] = 7 }
         local explorable = { { x = 3, y = 0, kind = "chest" } }
         local canExplore = { [0x01] = { ["3,0"] = "chest" } }
-        local fields = { ["4,0"] = BOSS_SIDE, ["2,0"] = doorField,
-                         ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 } }
+        local function fields(open)
+            local f = { ["4,0"] = BOSS_SIDE, ["2,0"] = open and openField or shutField,
+                        ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 } }
+            if opt.twoDoors then f["2,4"] = door2Field end
+            if opt.village then f["8,1"] = { ["8,1"] = 0, ["7,1"] = 1 } end
+            return fieldsOf(f)
+        end
         if opt.village then
-            explorable[2] = { x = 8, y = 1, kind = "visit" }
+            explorable[#explorable + 1] = { x = 8, y = 1, kind = "visit" }
             canExplore[0x02] = { ["8,1"] = "visit" }
-            fields["8,1"] = { ["8,1"] = 0, ["7,1"] = 1 }
+        end
+        local doors = { { x = 2, y = 0 } }
+        if opt.twoDoors then
+            explorable[#explorable + 1] = { x = 3, y = 4, kind = "chest" }
+            doors[2] = { x = 2, y = 4 }
         end
         local o = {
             objective = { kind = "boss", gameOver = opt.lord and { 0x02 } or nil },
-            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }), [0x02] = tiles({ sx, 1 }) },
-            field = fieldsOf(fields),
-            obstacles = {}, doors = { { x = 2, y = 0 } }, openers = { [0x01] = true },
+            reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
+                      [0x02] = opt.stuck and tiles({ sx, 1 }, { sx, 2 }) or tiles({ sx, 1 }),
+                      [0x03] = tiles({ 7, 3 }) },
+            field = fields(false),
+            obstacles = {}, doors = doors, openers = { [0x01] = true },
             explorable = explorable, canExplore = canExplore,
+            change = function(c)
+                if c.opened and c.opened["2,0"] then return { field = fields(true) } end
+                return {}
+            end,
         }
-        local _, ctx = B.candidates(boardOf(A, S, E), sightOf(o), st)
-        local a, plan = Planner.plan(B, boardOf(A, S, E), sightOf(o), st)
+        local units = { A, S, E }
+        if opt.twoDoors then units[#units + 1] = T end
+        local copts = opt.stuck and { stuck = { [B.jobKey(0x02, nil, 2, 0)] = { id = 0x02, x = 2, y = 0, since = 0 } } }
+        local board = boardOf(table.unpack(units))
+        board.turn = 2
+        local _, ctx = B.candidates(board, sightOf(o), st, copts)
+        local a, plan = Planner.plan(B, board, sightOf(o), st, copts)
         return a, ctx, plan
     end
     local _, far = B.candidates(boardOf(blue(0x01, 0, 0, 0)), sightOf { objective = { kind = "boss" } },
@@ -2769,8 +2802,8 @@ do
     local a, ctx, plan = case(7)
     local r = ctx.releases and ctx.releases[1]
     check(r and tostring(r.staged) .. " " .. r.need .. " " .. r.ready, "false 1 0", "release: read, not staged")
-    -- S: 8 from the door, the door 1 from the Fighter's tile, MOV 5 and reach 1: 3 short
-    check(r and r.strikers[1] and r.strikers[1].gap, 3, "release: S's gap, 3 tiles short")
+    -- S: 8 from the door, the door 1 from the Fighter's tile on the opened map, MOV 5, reach 1
+    check(r and r.strikers[1] and r.strikers[1].gap, 3, "release: S's gap, read on the opened map")
     check(a and a.act ~= "door", true, "release: unstaged (S 8 from the door), the door waits")
     local doorForfeits
     for _, c in ipairs(plan and plan.considered or {}) do
@@ -2793,6 +2826,13 @@ do
     _, ctx = case(7, { village = true })
     g = ctx.exploreGoal[0x02]
     check(g and g.x .. "," .. g.y, "8,1", "release: a unit with a job keeps it")
+    _, ctx = case(7, { stuck = true })
+    g = ctx.exploreGoal[0x02]
+    check(g == nil or not g.stage, true, "release: a unit the stuck record bars from the door is not sent")
+    _, ctx = case(7, { twoDoors = true })
+    local s2, t2 = ctx.exploreGoal[0x02], ctx.exploreGoal[0x03]
+    check((s2 and s2.x .. "," .. s2.y or "-") .. " " .. (t2 and t2.x .. "," .. t2.y or "-"), "2,0 2,4",
+          "release: S stages the first door; the second sends its own striker, T")
 end
 
 -- test_a_plan_strikes_what_its_door_unroofs (#766): the door at (2,0) opens a roofed room, and

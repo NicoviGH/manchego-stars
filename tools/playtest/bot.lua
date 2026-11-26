@@ -3041,9 +3041,11 @@ end
 
 -- How far `u` is from striking the release `r`'s front this turn once its door is open: the
 -- march cost from the door to u and from the door to the nearest front tile (one field from the
--- door reads both sides: GenerateExtendedMovementMap from the door's tile, units not blocking),
--- less u's MOV and longest reach. 0 or less: u can strike a red the door brings the turn it
--- opens. nil: u has no weapon, or no way there.
+-- door reads both sides: GenerateMovementMap floods from its origin whatever the origin's
+-- terrain, units not blocking), less u's MOV and longest reach. 0 or less: u can strike a red
+-- the door brings the turn it opens. nil: u has no weapon, or no way there. Read on the map the
+-- door's change leaves (releasesOf): a roofed room's tiles take their floor only then (ADR 0477;
+-- on the shut map vanilla Ch14's corridor is unreached, and no unit ever read as a striker).
 local function strikeGap(ctx, u, r)
     -- the Weapon Select list's reach (sight.weapons), not sight.itemReach: that one counts a
     -- weapon the unit cannot strike with now, and a strike the door's turn needs one it can
@@ -3068,8 +3070,8 @@ end
 -- killed three of the four Fighters it brought on the door's own turn; every miss had its
 -- strikers 4-8 tiles back. Each: { x, y, key, need = the front's size, stake = { tiles, gone }
 -- (the open part of its losses), strikers = { { u, gap } } nearest first (strikeGap), ready =
--- how many of them can strike its front this turn, less one opener when only a ready unit
--- can open it, staged = ready >= need }. Read once
+-- how many of them can strike its front this turn, less one when every unit that can open it
+-- this turn is ready, staged = ready >= need }. Read once
 -- a decision, on the board before anyone acts: a striker that moves in this turn has acted.
 local function releasesOf(ctx)
     local out = {}
@@ -3096,17 +3098,30 @@ local function releasesOf(ctx)
                 if openRecruit[c] then stake.gone[c], any = true, true end
             end
             if any then
-                -- the door's opening spends its opener's act: when every unit able to act that
-                -- opens doors is among the ready, one of them opens it and strikes nothing
+                -- each unit's gap, on the map the door's change leaves (sight.changed)
+                local function gaps()
+                    local out = {}
+                    for _, u in ipairs(ctx.actors) do out[u.id] = strikeGap(ctx, u, r) end
+                    return out
+                end
+                local gap = ctx.sight.changed and ctx.sight.changed({ opened = { [key] = true } }, gaps)
+                    or gaps()
+                -- the door's opening spends its opener's act: a unit that lacks nothing for this
+                -- door (lockAt) and stands about a move from it. When every such unit is among
+                -- the ready, one of them opens it and strikes nothing
+                local door = { x = r.x, y = r.y }
                 local strikers, ready, openers, readyOpeners = {}, 0, 0, 0
                 for _, u in ipairs(ctx.actors) do
-                    local gap = strikeGap(ctx, u, r)
-                    if opener(ctx, u) then openers = openers + 1 end
-                    if gap then
-                        strikers[#strikers + 1] = { u = u, gap = gap }
-                        if gap <= 0 then
+                    local near = walkFrom(ctx, door, u.x, u.y, u)
+                    local opens = not lockAt(ctx, u, r.x, r.y) and near ~= nil
+                        and near <= ctx.sight.mov(u) + 1
+                    if opens then openers = openers + 1 end
+                    local g = gap[u.id]
+                    if g then
+                        strikers[#strikers + 1] = { u = u, gap = g }
+                        if g <= 0 then
                             ready = ready + 1
-                            if opener(ctx, u) then readyOpeners = readyOpeners + 1 end
+                            if opens then readyOpeners = readyOpeners + 1 end
                         end
                     end
                 end
