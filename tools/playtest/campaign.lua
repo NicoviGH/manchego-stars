@@ -338,13 +338,16 @@ local function between(api, style, followed, need, carried)
         return true
     end
     local fielded, convoy, benched = fieldedNow(true)
+    local short   -- the lock uses neither bags nor convoy open: the shop's keys (#711)
     if convoy then
-        local ok, why = apply(Bot.supply(fielded, convoy, benched, need and need.demands))
+        local acts
+        acts, short = Bot.supply(fielded, convoy, benched, need and need.demands)
+        local ok, why = apply(acts)
         if not ok then return nil, "supply: " .. why, team end
         fielded = fieldedNow(false)   -- the shop weighs the bags only
     end
-    team.buys = {}
-    for _, p in ipairs(Bot.shop(api.gold(), api.stock(), fielded)) do
+    team.buys, team.short = {}, short
+    for _, p in ipairs(Bot.shop(api.gold(), api.stock(), fielded, short)) do
         local ok, why = api.buy(p)
         if not ok then return nil, "buy: " .. tostring(why), team end
         team.buys[#team.buys + 1] = p
@@ -509,7 +512,8 @@ function M.run(api)
                 if prepped then
                     entry.prep = entry.prep or {}
                     entry.prep[#entry.prep + 1] = { attempt = entry.attempts,
-                                                    supply = prepped.supply, buys = prepped.buys }
+                                                    supply = prepped.supply, buys = prepped.buys,
+                                                    short = prepped.short }
                 end
                 if not team then
                     entry.outcome = "crashed"

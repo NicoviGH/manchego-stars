@@ -507,12 +507,14 @@ class Workers(unittest.TestCase):
                 'BOTRUN {"outcome": "won", "chapter": 15, "attempt": 2}\n'
                 'CAMPAIGN {"chapter": 15, "attempts": 2, "prep": ['
                 '{"attempt": 1, "supply": [{"act": "take", "unit": 11, "item": 46}], "buys": []},'
-                '{"attempt": 2, "supply": [], "buys": [{"unit": 1, "item": 1}]}]}\n'
+                '{"attempt": 2, "supply": [], "buys": [{"unit": 1, "item": 1}],'
+                ' "short": {"chests": 1}}]}\n'
                 'CAMPAIGN {"outcome": "played"}')
         recs = mc.records_of({}, text, '/tmp/w', '/x.log')
         self.assertEqual([r.get('supply') for r in recs[:2]],
                          [[{'act': 'take', 'unit': 11, 'item': 46}], []])
         self.assertEqual([r.get('buys') for r in recs[:2]], [[], [{'unit': 1, 'item': 1}]])
+        self.assertEqual([r.get('short') for r in recs[:2]], [{}, {'chests': 1}])
         self.assertNotIn('supply', recs[2])
         self.assertNotIn('prep', recs[2])
 

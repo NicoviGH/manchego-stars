@@ -4433,11 +4433,17 @@ INSPECT.campaignApi = function(game)
         local buyers = units()
         local list = stockItems(chapter())
         INSPECT.gameCalls(function(call)
+            -- which lock a non-weapon opens for each buyer (Bot.shop's keys, #711): the game's
+            -- own key check, as api.convoy reads a convoy item (Sight.keyReader)
+            local keys = INSPECT.Sight.keyReader(INSPECT.keyIo(), call, SYM, BOARD)
             for _, s in ipairs(list) do
                 local item = call(SYM.MakeNewItem, { s.item })
-                s.price = {}
+                s.price, s.opens = {}, {}
                 for _, u in ipairs(buyers) do
                     s.price[u.charId] = call(SYM.GetItemPurchasePrice, { u.addr, item })
+                    if s.kind ~= "weapon" then
+                        s.opens[u.charId] = keys(u.addr, { id = s.item, uses = item >> 8 })
+                    end
                 end
             end
         end)
