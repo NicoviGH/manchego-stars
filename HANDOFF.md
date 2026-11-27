@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-27; main is b8096341 + HANDOFF commits)
+## Next session starts here (2026-11-27; main is 4956248c + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -99,18 +99,16 @@ replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns)
   start the turn committed in reach. Ch19 is not one fix from clean: every try loses 6-10 greens
   (Mansel, 0xCD Knights) and a blue, and misses 4-6 chests closed by enemies first.
 - **Item 6: PR #785 merged** (b8096341): every run record names its bot commit (`bot_commit`).
-- **R5** (main e536850f, R4's command and 34 starts, tags `r5a<N>`, `resume --chapter N --last N
-  --attempts 3 --scout --route 1 --seal-at 10`), clean within 3 tries, R4 -> R5: Ch10 2/5 -> 2/5,
-  Ch13 4/5 -> 4/5, Ch14 0/5 -> 0/5, Ch15 1/5 -> **3/5**, Ch16 1/5 -> 1/5 **but 4 of 5 crashed**
-  (no reading), Ch19 0/3 so far. Ch19's last 2 starts and Ch21 were still running at session end
-  (background shell in the old session). If they did not finish, carry them on with the same
-  `r5a19`/`r5a21` tags (script: same loop, chapters 19 and 21; Ch21 has 4 starts, no s4002).
-- **The Ch16 crash is a bug on main (#711 comment 7209651660):** `sight.lua:2857` calls
-  `Board.items(api.mem, e.addr)` on the harness's bound reader, which takes only `addr`. **First
-  job next session:** fix it to `Board.items(e.addr)` with a test on the bound reader that fails
-  without the fix (PR, Closes nothing: #711 stays open), then rerun Ch16's 5 starts as `r5b16`.
-- **Then:** post R5's table on #764 and #768, and take the largest blocker by size (R4's
-  ranking: Rennac in Ch14 (5), Ch16's thief from Colm (4), Amelia in Ch10 (3); recheck on R5).
+- **R5 is in: 11/34 clean vs R4's 8/34** (table on #764 comment 7223186698 and #768). Ch15 1->3/5,
+  Ch16 1->2/5 (`r5b16`, on PR #786). Ch10 2/5, Ch13 4/5, Ch14 0/5, Ch19 0/5, Ch21 0/4 unchanged.
+- **PR #786 merged** (4956248c): the Ch16 crash (`sight.pilfer` called the bound board's `items`
+  with the raw signature, #711). Tests now run pilfer/moveItem/convoyKey on `Board.bind`'s board.
+- **Overnight lesson:** a closed lid sleeps the Mac and pauses runs (pmset log); it is not a hang.
+  Long runs go under `caffeinate -i` with the lid open.
+- **Now: Ch14, 0/5.** All 15 tries won, nearly all with 0 deaths; every one misses Rennac (0x1C),
+  who then opens the chests at (22,3) and (22,5). PR #782's single recruit (`s766t`) did not hold
+  up in R5. A Sonnet diagnosis of the 15 `r5a14` traces (door turn, staging, talker distance,
+  #782's rule engaged or not) is the next input; result goes on #766.
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
