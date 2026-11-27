@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-27; main is 4956248c + HANDOFF commits)
+## Next session starts here (2026-11-27; main is 64d683ab + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -86,32 +86,20 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
-**2026-11-27: items 4-6 are closed out; R5 (one R4 set over items 1-4) mostly in; Ch16 crash found.**
-- **The cap-bars rule was built, replayed and deleted** (`k688a`: lost, 18 turns, 7 deaths, vs
-  `r688b` won 38/0). Then an instrumented run (`d688m` = `r688b`) settled (2,18): every move
-  Eirika is offered there reads 0.98 death from the Draco Zombie, so the cap is right; safe
-  strikes on it exist but are cut from each unit's menu (PER_UNIT). Keeping every safe strike
-  (`x688a`) was worse (4 deaths, chest still missed). What would open it: stage strikers beside a
-  blocker until they can kill it in one turn (ADR 0478's shape). Not built: 2 of 26 unclean
-  starts. #688 comment 7207480955.
-- **Item 4's second half (#711 item 1) was already on main** (46d48de0, PR #718).
-- **Item 5 (Ch19 fallback turns): nothing to build** (#752 comment 7207553667). No pick bug; units
-  start the turn committed in reach. Ch19 is not one fix from clean: every try loses 6-10 greens
-  (Mansel, 0xCD Knights) and a blue, and misses 4-6 chests closed by enemies first.
-- **Item 6: PR #785 merged** (b8096341): every run record names its bot commit (`bot_commit`).
-- **R5 is in: 11/34 clean vs R4's 8/34** (table on #764 comment 7223186698 and #768). Ch15 1->3/5,
-  Ch16 1->2/5 (`r5b16`, on PR #786). Ch10 2/5, Ch13 4/5, Ch14 0/5, Ch19 0/5, Ch21 0/4 unchanged.
-- **PR #786 merged** (4956248c): the Ch16 crash (`sight.pilfer` called the bound board's `items`
-  with the raw signature, #711). Tests now run pilfer/moveItem/convoyKey on `Board.bind`'s board.
-- **Overnight lesson:** a closed lid sleeps the Mac and pauses runs (pmset log); it is not a hang.
-  Long runs go under `caffeinate -i` with the lid open.
-- **Now: Ch14, 0/5.** All 15 tries won, nearly all with 0 deaths; every one misses Rennac (0x1C),
-  who then opens the chests at (22,3) and (22,5). PR #782's single recruit (`s766t`) did not hold
-  up in R5. A Sonnet diagnosis of the 15 `r5a14` traces (door turn, staging, talker distance,
-  #782's rule engaged or not) is the next input; result goes on #766.
+**2026-11-27: R5 is in and Ch14's fix is merged. The next steps are #764's body, "After R5".**
+- **R5: 11/34 clean vs R4's 8/34** (#764 comment 7223186698). Ch15 1->3/5, Ch16 1->2/5.
+- **Merged today:** PR #785 (records name their bot commit), PR #786 (the Ch16 pilfer crash,
+  #711), PR #787 (ADR 0481: a door that took a recruit waits for his talker, #766; Ch14 s4002
+  replays `t766b14`/`t766c14` clean on attempt 3).
+- **First job next session: After R5 item 2.** Size every other unclean R5 start by what alone
+  blocks it, from R5's traces, with one Sonnet trace-reader per chapter (the Ch14 brief is the
+  model: hypotheses with refuting tests, a count over every try). Fix the largest first, then R6.
+- **Lessons:** a closed lid sleeps the Mac and pauses runs (pmset log); it is not a hang. Long runs
+  go under `caffeinate -i` with the lid open. Never edit bot files while a replay plays from this
+  checkout: each attempt loads them fresh.
 
-**PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
-Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
+**PR #774 (the clear job, ADR 0472) stays unmerged:** the recommendation (close it unmerged) is
+in #764's "Calls for Nicolas"; his call.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
 Recent tags: `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
