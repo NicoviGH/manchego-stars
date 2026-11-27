@@ -831,6 +831,19 @@ function M.grade(d, plan, action, cap, lords, board, diedAt, admits, mover)
     return d
 end
 
+-- The deaths that spoil a clean clear (#788): a blue unit's, an escort green's, and a green's
+-- whose life the chapter's ending tests (`gated`, { [charId] = true }: it may gate a reward).
+-- `gated` nil (a harness that cannot read the ending) counts every green, ADR 0376's rule.
+function M.spoilingDeaths(deaths, gated)
+    local out = {}
+    for _, d in ipairs(deaths) do
+        if d.faction ~= "green" or d.escort or gated == nil or gated[d.charId] then
+            out[#out + 1] = d
+        end
+    end
+    return out
+end
+
 function M.run(api)
     local Bot, Json = api.Bot, api.Json
     if api.check_pinned then
@@ -983,6 +996,7 @@ function M.run(api)
     -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
     -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
     local owed = nil
+    local gated, gatedRead = nil, false
     -- the owed recruits an earlier attempt of this chapter saw arrive (Timeline.arrivals,
     -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
     -- Then the arrivals the chapter's own turn events script (sight.scriptedUnits, #724: a unit a
@@ -1275,6 +1289,11 @@ function M.run(api)
         if #told > 0 and playSight and playSight.arrived then playSight.arrived(told) end
     end
     local function changes(after)
+        -- the greens whose death spoils the clean clear besides an escort (#788): the ones the
+        -- chapter's ending tests for life, read once beside the owed recruits. A harness with no
+        -- api.gated, or a read it could not finish (nil), leaves it nil, and then every green's
+        -- death spoils it (ADR 0376's rule): never a pass on a read that failed
+        if api.gated and not gatedRead then gated, gatedRead = api.gated(), true end
         if api.recruits and not owed then
             local party = {}
             for _, c in ipairs(api.party()) do party[c] = true end
@@ -1297,8 +1316,9 @@ function M.run(api)
         lastBoard, actedIn = after, nil
     end
 
-    -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
-    -- given only if its three green villagers live), so both are deaths; a red one is a kill.
+    -- A blue or green unit lost is a death (a green the ending tests spoils the clear, #788:
+    -- vanilla Ch6's Orion's Bolt is given only if its three green villagers live); a red one is
+    -- a kill.
     -- A death or a kill is one the game ran UnitKill on (api.killed); `list`, the board's
     -- falls, gives a killer where the watch saw no fight, and the red units that left the
     -- field unkilled (`leftMap`). A slot the watch
@@ -1438,9 +1458,14 @@ function M.run(api)
         -- is still lost when the chapter ends: a clean clear is the end state (ADR 0475). The
         -- rest are kept in rec.thefts, each recovered one marked
         local stolen = M.unrecovered(rec.thefts, rec.drops)
-        rec.clear = { won = outcome == "won", lost = rec.deaths, recruits_missing = missing,
-                      rewards_missing = explore.missing(), stolen = stolen }
-        local held = rec.clear.won and #rec.deaths == 0 and #rec.clear.rewards_missing == 0
+        -- a clean clear loses no blue unit; a green's death spoils it only when the green is an
+        -- escort (its death ends the game) or gates a reward, i.e. the chapter's ending tests its
+        -- life (Nicolas, 2026-11-27, #788: vanilla Ch19's ten allied greens gate nothing). Every
+        -- death stays in rec.deaths, and the greens' in rec.greens
+        rec.clear = { won = outcome == "won", lost = M.spoilingDeaths(rec.deaths, gated),
+                      recruits_missing = missing, rewards_missing = explore.missing(),
+                      stolen = stolen }
+        local held = rec.clear.won and #rec.clear.lost == 0 and #rec.clear.rewards_missing == 0
             and #stolen == 0
         if not held or (owed and #missing > 0) then rec.clean = false
         elseif owed then rec.clean = true end
@@ -1836,6 +1861,7 @@ function M.run(api)
                             return { stalled = stalled, sent = sent, stuck = stuck, tried = tried,
                                      idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
                                      lows = lows,
+                                     gated = gated,
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(sight),

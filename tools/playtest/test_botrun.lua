@@ -1297,8 +1297,9 @@ do
     check(joined and joined.from, "green", "it joined from green")
 end
 
--- The four-part clean clear (#510 step 9 design, part A): won, no blue or green unit lost,
--- every owed recruit joined, every village and chest taken, each read off the game.
+-- The four-part clean clear (#510 step 9 design, part A): won, no blue unit lost (nor a green
+-- the ending tests, #788), every owed recruit joined, every village and chest taken, each read
+-- off the game.
 
 -- the rout, judged: nothing owed, nothing to explore
 local function judged(o)
@@ -1342,7 +1343,8 @@ do
     check(#r.clear.rewards_missing, 0, "clean: no reward missing")
 end
 
--- test_a_green_death_spoils_the_clear: a green ally falls in the enemy phase (design 11).
+-- test_a_green_death_spoils_the_clear: a green ally falls in the enemy phase (design 11). The
+-- harness here has no api.gated, so ADR 0376's rule holds: every green's death counts (#788).
 do
     local units = rout()
     units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
@@ -1355,6 +1357,35 @@ do
     check(r.outcome, "won", "green death: the chapter is still won")
     check(r.deaths[1] and r.deaths[1].faction, "green", "green death: recorded, with its side")
     check(r.clean, false, "green death: not clean")
+end
+
+-- test_a_green_death_spoils_the_clear_only_when_the_ending_tests_it (#788): a green whose life
+-- the chapter's ending tests (api.gated) may gate a reward, so its death spoils the clear; any
+-- other green's death is recorded and spoils nothing (vanilla Ch19's ten allied greens).
+do
+    local function fell(gated)
+        local units = rout()
+        units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
+        return judged { units = units, api = { gated = function() return gated end },
+                        enemy = function(g, find)
+            local v = find(0x41)
+            if v.dead then return {} end
+            v.hp, v.dead, v.onField = 0, true, false
+            return { { id = 0x41, charId = 0x41, faction = "green", killer = 0x81 } }
+        end }
+    end
+    local r = fell({})
+    check(r.deaths[1] and r.deaths[1].charId, 0x41, "ungated green: its death recorded")
+    check(r.greens.allied_deaths[1], 0x41, "ungated green: reported among the greens")
+    check(#r.clear.lost, 0, "ungated green: no loss for the clear")
+    check(r.clean, true, "ungated green: still clean")
+    r = fell({ [0x41] = true })
+    check(r.clear.lost[1] and r.clear.lost[1].charId, 0x41, "gated green: a loss for the clear")
+    check(r.clean, false, "gated green: not clean")
+    -- a read the harness could not finish (api.gated -> nil): every green counts
+    r = fell(nil)
+    check(r.clear.lost[1] and r.clear.lost[1].charId, 0x41, "unread gate: the green a loss")
+    check(r.clean, false, "unread gate: not clean")
 end
 
 -- test_a_green_unit_a_script_unloads_is_not_lost: the chapter's ending clears its green units

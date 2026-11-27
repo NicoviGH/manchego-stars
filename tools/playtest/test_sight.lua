@@ -1793,6 +1793,47 @@ do
     check(pcall(Json.encode, Sight.demandsOf({}, {}, 0, free)), true, "demandsOf: a talk demand encodes")
 end
 
+-- aliveChecks (#788): the units an ending tests for life, read off its bytes. Modelled on vanilla
+-- Ch6's ending (EventScr_Ch6_EndingScene): CHECK_ALIVE 0xFA, a BEQ past the reward, CHECK_ALIVE
+-- 0xFB, a CALL into a script that checks 0xF9 and an event slot (CHAR_EVT_*: no one), the reward's
+-- label, END. Every check is read whatever its branch; the slot is dropped.
+do
+    local m = fakeMem()
+    local EV, SUB = 0x08004000, 0x08004100
+    local function alive(at, pid) m.w16(at, 0x3322); m.w16(at + 2, pid) end
+    alive(EV, 0xFA)
+    m.w16(EV + 4, 0x0C40); m.w16(EV + 6, 0)                       -- BEQ to label 0
+    alive(EV + 12, 0xFB)
+    m.w16(EV + 16, 0x0A40); m.w32(EV + 20, SUB)                   -- CALL SUB
+    m.w16(EV + 24, 0x0820); m.w16(EV + 26, 0)                     -- LABEL 0
+    m.w16(EV + 28, 0x0120)                                        -- END
+    alive(SUB, 0xF9); alive(SUB + 4, 0xFFFF); m.w16(SUB + 8, 0x0120)
+    local got = {}
+    for pid in pairs(Sight.aliveChecks(m, EV)) do got[#got + 1] = string.format("%X", pid) end
+    table.sort(got)
+    check(table.concat(got, " "), "F9 FA FB", "aliveChecks: every check, through a CALL, no slot")
+    -- endingChecks reads the group's +4C through GetChapterEventDataPointer (a fake sandbox)
+    local GROUP = 0x08004800
+    m.w32(GROUP + 0x4C, EV)
+    local api = { mem = m, chapter = function() return 7 end,
+                  SYM = { GetChapterEventDataPointer = 0x0800A000 } }
+    local asked
+    local function sandbox(f)
+        return f(function(addr, args) asked = { addr, args[1] }; return GROUP end)
+    end
+    local ending = Sight.endingChecks(api, sandbox)
+    check(string.format("%s %s %s %X %d", tostring(ending[0xF9]), tostring(ending[0xFA]),
+                        tostring(ending[0xFB]), asked[1], asked[2]),
+          "true true true 800A000 7", "endingChecks: the chapter's +4C script")
+    -- a walk the budget cut short is no read at all: nil, never a partial list
+    local budget = Sight.EV_WALK_BUDGET
+    Sight.EV_WALK_BUDGET = 2
+    check(Sight.endingChecks(api, sandbox), nil, "endingChecks: a truncated walk reads nil")
+    Sight.EV_WALK_BUDGET = budget
+    m.w16(EV, 0x3320)   -- CHECKSTATE sub 0 (not CHECK_ALIVE): not read
+    check(Sight.aliveChecks(m, EV)[0xFA], nil, "aliveChecks: another CHECKSTATE is no life test")
+end
+
 -- scriptEffects (#724): a turn event's bytes say who it loads and removes. E_13's turn 5 sets slot 2
 -- to a unit array (SVAL), CALLs the shared reinforcement script (LOAD1(1, -1): the array in slot 2,
 -- EventScr_LoadReinforce) and a DISA removes a char; a LOADSINGLEUNIT is a load of its own.

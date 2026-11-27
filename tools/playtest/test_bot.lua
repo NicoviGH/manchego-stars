@@ -6958,7 +6958,7 @@ end
 -- An allied green breaks ties only among plans within a turn of the most progress: at 0.8 of a
 -- turn A blocks, and the plan predicts G's phase with it there; at four turns A keeps the
 -- ground and G is lost.
-local function greenBlock(block)
+local function greenBlock(block, opts)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -6973,12 +6973,12 @@ local function greenBlock(block)
                        takenHits = 1, takenCrit = 0, targetHp = 10 } }
         end,
     }
-    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"), opts)
     local g
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.id == 0x30 then g = p end
     end
-    return at(a), g and g.green and g.die
+    return at(a), g and g.green and g.die, plan and plan.rank and plan.rank.value
 end
 do
     local a, die = greenBlock(24)
@@ -6987,6 +6987,26 @@ do
     a, die = greenBlock(40)
     check(a, "0,0", "planner: a green unit is no reason to lose four turns of progress")
     check(die, 1, "planner: and its death is predicted")
+end
+
+-- test_planner_pays_a_green_only_when_it_spoils_the_clear (#788, ADR 0482): the same lost green G
+-- costs the plan's value W.death and counts in the green_die tie-break when the ending tests its
+-- life (opts.gated names it) or the gate is unread (nil); when the ending tests no green, neither.
+-- Its death is still predicted.
+do
+    local W = Planner.WEIGHTS.careful   -- greenBlock plays careful
+    local _, die, unread = greenBlock(40)
+    local _, _, paid = greenBlock(40, { gated = { [0x30] = true } })
+    local a, dieFree, free = greenBlock(40, { gated = {} })
+    check(paid, unread, "planner: a gated green is paid as an unread gate pays it")
+    check(a, "0,0", "planner: an ungated green changes no act here")
+    check(dieFree, die, "planner: an ungated green's death is still predicted")
+    check(math.abs(free - paid - W.death * die) < 1e-6, true,
+          "planner: an ungated green's death costs the value nothing")
+    -- nor breaks ties: careful blocks for a gated green within a turn of progress (above), and
+    -- keeps the ground for one the ending does not test
+    check(greenBlock(24, { gated = { [0x30] = true } }), "1,0", "planner: blocks for a gated green")
+    check(greenBlock(24, { gated = {} }), "0,0", "planner: an ungated green breaks no tie")
 end
 
 -- test_planner_mends_a_plan_that_loses_a_green_unit: A's march to (0,1) is its best act by its
@@ -7014,9 +7034,19 @@ do
     local beam = Planner.BEAM
     Planner.BEAM = 1
     local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    -- #788: a green the ending does not test spoils nothing, so no mend is tried for it: the
+    -- search judges fewer enemy phases than for the same green gated
+    local _, _, paidCost = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"),
+                                        { gated = { [0x30] = true } })
+    local free, freePlan, freeCost = Planner.plan(B, boardOf(A, G, X), sightOf(o),
+                                                  style("careful"), { gated = {} })
     Planner.BEAM = beam
     check(at(a) .. " " .. tostring(plan and plan.kind), "1,0 mend",
           "planner: the mend blocks for a green unit")
+    check(at(free) .. " " .. tostring(freePlan and freePlan.kind == "mend"), "0,1 false",
+          "planner #788: no mend for a green whose death spoils nothing")
+    check(freeCost.phases < paidCost.phases, true,
+          "planner #788: and none is judged for it")
 end
 
 -- test_planner_mend_tries_each_act_once: greens G1 and G2 both stand beside (1,0), and only
@@ -8780,8 +8810,9 @@ do
 end
 
 -- test_a_green_meets_the_fog_read (#713, comment 7087475499: the escort Mansel 0xC8 died in fog on
--- turn 7, unread): every green's loss is paid as a player unit's, so the fog's strike on it is in
--- the plan's fog sum and its predict entry.
+-- turn 7, unread): a green whose loss is paid as a player unit's (here an unread gate, which pays
+-- every green) meets the fog's strike in the plan's fog sum and its predict entry; one whose
+-- death spoils nothing does not (#788, M.greenPaid).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local G = blue(0x40, 5, 3, 0, { faction = "green", minRange = false })
@@ -8792,12 +8823,33 @@ do
         fogStrike = function(u) return { takenDist = { [0] = 0.5, [99] = 0.5 } } end,
         enemyPhase = function() return {} end,
     }
-    local _, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("bold"))
-    local fog
-    for _, p in ipairs(plan and plan.predict or {}) do
-        if p.id == 0x40 then fog = p.fog end
+    local function fogOf(opts)
+        local _, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("bold"), opts)
+        local fog
+        for _, p in ipairs(plan and plan.predict or {}) do
+            if p.id == 0x40 then fog = p.fog end
+        end
+        return fog
     end
-    check(fog, 0.5, "green fog: the fog's strike on a green is read")
+    check(fogOf(), 0.5, "green fog: the fog's strike on a green is read")
+    check(fogOf({ gated = { [0x40] = true } }), 0.5, "green fog: and on a gated one")
+    check(fogOf({ gated = {} }), nil, "green fog #788: not on a green whose death spoils nothing")
+end
+
+-- test_green_paid_by_branch (#788, ADR 0482): M.greenPaid pays an unread gate, an escort (its
+-- death ends the game), an owed recruit (Ch2's Ross: st.recruits or st.loose, by unit id) and a
+-- gated green, and nothing else.
+do
+    local g = { id = 7, charId = 0x41 }
+    local function st(o)
+        return { gameOver = o.gameOver or {}, recruits = o.recruits or {}, loose = o.loose or {} }
+    end
+    check(Planner.greenPaid(st {}, g, nil), true, "greenPaid: an unread gate pays it")
+    check(Planner.greenPaid(st {}, g, {}), false, "greenPaid: ungated, nothing")
+    check(Planner.greenPaid(st {}, g, { [0x41] = true }), true, "greenPaid: gated")
+    check(Planner.greenPaid(st { gameOver = { [0x41] = true } }, g, {}), true, "greenPaid: an escort")
+    check(Planner.greenPaid(st { recruits = { [7] = true } }, g, {}), true, "greenPaid: a recruit")
+    check(Planner.greenPaid(st { loose = { [7] = true } }, g, {}), true, "greenPaid: a loose recruit")
 end
 
 -- test_a_replan_judges_the_rest_of_the_plan_in_hand: on a replan botrun hands the planner the
@@ -11402,6 +11454,22 @@ do
     }
     local a, plan = Planner.plan(B, boardOf(A, G, X, K), sightOf(o), gifted("careful", 1000))
     check(plan.lookahead.extended, true, "lookahead: extended")
+    -- #788: the second phase pays the green's death in the value only when it spoils the clear
+    -- (M.greenPaid): gated, it costs what it costs unread; ungated, nothing. green_die is kept
+    local function extendedValue(gated)
+        local _, p = Planner.plan(B, boardOf(A, G, X, K), sightOf(o), gifted("careful", 1000),
+                                  { gated = gated })
+        for _, c in ipairs(p.considered) do
+            if c.extended then return c.rank.value, c.rank.green_die, table.concat(c.acts, " ") end
+        end
+    end
+    local paid, paidDie, paidKey = extendedValue({ [0x30] = true })
+    local free, freeDie, freeKey = extendedValue({})
+    check(freeKey, paidKey, "lookahead #788: the same plan heads both")
+    check(free - paid > 0.99 * Planner.WEIGHTS.careful.death, true,
+          "lookahead #788: an ungated green's second-phase death costs the value nothing")
+    check(paidDie > 0.99 and freeDie == 0, true,
+          "lookahead #788: and green_die counts it only when it spoils the clear")
     for _, c in ipairs(plan.considered) do
         if c.extended then
             check(c.rank.green_die > 0.99, true, "lookahead: the green's second-phase death is paid")

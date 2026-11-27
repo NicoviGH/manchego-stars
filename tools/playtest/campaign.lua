@@ -12,7 +12,8 @@
 -- game's own shop screen), takes from the convoy before it and gives seals and boosters back
 -- (Bot.supply), spends seals and boosters after it (Bot.uses), and plays the chapter
 -- (botrun.lua). A
--- clean clear (the record's `clean`: won, no blue or green unit lost, every owed recruit
+-- clean clear (the record's `clean`: won, no blue unit lost nor a green the ending tests, #788,
+-- every owed recruit
 -- joined, every village and chest taken) moves on and its team is CARRIED into the next
 -- chapter's pick; anything else loads the chapter-start state back and attempts again, at most
 -- MAX_ATTEMPTS times (the retry cap, ADR 0399; api.attempts bounds it lower). The team follows

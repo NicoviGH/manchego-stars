@@ -3802,6 +3802,10 @@ INSPECT.botApi = function(game)
             end
             return out
         end,
+        -- the charIds the chapter's ending scene tests for life (Sight.endingChecks, #788): a
+        -- green among them may gate a reward, so its death spoils the clean clear; nil when the
+        -- read was cut short (every green then counts)
+        gated = function() return Sight.endingChecks(sightApi) end,
         -- the game's party, by charId (INSPECT.prepList)
         party = function()
             local out = {}

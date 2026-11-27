@@ -25,8 +25,9 @@
 --      tiles the board's own listing never had.
 --   3. Judge: the best FINAL complete plans each meet the enemy phase the game's own AI would
 --      play against them (sight.enemyPhase), which replaces the exposure estimate: they pay
---      for each unit's chance to die there (a green one's too: it spoils the clear; a recruit
---      our counter fells loses its goal; a unit whose death ends the game costs the chapter), its
+--      for each unit's chance to die there (a green one's when it spoils the clear, M.greenPaid;
+--      a recruit our counter fells loses its goal; a unit whose death ends the game costs the
+--      chapter), its
 --      expected damage. A unit left beside ground it cannot see also meets one strike from the
 --      strongest enemy seen so far, stood at the fog's edge: its own rank key, not its chance
 --      to die (M.outranks' `fog`).
@@ -389,6 +390,17 @@ M.sortedKeys = sortedKeys
 -- sets EVFLAG_GAMEOVER, a lord's: sight.objective.gameOver), else one unit's death.
 local function loss(W, st, charId)
     return st.gameOver[charId] and W.win or W.death
+end
+
+-- Whether a green's death is paid in a plan's value (#788, ADR 0482): when it spoils the clean
+-- clear, i.e. it ends the game (an escort, paid W.win), it is an owed recruit (ADR 0381: vanilla
+-- Ch2's Ross), or the chapter's ending tests its life (`gated`, botrun's api.gated: a reward it
+-- may gate). `gated` nil (unread) pays every green, ADR 0376's rule. Any other green's death
+-- costs nothing, in the value or the rank's green_die tie-break (ADR 0384): its death is still
+-- predicted, and reported.
+function M.greenPaid(st, g, gated)
+    return gated == nil or st.gameOver[g.charId] or st.recruits[g.id] or st.loose[g.id]
+        or gated[g.charId] or false
 end
 
 -- The ledger goal an act takes (Goals' ids): a Talk its recruit, a Visit or a chest its tile;
@@ -905,6 +917,9 @@ function M.triggers(fin, byId, enemies, sight)
 end
 
 function M.plan(Bot, board, sight, style, opts)
+    -- the greens whose death spoils the clear besides an escort and a recruit (botrun's read of
+    -- the ending, #788): M.greenPaid's `gated`, one read for every place a green is charged
+    local gated = opts and opts.gated
     local W = M.WEIGHTS[style.aggression]
     if not W then error("planner.lua: no weights for style " .. tostring(style.aggression)) end
     local cap = M.CAPS[style.aggression]
@@ -1949,10 +1964,10 @@ function M.plan(Bot, board, sight, style, opts)
                    area_positional = 0, area_truncated = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
-    -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
-    -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
-    -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
-    -- meets the phase where it stands
+    -- a green unit's death is paid at a player unit's price (ADR 0381: vanilla Ch2's Ross, a
+    -- Talk recruit, killed on turn 2 in every style while only blue deaths were paid), though
+    -- only an escort or a green the ending tests spoils the clean clear (#788). No plan moves
+    -- one: it meets the phase where it stands
     local greens = {}
     -- A carried green is one too (board's carriedBy): carried it meets no strike, and a plan
     -- that drops it meets the phase on its drop tile
@@ -2491,13 +2506,14 @@ function M.plan(Bot, board, sight, style, opts)
             if f > 0 then st.fogBy[u.id], st.fogSum = f, st.fogSum + f end
         end
         for _, p in ipairs(planned) do addFog(p.unit, p.x, p.y, p.hp - (taken[p.unit.id] or 0)) end
-        -- a green meets the fog where the plan leaves it (#713): every green's loss is paid as a
-        -- player unit's (below), so its fog read is summed with theirs. A carried one meets none
+        -- a green meets the fog where the plan leaves it (#713): a green whose death spoils the
+        -- clear is paid as a player unit's (below, M.greenPaid), so its fog read is summed with
+        -- theirs; any other green's is not (#788). A carried one meets none
         for _, g in ipairs(greens) do
             local c = (st.carry or {})[g.id]
             local gx, gy = g.x, g.y
             if c and c.x then gx, gy = c.x, c.y end
-            if not (c and c.by) and (g.onField or (c and c.x)) then
+            if M.greenPaid(st, g, gated) and not (c and c.by) and (g.onField or (c and c.x)) then
                 addFog(g, gx, gy, g.hp - (taken[g.id] or 0))
             end
         end
@@ -2507,7 +2523,9 @@ function M.plan(Bot, board, sight, style, opts)
         -- death in the phase is read in full above
         st.predict = {}
         for _, g in ipairs(greens) do
-            judged = judged - loss(W, st, g.charId) * die[g.id]
+            if M.greenPaid(st, g, gated) then
+                judged = judged - loss(W, st, g.charId) * die[g.id]
+            end
             local by = sortedKeys(strikers[g.id])   -- a list: the record is logged as JSON
             st.predict[#st.predict + 1] = { id = g.id, charId = g.charId, x = g.x, y = g.y,
                                             hp = g.hp, die = die[g.id], taken = taken[g.id],
@@ -2619,7 +2637,7 @@ function M.plan(Bot, board, sight, style, opts)
             -- without its chance every plan that risks the recruit at all ties, and one that
             -- lowers it ranks no higher (vanilla Ch2's Ross, 37% in every turn-1 plan, #510).
             -- The forfeit ranks first, so this only breaks ties among plans that forfeit alike
-            if not gameOver[g.charId] then
+            if not gameOver[g.charId] and M.greenPaid(st, g, gated) then
                 greenDie = greenDie + (die[g.id] or 0)
             end
         end
@@ -3043,8 +3061,11 @@ function M.plan(Bot, board, sight, style, opts)
             end
             return out
         end
+        -- a green whose death spoils nothing is no reason to mend (#788, M.greenPaid)
         for _, p in ipairs(base.predict) do
-            if p.die > 0 then risky[#risky + 1] = p end
+            if p.die > 0 and not (p.green and not M.greenPaid(base, p, gated)) then
+                risky[#risky + 1] = p
+            end
         end
         -- a unit a spoiling theft robs in the plan ("stolen:<id>", Goals.forfeited) tries its
         -- other acts too, first: the forfeit ranks before any death, and the beam ranked its acts
@@ -3248,9 +3269,14 @@ function M.plan(Bot, board, sight, style, opts)
                         local f = first[u.id]
                         local was = f and f.die or 0
                         local more = (1 - was) * (second[u.id] or 0)
-                        rank.value = rank.value - loss(W, st, u.charId) * more
+                        -- a green is paid here as in the first phase: only when its death
+                        -- spoils the clear (M.greenPaid, #788), in the value and the tie-break
+                        local paid = not (f and f.green) or M.greenPaid(st, u, gated)
+                        if paid then
+                            rank.value = rank.value - loss(W, st, u.charId) * more
+                        end
                         if u.maxhp then rank.value = rank.value - W.taken * (lost[u.id] or 0) end
-                        if f and f.green and not protected[u.id] then
+                        if f and f.green and not protected[u.id] and paid then
                             rank.green_die = rank.green_die + more
                         end
                     end
