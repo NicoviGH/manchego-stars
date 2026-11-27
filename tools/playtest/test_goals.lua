@@ -657,7 +657,8 @@ do
     local function keyed(memory, units, arrivedOn)
         local sight = fakeSight({ open = open })
         function sight.closings() return {}, {}, {} end
-        function sight.arrivalOf(u) return arrivedOn[u.id] end
+        local Board = dofile(here .. "board.lua")
+        function sight.keyOf(u) return Board.memoryKey(u.id, u.charId, u.classId, arrivedOn[u.id]) end
         local b = { units = units, turn = 8 }
         local g = find(Goals.list(b, sight, { memory = memory }, { turn = 8, board = b }), "visit:4,4")
         return g and g.closer

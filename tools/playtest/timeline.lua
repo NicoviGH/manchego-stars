@@ -312,19 +312,23 @@ end
 -- Each character the screen showed arrive, its latest attempt's sighting (ADR 0436): botrun's
 -- pending recruits. { turn, boardTurn, x, y, charId, classId, by, timed }.
 function M.arrivals(memory) return memo("arrivals", memory, compute.arrivals) end
-function compute.arrivals(memory)
-    local out, at = {}, {}
+-- Each unit the screen showed arrive, over the attempts oldest first: fn(u, u.appeared). The one
+-- walk M.arrivals and M.calendar both key their own way.
+local function sightings(memory, fn)
     for _, tl in ipairs(attempts(memory)) do
         for _, u in ipairs(tl.units or {}) do
-            local a = u.appeared
-            if a then
-                local e = { turn = a.turn, boardTurn = a.boardTurn, x = a.x, y = a.y,
-                            charId = u.charId, classId = u.classId, by = a.by, timed = a.timed }
-                if at[u.charId] then out[at[u.charId]] = e
-                else out[#out + 1] = e; at[u.charId] = #out end
-            end
+            if u.appeared then fn(u, u.appeared) end
         end
     end
+end
+function compute.arrivals(memory)
+    local out, at = {}, {}
+    sightings(memory, function(u, a)
+        local e = { turn = a.turn, boardTurn = a.boardTurn, x = a.x, y = a.y,
+                    charId = u.charId, classId = u.classId, by = a.by, timed = a.timed }
+        if at[u.charId] then out[at[u.charId]] = e
+        else out[#out + 1] = e; at[u.charId] = #out end
+    end)
     return out
 end
 
@@ -429,16 +433,12 @@ end
 function M.calendar(memory) return memo("calendar", memory, compute.calendar) end
 function compute.calendar(memory)
     local byKey, keys = {}, {}
-    for _, tl in ipairs(attempts(memory)) do
-        for _, u in ipairs(tl.units or {}) do
-            local a = u.appeared
-            if a and not brought(u) then
-                if not byKey[u.key] then keys[#keys + 1] = u.key end
-                byKey[u.key] = { charId = u.charId, classId = u.classId, faction = u.faction,
-                                 x = a.x, y = a.y, boardTurn = a.boardTurn }
-            end
-        end
-    end
+    sightings(memory, function(u, a)
+        if brought(u) then return end
+        if not byKey[u.key] then keys[#keys + 1] = u.key end
+        byKey[u.key] = { charId = u.charId, classId = u.classId, faction = u.faction,
+                         x = a.x, y = a.y, boardTurn = a.boardTurn }
+    end)
     table.sort(keys)
     local out = {}
     for _, k in ipairs(keys) do out[#out + 1] = byKey[k] end

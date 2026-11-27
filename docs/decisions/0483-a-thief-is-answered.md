@@ -22,8 +22,8 @@ same thief.
    score, so a march that hands the thief the key outranked the stay that kept it.
 2. **The looter's death keeps its chest.** `sight.closings` now names the looter that takes each
    tile (its third answer). For a closing a retry remembers, the looter is the board's red of the
-   remembered closer's memory key (`Timeline.deadlines` `closers`, `Board.memoryKey` over
-   `sight.arrivalOf`). Vanilla Ch16's two thieves share a character and class, so that pair
+   remembered closer's memory key (`Timeline.deadlines` `closers`; `sight.keyOf`, the one step that
+   names a board's unit as the record does). Vanilla Ch16's two thieves share a character and class, so that pair
    alone named neither (review of PR #790); with no key to read, the one red of that pair. A goal carries
    that looter as `closer`. A plan that kills the closer reads the goal with no closing date
    (planner's `chanceOf`). Before this, the date was read once per board, so a strike on the
@@ -38,7 +38,9 @@ same thief.
    in the judged phase's bags (`planner.tradesIn` → sight's `stagePhase`, through
    `sight.tradeItems`, which `moveItem` shares). So the thief steals from the bag the Trade
    leaves, and a hand-off is worth exactly the theft it moves out of reach. A plan Trade whose
-   item is not where it names raises: the game could not play that plan as judged. A hand-off earns no
+   item is not where it names raises: the game could not play that plan as judged. The planner
+   keeps such a plan from being built: a full-bag taker's give-back is taken once per plan, as
+   the item itself is (`fx.tookBack`). A hand-off earns no
    breach weight.
 4. **Strikers meet a thief the calendar brings.** From attempt 2 on, memory knows a red the game
    brought to a tile on a board turn (`Timeline.calendar`: one entry per unit key, since many

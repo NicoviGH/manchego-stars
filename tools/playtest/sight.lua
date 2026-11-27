@@ -334,7 +334,6 @@ function M.riding(state) return ((state or 0) & M.US_IN_BALLISTA) ~= 0 end
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL, CA_BALLISTAE
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL, M.CA_BALLISTAE = 0x69, 0x6B, 0x04, 1 << 7
-M.ITEM_CHESTKEY_BUNDLE = 0x79   -- include/constants/items.h
 M.ITEM_GOLD = 0x77   -- include/constants/items.h: a chest of gold puts nothing in the bag
 -- The staves the game heals one ally with: bmitemuse.c DoItemUse sends Heal, Mend and Recover
 -- (0x4B-0x4D) and Physic (0x4E) to DoUseHealStaff, gSelectInfo_Heal's target selection, the one
@@ -3475,9 +3474,11 @@ end
 -- at the start by its slot (Board.memoryKey, ADR 0449). So a memory of the start's unit in a slot
 -- does not name an arrival that took the slot later, nor the reverse.
 function M.knows(Board, keys, u, arrival)
-    return keys ~= nil and u ~= nil
-        and keys[Board.memoryKey(u.id, u.charId, u.classId, arrival)] == true
+    return keys ~= nil and u ~= nil and keys[M.keyOf(Board, u, arrival)] == true
 end
+-- Red unit `u`'s memory key (Board.memoryKey) when it arrived on turn `arrival`: the one step that
+-- names a board's unit as the record does (M.knows; s.keyOf for Goals.closings' closers).
+function M.keyOf(Board, u, arrival) return Board.memoryKey(u.id, u.charId, u.classId, arrival) end
 
 -- Whether an enemy with unit state `state` counts as seen (Board.playsAsSeen, the game's US_BIT9
 -- its fog): what both judged phases' decides, closings' looters and keySources ask.
@@ -3953,6 +3954,7 @@ function M.new(outer)
         return a and a.charId == u.charId and a.classId == u.classId and a.turn or nil
     end
     function s.knows(u) return M.knows(Board, remembered, u, s.arrivalOf(u)) end
+    function s.keyOf(u) return M.keyOf(Board, u, s.arrivalOf(u)) end
     function s.sighted(list)
         for _, u in ipairs(list) do
             sightings = sightings + 1

@@ -6344,6 +6344,24 @@ do
         end
     end
     check(offered, 0, "hand-off: no board menu offers it")
+    -- a full-bag taker's give-back leaves its bag once (#790 re-review): two hand-offs to T that
+    -- each name T's one 0x01 as `back` are not both in a plan, nor a Take of 0x01 from T and a
+    -- hand-off giving it back; the judged phase could not stage the second
+    local W = { breach = 0 }
+    local give = function(from, item)
+        return { act = "trade", unitId = from, targetId = 3, gives = true, item = item, uses = 1,
+                 back = { id = 0x01, uses = 30 }, handoff = true, unitHp = 20 }
+    end
+    local _, first = Planner.score(give(2, 0x6D), { hp = {}, took = {} }, W)
+    local took = { [first.took] = true, [first.tookBack] = true }
+    local _, second = Planner.score(give(4, 0x6E), { hp = {}, took = took }, W)
+    check(second.blocked, true, "hand-off: a second Trade of the taker's one give-back is no act")
+    local _, take = Planner.score({ act = "trade", unitId = 5, targetId = 3, item = 0x01, uses = 30,
+                                    unitHp = 20 }, { hp = {}, took = {} }, W)
+    local _, after = Planner.score(give(2, 0x6D), { hp = {}, took = { [take.took] = true } }, W)
+    check(after.blocked, true, "hand-off: nor one whose give-back an earlier Take moved")
+    local _, other = Planner.score(give(4, 0x6E), { hp = {}, took = { [first.took] = true } }, W)
+    check(other.blocked, false, "hand-off: another item's Trade to the same taker, with no give-back taken, is an act")
     check(Planner.tradesIn({ { act = "trade", unitId = 2, targetId = 3, gives = true, item = 0x6D,
                                uses = 1 },
                              { act = "trade", unitId = 3, targetId = 2, item = 0x69, uses = 1,

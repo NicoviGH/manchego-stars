@@ -101,9 +101,6 @@ local M = {}
 -- timeline.lua, beside this file: what a retry remembers losing, and when (#765)
 local Timeline = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/timeline.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "timeline.lua"))
--- board.lua: Board.memoryKey, the one name a unit has across attempts
-local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
-    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
 
 -- What each turn further from a goal leaves of its chance: another enemy phase where something
 -- can go wrong (Claude's starting value, #510 comment 6534885686; tuned on the runs).
@@ -178,7 +175,7 @@ function M.closings(sight, style, ctx, board)
         for k, v in pairs(out) do copy[k] = v end
         for k, v in pairs(by or {}) do byCopy[k] = v end
         -- the red on the board that is a remembered closer, or nil: the one of its memory key
-        -- (Board.memoryKey over sight.arrivalOf, the key the record named it by), since vanilla
+        -- (sight.keyOf, the key the record named it by), since vanilla
         -- Ch16's two thieves share a character and class (ADR 0483); with no key to read, the
         -- one red of that character and class, and none when two stand there
         local function onBoard(c)
@@ -186,8 +183,8 @@ function M.closings(sight, style, ctx, board)
             for _, u in ipairs(c and board and board.units or {}) do
                 if u.faction == "red" and not u.dead and u.charId == c.charId
                         and u.classId == c.classId then
-                    if c.key and sight.arrivalOf then
-                        if Board.memoryKey(u.id, u.charId, u.classId, sight.arrivalOf(u)) == c.key then
+                    if c.key and sight.keyOf then
+                        if sight.keyOf(u) == c.key then
                             return u.id
                         end
                     elseif found then

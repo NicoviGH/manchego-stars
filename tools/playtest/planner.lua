@@ -617,7 +617,14 @@ local function score(act, st, W, style, odds, likeliest)
         -- no way: what it is worth is the theft the judged phase no longer plays
         if not act.handoff then v = v + W.breach end
         fx.took = "trade:" .. (act.gives and act.unitId or act.targetId) .. ":" .. act.item .. "x" .. act.uses
-        fx.blocked = st.took[fx.took] == true
+        -- a full-bag taker's give-back (`back`) leaves its bag the same way: a second Trade
+        -- that names that item, from the taker, is no act either (two hand-offs to one full
+        -- teammate named its one give-back twice, and the judged phase could not stage both)
+        if act.back then
+            fx.tookBack = "trade:" .. (act.gives and act.targetId or act.unitId) .. ":"
+                .. act.back.id .. "x" .. act.back.uses
+        end
+        fx.blocked = st.took[fx.took] == true or (fx.tookBack ~= nil and st.took[fx.tookBack] == true)
     elseif act.obstacle or act.act == "door" then
         -- a door keeps `breach` (#658). So does a wall strike with no forecast of its blow: the
         -- goals then cost the wall by the walk alone (bot.lua strikersOf), so the turns can
@@ -629,6 +636,9 @@ local function score(act, st, W, style, odds, likeliest)
     end
     return v, fx
 end
+
+-- one act's worth and effects on plan state `st` (the tests read a Trade's `took`, ADR 0483)
+M.score = score
 
 local function key(act)
     -- a Take's target is the lock its key is for ("lock" .. terrain, #699): a chest's Take told
@@ -1404,9 +1414,12 @@ function M.plan(Bot, board, sight, style, opts)
                 -- what the act alone does to the goals: a march toward one earns nothing of its
                 -- own, and ranked without this it was cut from the menu (vanilla Ch2: Eirika's
                 -- walk to Ross never reached the beam, and Ross died on turn 4)
-                local alone = { acts = { a }, took = fx.took and { [fx.took] = true } or {},
+                local alone = { acts = { a }, took = {},
                                 recruitHit = fx.recruitHit and { [fx.recruitHit.id] = fx.recruitHit.p } or {},
                                 win = fx.win or 0, gone = gone }
+                for _, k in ipairs({ fx.took or false, fx.tookBack or false }) do
+                    if k then alone.took[k] = true end
+                end
                 scored[#scored + 1] = { a = a, v = v - risk(a, fx.hp, gone) + goalTerm(alone) }
                 a.own = scored[#scored].v   -- the advance's tie-break
             end
@@ -1719,6 +1732,7 @@ function M.plan(Bot, board, sight, style, opts)
             n.fought[uid] = { back = fx.counter, die = fx.die, exchange = fx.exchange }
         end
         if fx.took then n.took[fx.took] = true end
+        if fx.tookBack then n.took[fx.tookBack] = true end
         if fx.recruitHit then
             n.recruitHit[fx.recruitHit.id] = math.max(n.recruitHit[fx.recruitHit.id] or 0,
                                                      fx.recruitHit.p)
