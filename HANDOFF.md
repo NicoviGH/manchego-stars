@@ -81,12 +81,20 @@ returns 0 with no field through the shut (4,18) door), and the chest stalls only
 because `goalQuiet` counts only event-free phases. Test the route-loss lead first, then one key
 per chest (#711 item 1), then items 5, 6, then one R4 set over the batch (#764's body).
 
-**PR #784 (ADR 0480) is open, reviewed and green, awaiting Nicolas's merge:** the route-loss lead
-is confirmed and fixed (a job behind a shut door read loss 0). A job's loss is now read leg by
-leg along the march's own chain. It does not save (2,18): replays `r688a`/`r688b` won in 38 turns
-with 0 deaths (main 30), the chest still missed. Under bold's weights a sure death (400 gold) is
-less than the chest, so the job stays Eirika's and the death cap holds her (#688 comment).
-**Next:** one key per chest (#711 item 1), then items 5 and 6, then one R4 set over the batch.
+**PR #784 is merged (5c1e8f40, ADR 0480): a job's way through a door is priced leg by leg.**
+A job behind a shut door read loss 0, because its field never reached the unit. Now the loss is
+read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
+replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
+
+**Next (agreed with Nicolas, 2026-11-26), before #711 item 1:** make the job matcher and the
+death cap agree. On Ch21 s4009 the matcher keeps the (2,18) chest on Eirika, because bold's sure
+death (400 gold) is less than the chest (about 5,500 gold at its chance). Meanwhile the cap
+refuses every move on her way, so she holds at (12,18) for 20 turns until `goalQuiet` frees the
+job on turn 21. The proposed rule is that a job the cap will not let its unit walk is chance 0
+for that unit (read the way's stops against the cap: `legLive`'s stops, the cap's read). The job
+then goes on turn 1 to a unit that can make it (Syrene by Trade, say). No weight changes.
+Untested: prove it with a unit test plus one replay of Ch21 s4009 a1 against `r688b`. Then do one
+key per chest (#711 item 1), then items 5 and 6, then one R4 set over the batch.
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
