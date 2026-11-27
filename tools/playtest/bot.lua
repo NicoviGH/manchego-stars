@@ -1978,15 +1978,18 @@ end
 -- way through. Was: only for a unit cut off from the goal, and the obstacle nearest it, so a
 -- unit with any walk round never weighed a wall (#655). Kept for the decision (ctx.breaches);
 -- one still being worked out reads as none: a door's key way can ask for this same breach
--- again (the key's holder cut off from the door), and that way would never end.
-local function breachFor(ctx, u, goal, seeking)
+-- again (the key's holder cut off from the door), and that way would never end. `from`: where
+-- the way starts (a chain's tile, turnsFor's `from`); where u stands when nil.
+local function breachFor(ctx, u, goal, seeking, from)
     if not (goal and ctx.sight.obstacles) then return nil end
+    from = from or u
     local k = goalKey(u.id, goal) .. "|" .. lockSig(seeking) .. "|" .. (ctx.wallSig or "")
+        .. "@" .. tileKey(from.x, from.y) .. (startsLate(u, from) and "!" or "")
     local b = ctx.breaches[k]
     if b ~= nil then return b or nil end
     ctx.breaches[k] = false
-    local via = viaObstacle(ctx, u, goal, u, seeking)
-    local walk = via and ctx.sight.turnsTo(u, goal, u)
+    local via = viaObstacle(ctx, u, goal, from, seeking)
+    local walk = via and ctx.sight.turnsTo(u, goal, from)
     b = via and (not walk or via.turns < walk) and via.o or false
     ctx.breaches[k] = b
     return b or nil
@@ -2071,10 +2074,11 @@ end
 
 -- The obstacles on `u`'s cheapest way to `tile` (breachFor), first to last: the last one,
 -- then each one's step before it (obstacleTurns' second read). Empty when the walk is as short.
-local function chainTo(ctx, u, tile, seeking)
-    local b = breachFor(ctx, u, tile, seeking)
+-- `from` as breachFor's: the march's from where u stands, a job's loss (wayLegs) from its start.
+local function chainTo(ctx, u, tile, seeking, from)
+    local b = breachFor(ctx, u, tile, seeking, from)
     if not b then return {} end
-    local prev, out = select(2, obstacleTurns(ctx, u, u, seeking)), { b }
+    local prev, out = select(2, obstacleTurns(ctx, u, from or u, seeking)), { b }
     while prev[obstacleKey(out[1])] do table.insert(out, 1, prev[obstacleKey(out[1])]) end
     return out
 end
@@ -3006,20 +3010,6 @@ local function openTiles(ctx) return Goals.openTiles(ctx.sight, ctx.style, ctx) 
 -- its own turns, none once a looter closes it first), that chance, and the turn it gets there on.
 -- A unit cut off from it goes through the breach (turnsFor). `from` (jobs.lua's chain: { x, y,
 -- late }) starts the trip where an earlier job ends, `late` turns from now; nil: where u stands.
--- The chance `u` dies on its march to `tile` (#766: a job is worth its goal for the least
--- expected loss, #764): the tiles its march stops on, a turn of MOV each down its own field to
--- the tile (sight.march), from `from` (a chain's last tile) or where it stands. Each stop is
--- read as worstCase reads a tile: every enemy that reaches it strikes u there (exposure: the
--- game's own forecast), u at its HP now; the stops together. An estimate: the enemies stand
--- where they stand now, and our army does not cover u. Vanilla Ch14 (`s766a`): a talker sent
--- west for Rennac and a thief sent to a chest behind a door both walked into the corridor the
--- enemy held, and the death cap turned the one back and wore the other down to its death.
--- Where the way turnsFor counts goes through doors or walls (viaObstacle: u is cut off, or that
--- way is the shorter), the march is read leg by leg along it (wayLegs). Was: a goal with no
--- field to u read as no loss, so a chest behind a shut door was safe from anywhere (vanilla
--- Ch21 s4009, `c688m`: Eirika's job to the (2,18) chest, behind the (4,18) door, read loss 0
--- for 30 turns past a Draco Zombie that kills her in one blow).
-
 -- The survival of one leg: `u` down `field` from (x, y), a turn of MOV a stop, each stop's
 -- strikes as routeLoss reads them; 1 when (x, y) is off the field. Each leg starts a fresh
 -- turn: the march stops at a door to open it.
@@ -3049,17 +3039,15 @@ local function legLive(ctx, u, field, x, y)
     return live
 end
 
--- The legs of `u`'s way from `from` (a unit or a chain's tile, as turnsFor reads it) to `tile`, { goal, x, y } each, first to last: the walk
--- alone, or, where turnsFor's way goes through obstacles (viaObstacle and its chain,
--- obstacleTurns' second read, as chainTo follows it), a walk to each in turn, the next leg
--- starting where its field is joined past the last (stepsOnto). A door reached by its key's way
--- (keyWay) is read as walked to directly.
+-- The legs of `u`'s way from `from` (a unit, or a chain's tile as turnsFor reads it) to `tile`,
+-- { goal, x, y } each, first to last: the walk alone when it is as short, else a walk to each
+-- obstacle on turnsFor's way through them (chainTo, the march's own chain) and on to the tile,
+-- each leg starting where its field is joined past the obstacle before it (stepsOnto). A lock
+-- reached by its key's way (keyWay) is read as walked to directly. A leg with no join tile ends
+-- the read there (the rest of the way is no loss): viaObstacle priced that way through the
+-- same stepsOnto, so it is reached only when a field went missing in between.
 local function wayLegs(ctx, u, tile, from)
-    local via = viaObstacle(ctx, u, tile, from)
-    local walk = ctx.sight.turnsTo and ctx.sight.turnsTo(u, tile, from)
-    if not via or (walk and walk <= via.turns) then return { { goal = tile, x = from.x, y = from.y } } end
-    local prev, chain = select(2, obstacleTurns(ctx, u, from)), { via.o }
-    while prev[obstacleKey(chain[1])] do table.insert(chain, 1, prev[obstacleKey(chain[1])]) end
+    local chain = chainTo(ctx, u, tile, nil, from)
     chain[#chain + 1] = tile
     local legs, at = {}, from
     for i, g in ipairs(chain) do
@@ -3075,12 +3063,26 @@ local function wayLegs(ctx, u, tile, from)
     return legs
 end
 
+-- The chance `u` dies on its march to `tile` (#766: a job is worth its goal for the least
+-- expected loss, #764): the tiles its march stops on, a turn of MOV each down its own field to
+-- the tile (sight.march), from `from` (a chain's last tile) or where it stands. Each stop is
+-- read as worstCase reads a tile: every enemy that reaches it strikes u there (exposure: the
+-- game's own forecast), u at its HP now; the stops together. An estimate: the enemies stand
+-- where they stand now, and our army does not cover u. Vanilla Ch14 (`s766a`): a talker sent
+-- west for Rennac and a thief sent to a chest behind a door both walked into the corridor the
+-- enemy held, and the death cap turned the one back and wore the other down to its death.
+-- Where the way turnsFor counts goes through doors or walls (viaObstacle: u is cut off, or that
+-- way is the shorter), the march is read leg by leg along it (wayLegs). Was: a goal with no
+-- field to u read as no loss, so a chest behind a shut door was safe from anywhere (vanilla
+-- Ch21 s4009, `c688m`: Eirika's job to the (2,18) chest, behind the (4,18) door, read loss 0
+-- for 30 turns past a Draco Zombie that kills her in one blow).
 local function routeLoss(ctx, u, tile, from)
-    local x, y = from and from.x or u.x, from and from.y or u.y
-    local key = u.id .. ">" .. tileKey(tile.x, tile.y) .. "@" .. tileKey(x, y)
+    from = from or u
+    local key = u.id .. ">" .. tileKey(tile.x, tile.y) .. "@" .. tileKey(from.x, from.y)
+        .. (startsLate(u, from) and "!" or "")
     if ctx.routeLosses[key] then return ctx.routeLosses[key] end
     local live = 1
-    for _, leg in ipairs(wayLegs(ctx, u, tile, from or u)) do
+    for _, leg in ipairs(wayLegs(ctx, u, tile, from)) do
         live = live * legLive(ctx, u, fieldFor(ctx, leg.goal, u), leg.x, leg.y)
     end
     ctx.routeLosses[key] = 1 - live

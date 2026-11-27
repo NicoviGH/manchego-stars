@@ -9498,13 +9498,15 @@ end
 -- goes through the door, and its first stop on the way, (3,0), is where E kills it for sure:
 -- the job's loss is that death. Read as no loss (no field, no danger), vanilla Ch21 s4009's
 -- (2,18) chest, behind the (4,18) door, kept Eirika's job at loss 0 for 30 turns past a Draco
--- Zombie that kills her in one blow (`c688m`). Out of E's reach, the way costs nothing.
+-- Zombie that kills her in one blow (`c688m`). With E's strike on (7,0) instead, past the door,
+-- the second leg (from (6,0), where the chest's field is joined) is what pays it. Out of E's
+-- reach, the way costs nothing (the walk-alone leg is test_a_job_is_priced_by_the_danger_on_its_way's).
 do
     local A = blue(0x01, 0, 0, 0, { minRange = false, mov = 3 })
     local E = red(0x81, 3, 2, { minRange = 1, maxRange = 1 })
-    local function o(danger)
+    local function o(danger, at)
         return {
-            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = tiles({ 3, 1 }) },
+            reach = { [0x01] = tiles({ 0, 0 }), [0x81] = at and tiles({ 7, 1 }) or tiles({ 3, 1 }) },
             field = fieldsOf {
                 ["7,0"] = { ["6,0"] = 1, ["7,0"] = 0 },
                 ["5,0"] = { ["0,0"] = 5, ["1,0"] = 4, ["2,0"] = 3, ["3,0"] = 2, ["4,0"] = 1,
@@ -9514,16 +9516,17 @@ do
             explorable = { { x = 7, y = 0, kind = "chest" } },
             canExplore = { [0x01] = { ["7,0"] = "chest" } },
             danger = danger,
-            fc = { [0x01] = { [0x81] = { ["3,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } } },
+            fc = { [0x01] = { [0x81] = { [at or "3,0"] = fc { takenHit = 100, takenDmg = 99, takenHits = 1 } } } },
         }
     end
-    local function lossOf(danger)
-        local _, plan = Planner.plan(B, boardOf(A, E), sightOf(o(danger)), style("careful"))
+    local function lossOf(danger, at)
+        local _, plan = Planner.plan(B, boardOf(A, E), sightOf(o(danger, at)), style("careful"))
         for _, j in ipairs(plan and plan.jobs or {}) do
             if j.id == 0x01 and j.goal == "chest:7,0" then return j.loss end
         end
     end
     check(lossOf({ ["3,0"] = 1 }) > 0, true, "door: the way through the door is priced by its danger")
+    check(lossOf({ ["7,0"] = 1 }, "7,0") > 0, true, "door: the leg past the door is priced from its join tile")
     check(lossOf({}), 0, "door: a safe way through the door costs nothing")
 end
 

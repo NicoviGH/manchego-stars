@@ -20,17 +20,22 @@ way passes a Draco Zombie that kills her in one blow. The other chest's rows did
 
 ## The rule
 
-- **The legs** (`wayLegs`): the walk alone when it is as short as the way through obstacles,
-  the measure turnsFor already uses (`viaObstacle`). Otherwise the way runs through the obstacle
-  chain (`obstacleTurns`' second read, as `chainTo` follows it): a walk to each obstacle in turn,
-  then on from the tile where the next leg's field is joined past it. That tile is where
-  `stepsThrough` already counts its steps (now returned beside the count, and cached in
-  `stepsOnto`).
+- **The legs** (`wayLegs`) come from the march's own chain (`chainTo`, which now takes a start,
+  as `breachFor` does; its memo key now carries the start). This is the walk alone when that is
+  as short as the way through obstacles. Otherwise it is a walk to each obstacle in turn, then on
+  from the tile where the next leg's field is joined past it. That tile is where `stepsThrough`
+  already counts its steps (now returned beside the count, and cached in `stepsOnto`). The march
+  and the price read one way.
 - **Each leg** (`legLive`) is the old walk: a turn of MOV a stop, each stop's strikes from the
   game's forecast, u at its HP now. Each leg starts a fresh turn, because the march stops at a
   door to open it.
-- **Left as an estimate:** a door reached through its key's way (`keyWay`) is read as walked to
-  directly, and the few tiles walked inside an opened change are not read.
+- **Left as an estimate:**
+  - A locked door or chest that turnsFor reaches through its key's way (`keyWay`: the walk to the
+    enemy or teammate holding the key) is read as walked to directly. On Ch21, Eirika holds her
+    own Chest Key, so her way is the plain one.
+  - The few tiles walked inside an opened change are not read.
+  - A leg with no join tile ends the read. `viaObstacle` priced that way through the same
+    `stepsOnto`, so this happens only if a field goes missing in between.
 
 ## Proof
 
