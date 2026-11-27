@@ -2342,28 +2342,31 @@ do
         return ctx.tradeNeed[u.id] or nil
     end
 
-    -- The hand-offs of robbed unit `u`'s item out of a thief's reach (ADR 0483, #688's items
-    -- half): the first item a thief on the field would cost us (sight.atRisk's first: a spoiler,
-    -- else an opener), given by `u` to each teammate within its move and one, or taken from it by
-    -- each teammate within theirs, as { unit = the actor, a = its act }. The planner's mend offers
-    -- them for a unit its judged phase robs (M.handoffsFor); the judged phase plays the bags the
-    -- Trade leaves (planner tradesIn), so a hand-off is worth what the theft it moves out of reach
-    -- costs. On every unit's menu they were offered on quiet turns too, and Trades passed crests
-    -- back and forth (replay l764d)
-    M.handoffs = function(ctx, u)
+    -- The hand-offs of robbed unit `u`'s items out of a thief's reach (ADR 0483, #688's items
+    -- half): each item of its bag the judged phase's thefts take (`taken`, a set of item ids:
+    -- the planner's st.stolen, so a thief the calendar brings this phase counts, and a holder of a
+    -- Chest Key and a Crest hands off the one stolen), given by `u` to each teammate within its
+    -- move and one, or taken from it by each teammate within theirs, as { unit = the actor, a =
+    -- its act }. The planner's mend offers them for a unit its judged phase robs
+    -- (M.handoffsFor); the judged phase plays the bags the Trade leaves (planner tradesIn), so a
+    -- hand-off is worth what the theft it moves out of reach costs. On every unit's menu they
+    -- were offered on quiet turns too, and Trades passed crests back and forth (replay l764d)
+    M.handoffs = function(ctx, u, taken)
         local s, out = ctx.sight, {}
-        local key = s.atRisk and s.atRisk(u)[1]
-        if not key then return out end
         local open = function() return true end
-        for _, t in ipairs(ctx.blues or {}) do
-            local reach = math.max(s.mov(u), s.mov(t)) + 1
-            if t.id ~= u.id and not t.dead and Board.distance(u.x, u.y, t.x, t.y) <= reach then
-                local h = { key = key }
-                for _, a in ipairs({ tradeAct(ctx, u, t, h, true, open) or false,
-                                     tradeAct(ctx, t, u, h, false, open) or false }) do
-                    if a then
-                        a.handoff, a.why = true, "trade"
-                        out[#out + 1] = { unit = a.unitId == u.id and u or t, a = a }
+        for _, it in ipairs(u.items or {}) do
+            if (taken or {})[it.id] then
+                local h = { key = { id = it.id, uses = it.uses } }
+                for _, t in ipairs(ctx.blues or {}) do
+                    local reach = math.max(s.mov(u), s.mov(t)) + 1
+                    if t.id ~= u.id and not t.dead and Board.distance(u.x, u.y, t.x, t.y) <= reach then
+                        for _, a in ipairs({ tradeAct(ctx, u, t, h, true, open) or false,
+                                             tradeAct(ctx, t, u, h, false, open) or false }) do
+                            if a then
+                                a.handoff, a.why = true, "trade"
+                                out[#out + 1] = { unit = a.unitId == u.id and u or t, a = a }
+                            end
+                        end
                     end
                 end
             end
@@ -2885,12 +2888,12 @@ end
 -- move there (vanilla E_19, 2026-11-16: "could not perform item").
 local function offeredAt(ctx, u, a) return exposed(ctx, u, { a })[1] end
 
--- The planner's mend of a unit a thief robs (ADR 0483): the Trades that move `u`'s item at risk
--- to a teammate (M.handoffs), each offered as the menus' acts are (exposed). ctx: M.candidates'
--- second value.
-function M.handoffsFor(ctx, u)
+-- The planner's mend of a unit a thief robs (ADR 0483): the Trades that move the items its
+-- judged phase takes (`taken`, item ids) to a teammate (M.handoffs), each offered as the menus'
+-- acts are (exposed). ctx: M.candidates' second value.
+function M.handoffsFor(ctx, u, taken)
     local out = {}
-    for _, h in ipairs(M.handoffs(ctx, u)) do out[#out + 1] = offeredAt(ctx, h.unit, h.a) end
+    for _, h in ipairs(M.handoffs(ctx, u, taken)) do out[#out + 1] = offeredAt(ctx, h.unit, h.a) end
     return out
 end
 
@@ -3466,7 +3469,6 @@ local function releasesOf(ctx)
     return out
 end
 M.releasesOf = releasesOf
-
 
 -- The stage job (#764 R2, #766): each release not yet staged (ctx.releases) gets its `need`
 -- nearest strikers that have no job, sent to its door, so the turn it opens they strike what it

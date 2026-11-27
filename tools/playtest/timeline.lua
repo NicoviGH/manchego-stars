@@ -355,7 +355,7 @@ end
 -- first board turn for that unit, or nil (botrun's stamps). A death is the play's, never kept.
 -- Every loss the attempts remember, once per memory: { kind = "tile"|"gone", k ("x,y" or a
 -- charId), t (its turn), from (the unit's own appearance when the play brought it: { charId,
--- classId, boardTurn }), by (a tile's closer, { charId, classId }, when the record names it) }.
+-- classId, boardTurn }), by (a tile's closer, { charId, classId, key }, when the record names it) }.
 local function losses(memory)
     local out = {}
     for _, tl in ipairs(attempts(memory)) do
@@ -369,7 +369,8 @@ local function losses(memory)
             local u = byKey[c.closerKey]
             out[#out + 1] = { kind = "tile", k = tileKey(c.x, c.y), t = c.phase,
                               from = from(u),
-                              by = u and { charId = u.charId, classId = u.classId } or nil }
+                              by = u and { charId = u.charId, classId = u.classId, key = u.key }
+                                  or nil }
         end
         for _, u in ipairs(tl.units or {}) do
             if u.gone and u.gone.how == "left" then
@@ -380,8 +381,9 @@ local function losses(memory)
     return out
 end
 
--- `closers` = { ["x,y"] = { charId, classId } }: who closed each tile at its earliest date, when
--- the record names it (a retry's planner credits a kill of that unit, Goals.closings).
+-- `closers` = { ["x,y"] = { charId, classId, key } }: who closed each tile at its earliest date,
+-- when the record names it, `key` its Board.memoryKey (a retry's planner credits a kill of that
+-- unit, Goals.closings).
 function M.deadlines(memory, appeared)
     local out, closers = { tile = {}, gone = {} }, {}
     for _, l in ipairs(memo("losses", memory, losses)) do
@@ -442,7 +444,6 @@ function compute.calendar(memory)
     for _, k in ipairs(keys) do out[#out + 1] = byKey[k] end
     return out
 end
-
 
 -- A character's walk (M.routes' steps) by its charId and class, from the latest attempt that
 -- showed it walk, or nil: a unit's slot id is not the same over attempts, its character is

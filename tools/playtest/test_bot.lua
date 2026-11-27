@@ -553,8 +553,6 @@ local function sightOf(o)
         end
         return out
     end
-    -- the items a thief on the field would cost us, per unit (sight.atRisk, ADR 0483)
-    if o.atRisk then s.atRisk = function(u) return o.atRisk[u.id] or {} end end
     -- the classes that steal (sight.steals: a class's CA_STEAL, ADR 0483)
     if o.steals then s.steals = function(classId) return o.steals[classId] or false end end
     -- the convoy's door key for each unit (sight.convoyKey): { id, uses }
@@ -6302,24 +6300,25 @@ end
 
 -- A holder with no tile out of the thief's reach hands its spoiling item to a teammate by Trade
 -- (ADR 0483, #688's items half; vanilla Ch16 s4005: Colm cornered at (19,1) with the Knight
--- Crest, every tile of his robbed). H holds 0x6D on (5,5), its only tile; T stands beside it.
--- The judged phase steals from whoever holds the item, and a Trade the plan makes moves it
--- (plan.trades), so the hand-off forfeits nothing. With no item at risk no hand-off is offered.
+-- Crest, every tile of his robbed). H holds 0x6E then 0x6D on (5,5), its only tile; T stands
+-- beside it. The judged phase steals 0x6D from whoever holds it, and a Trade the plan makes moves
+-- it (plan.trades), so handing off that item, the one the theft takes, forfeits nothing; handing
+-- off the bag's first (0x6E) would leave it robbed. A theft that names no item hands nothing off.
 do
-    local H = blue(0x02, 1, 5, 5, { minRange = false, items = { { id = 0x6D, uses = 1 } } })
+    local H = blue(0x02, 1, 5, 5, { minRange = false,
+                                    items = { { id = 0x6E, uses = 1 }, { id = 0x6D, uses = 1 } } })
     local T = blue(0x03, 2, 5, 7, { minRange = false, items = {} })
     local X = red(0x81, 9, 9, { minRange = false })
-    local function plan(atRisk)
+    local function plan(item)
         local o = {
             reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
-            atRisk = atRisk,
             enemyPhase = function(p)
                 local holder = 0x02
                 for _, t in ipairs(p.trades or {}) do
                     if t.holder == 0x02 and t.item == 0x6D then holder = t.taker end
                 end
                 if holder ~= 0x02 then return {} end
-                return { thefts = { { thief = 0x81, target = 0x02, item = 0x6D, lock = false,
+                return { thefts = { { thief = 0x81, target = 0x02, item = item, lock = false,
                                       spoils = true } } }
             end,
         }
@@ -6327,19 +6326,18 @@ do
     end
     local _, robbed = plan(nil)
     check(robbed and robbed.forfeited and robbed.forfeited[1], "stolen:2",
-          "hand-off: with no item at risk named, the cornered holder is robbed")
-    local _, saved = plan({ [0x02] = { { id = 0x6D, uses = 1 } } })
+          "hand-off: a theft that names no item, the cornered holder is robbed")
+    local _, saved = plan(0x6D)
     local traded
     for _, a in ipairs(saved and saved.considered and saved.considered[1] and saved.considered[1].acts or {}) do
         if a:match(">trade@") then traded = a end
     end
     check(saved and #(saved.forfeited or { 1 }) == 0 and traded ~= nil, true,
-          "hand-off: the holder hands the item to the teammate beside it and forfeits nothing")
+          "hand-off: the holder hands the stolen item to the teammate beside it and forfeits nothing")
     -- the hand-off is the mend's, for a unit its judged phase robs: no board menu offers it, so a
     -- quiet turn trades nothing (replay l764d: Trades passed crests back and forth all game)
     local offered = 0
-    local o = { reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
-                atRisk = { [0x02] = { { id = 0x6D, uses = 1 } } } }
+    local o = { reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) } }
     for _, c in ipairs(B.candidates(boardOf(H, T, X), sightOf(o), gifted("careful", 500))) do
         for _, a in ipairs(c.acts) do
             if a.act == "trade" then offered = offered + 1 end
@@ -6378,7 +6376,7 @@ do
         local board = boardOf(S, E)
         board.turn = 1
         local _, ctx = B.candidates(board, sightOf(o), st)
-        return ctx.releases and ctx.releases[1], ctx.exploreGoal[0x02]
+        return ctx.releases and ctx.releases[1], ctx.exploreGoal[0x02], board, sightOf(o), st
     end
     local r, g = case(12)
     check(r and r.need .. " " .. r.strikers[1].gap .. " " .. tostring(r.due), "1 -3 false",
@@ -6401,6 +6399,13 @@ do
     r, g = case(8, { lord = true })
     check(r and tostring(r.due) .. " " .. tostring(g ~= nil and g.stage == true), "false false",
           "calendar thief: a lord is never sent")
+    -- the planner's readers of a release: no act opens an arrival (its key is no door's), so no
+    -- plan forfeits for it; the plan record carries it as a door's row
+    local _, _, board, sight, st = case(8)
+    local _, plan = Planner.plan(B, board, sight, st)
+    local row = plan and plan.releases and plan.releases[1]
+    check(row and row.x .. "," .. row.y .. " " .. row.need, "9,0 1", "calendar thief: the record's row")
+    check(plan and plan.rank and plan.rank.forfeits, 0, "calendar thief: no plan forfeits for it")
 end
 
 -- A looter about to take a chest (sight.closings' third answer names it) is worth killing: the

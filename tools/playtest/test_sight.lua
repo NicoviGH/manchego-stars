@@ -4303,6 +4303,9 @@ do
     -- the joined map
     check(stage ~= nil and stage:find("M%.stageWear%(api, call, S, plan, byId, joined%)") ~= nil,
           true, "stageWear: the staged phase passes the joined map")
+    -- a plan's Trade whose item is not where it names raises (ADR 0483 review): never skipped
+    check(stage ~= nil and stage:find("if not %(slot and %(back or not t%.back%)%) then%s+error%(") ~= nil,
+          true, "stagePhase: a plan's Trade that cannot be staged raises")
     local nextPhase = sightSrc:match("function s%.nextPhase%(plan, reply%).-\n    end\n")
     check(nextPhase ~= nil and nextPhase:find("healFaction%(call, byId, \"green\"%)%s+healFaction%(call, byId, \"blue\"%)%s+local played = reply and armyReply") ~= nil
           and nextPhase:find("armyReply%(call.-healFaction%(call, byId, \"red\"%).-playPhase%(call, proc, byId, berserkFirst, 1,") ~= nil,

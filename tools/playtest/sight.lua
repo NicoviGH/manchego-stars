@@ -4455,14 +4455,17 @@ function M.new(outer)
         end
         -- the plan's Trades (planner's tradesIn: { holder, taker, item, uses, back }): the bags
         -- as they leave them, so a thief steals from the bag a hand-off left (ADR 0483). One
-        -- whose item is no longer where it names (an earlier write moved it) is skipped
+        -- whose item is not where it names is a plan the game cannot play as judged (two Trades
+        -- of one item): it raises, never priced on a bag the game will not have
         for _, t in ipairs(plan.trades or {}) do
             local h, k = byId[t.holder], byId[t.taker]
             local slot = h and k and M.slotOf(mem, Board, h.addr, t.item, t.uses)
             local back = slot and t.back and M.slotOf(mem, Board, k.addr, t.back.id, t.back.uses)
-            if slot and (back or not t.back) then
-                M.tradeItems(api, call, S, Board, h.addr, slot, k.addr, back)
+            if not (slot and (back or not t.back)) then
+                error(("sight.lua: a plan's Trade of item %s from %s to %s cannot be staged")
+                      :format(tostring(t.item), tostring(t.holder), tostring(t.taker)))
             end
+            M.tradeItems(api, call, S, Board, h.addr, slot, k.addr, back)
         end
         -- the ghosts (#713) after our units: a cell the plan stands a player unit on holds none
         placeGhosts(units())
@@ -5090,44 +5093,6 @@ function M.new(outer)
             end)
         end
         return stealsOf[classId]
-    end
-    -- The items of player unit `u` a thief on the field would cost us (ADR 0483): none while no
-    -- red on the field has CA_STEAL (its character's or class's attributes, as s.readsReds reads
-    -- ballistae); else each item the game ranks above the stat boosters (M.stealSpoils, the
-    -- record's line) or that opens a chest (a Chest Key, a Lockpick, a key bundle). -> { { id,
-    -- uses } }, the spoilers first, the hand-offs Bot offers by Trade. Read once per board and unit.
-    function s.atRisk(u)
-        seen.atRisk = seen.atRisk or {}
-        if seen.atRisk[u.id] then return seen.atRisk[u.id] end
-        if seen.thiefOnField == nil then
-            seen.thiefOnField = false
-            for _, o in ipairs(units()) do
-                if o.faction == "red" and o.onField and not o.dead
-                        and (attrsOf(o.addr) & M.CA_STEAL) ~= 0 then
-                    seen.thiefOnField = true
-                end
-            end
-        end
-        local out = {}
-        if seen.thiefOnField and #(u.items or {}) > 0 then
-            -- the spoilers first, then the openers, each in bag order
-            out = sandbox(function(call)
-                local spoil, open = {}, {}
-                for _, it in ipairs(u.items) do
-                    local opener = it.id == M.ITEM_CHESTKEY or it.id == M.ITEM_LOCKPICK
-                        or it.id == M.ITEM_CHESTKEY_BUNDLE
-                    if select(2, M.stealSpoils(call, S, it.id)) then
-                        spoil[#spoil + 1] = { id = it.id, uses = it.uses }
-                    elseif opener then
-                        open[#open + 1] = { id = it.id, uses = it.uses }
-                    end
-                end
-                for _, it in ipairs(open) do spoil[#spoil + 1] = it end
-                return spoil
-            end)
-        end
-        seen.atRisk[u.id] = out
-        return out
     end
     -- Whether the chapter has fog (gPlaySt.chapterVisionRange > 0): botrun's gate for reading
     -- the arrivals (s.arrivalUnits) before any plan's sandbox opens.

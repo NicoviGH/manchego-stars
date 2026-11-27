@@ -101,6 +101,9 @@ local M = {}
 -- timeline.lua, beside this file: what a retry remembers losing, and when (#765)
 local Timeline = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/timeline.lua")
     or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "timeline.lua"))
+-- board.lua: Board.memoryKey, the one name a unit has across attempts
+local Board = dofile(PLAYTEST_DIR and (PLAYTEST_DIR .. "/board.lua")
+    or ((debug.getinfo(1, "S").source:match("^@(.*/)") or "./") .. "board.lua"))
 
 -- What each turn further from a goal leaves of its chance: another enemy phase where something
 -- can go wrong (Claude's starting value, #510 comment 6534885686; tuned on the runs).
@@ -154,8 +157,8 @@ end
 -- closes nothing (this attempt's play kept the tile so far).
 -- Third answer: { ["x,y"] = the unit id of the looter that closes it }, sight's for its own
 -- closings, and for a remembered one the red unit on `board` (default ctx.board) of the
--- closer's character and class (Timeline.deadlines' closers; none when not exactly one stands
--- there). A plan that kills it keeps the tile (planner's chanceOf, ADR 0483).
+-- closer's memory key (Timeline.deadlines' closers; with no key, of its character and class,
+-- and none when not exactly one stands there). A plan that kills it keeps the tile (planner's chanceOf, ADR 0483).
 function M.closings(sight, style, ctx, board)
     board = board or ctx.board
     local out, paths, by = {}, {}, {}
@@ -174,14 +177,24 @@ function M.closings(sight, style, ctx, board)
         local copy, byCopy = {}, {}   -- sight keeps its answers for the board
         for k, v in pairs(out) do copy[k] = v end
         for k, v in pairs(by or {}) do byCopy[k] = v end
-        -- the one red on the board of a remembered closer's character and class, or nil
+        -- the red on the board that is a remembered closer, or nil: the one of its memory key
+        -- (Board.memoryKey over sight.arrivalOf, the key the record named it by), since vanilla
+        -- Ch16's two thieves share a character and class (ADR 0483); with no key to read, the
+        -- one red of that character and class, and none when two stand there
         local function onBoard(c)
             local found
             for _, u in ipairs(c and board and board.units or {}) do
                 if u.faction == "red" and not u.dead and u.charId == c.charId
                         and u.classId == c.classId then
-                    if found then return nil end
-                    found = u.id
+                    if c.key and sight.arrivalOf then
+                        if Board.memoryKey(u.id, u.charId, u.classId, sight.arrivalOf(u)) == c.key then
+                            return u.id
+                        end
+                    elseif found then
+                        return nil
+                    else
+                        found = u.id
+                    end
                 end
             end
             return found

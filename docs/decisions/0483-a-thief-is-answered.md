@@ -21,20 +21,24 @@ same thief.
    chests were already charged in the score (ADR 0442), but the rank puts progress before the
    score, so a march that hands the thief the key outranked the stay that kept it.
 2. **The looter's death keeps its chest.** `sight.closings` now names the looter that takes each
-   tile (its third answer). For a closing a retry remembers, the looter is the board's one red of
-   the remembered closer's character and class (`Timeline.deadlines` `closers`). A goal carries
+   tile (its third answer). For a closing a retry remembers, the looter is the board's red of the
+   remembered closer's memory key (`Timeline.deadlines` `closers`, `Board.memoryKey` over
+   `sight.arrivalOf`). Vanilla Ch16's two thieves share a character and class, so that pair
+   alone named neither (review of PR #790); with no key to read, the one red of that pair. A goal carries
    that looter as `closer`. A plan that kills the closer reads the goal with no closing date
    (planner's `chanceOf`). Before this, the date was read once per board, so a strike on the
    looter saved nothing.
-3. **A hand-off by Trade (#688's items half), offered only by the mend.** When a red with
-   `CA_STEAL` is on the field, `sight.atRisk(u)` lists the items of `u` a theft would cost: a
-   spoiler (`stealSpoils`, the record's line) first, then a chest opener. Where the mend tries a
+3. **A hand-off by Trade (#688's items half), offered only by the mend.** Where the mend tries a
    robbed unit (both the spoiled and the lock-robbed case), it also tries the Trades that move
-   the first of them out: the robbed unit gives it to a teammate, or a teammate takes it
-   (`Bot.handoffsFor`, over `tradeAct`). No board menu offers them. The plan's Trades are staged
+   out each item its judged phase's thefts take (planner's `st.stolen`, the thefts' `item`):
+   the robbed unit gives it to a teammate, or a teammate takes it (`Bot.handoffsFor`, over
+   `tradeAct`). The first version read the items from a list of what a thief on the field could
+   take and handed off its first. That missed a thief the calendar brings in the judged phase,
+   and a holder of two items at risk handed off the wrong one (review of PR #790). No board menu offers them. The plan's Trades are staged
    in the judged phase's bags (`planner.tradesIn` → sight's `stagePhase`, through
    `sight.tradeItems`, which `moveItem` shares). So the thief steals from the bag the Trade
-   leaves, and a hand-off is worth exactly the theft it moves out of reach. A hand-off earns no
+   leaves, and a hand-off is worth exactly the theft it moves out of reach. A plan Trade whose
+   item is not where it names raises: the game could not play that plan as judged. A hand-off earns no
    breach weight.
 4. **Strikers meet a thief the calendar brings.** From attempt 2 on, memory knows a red the game
    brought to a tile on a board turn (`Timeline.calendar`: one entry per unit key, since many

@@ -1045,8 +1045,12 @@ function M.plan(Bot, board, sight, style, opts)
         -- the looter that closes the tile dies in the plan: the tile stays open (ADR 0483;
         -- vanilla Ch16's east thief looted (20,5) while no strike on it was worth anything)
         if g.closer and st.gone[g.closer] then
-            g = copy(g)
-            g.closes = nil
+            -- one open copy per goal, shared by every plan that kills its looter
+            if not g.kept then
+                g.kept = copy(g)
+                g.kept.closes = nil
+            end
+            g = g.kept
         end
         local c = g.kind == "recruit" and (st.carry or {})[g.unitId]
         read = read or turnsOn(st, pos)
@@ -2479,7 +2483,13 @@ function M.plan(Bot, board, sight, style, opts)
         -- thieves' ids, kept as st.thieves for the mend, ADR 0475). A holder robbed of its last
         -- opener in a way past DUST is the mend's too (`locked`, kept as st.lockThieves): the
         -- beam never sees the chests it loses (vanilla Ch16 s4005, R5: Eirika's Chest Key).
-        local robbed, keeps, spoiled, locked = {}, {}, {}, {}
+        -- What either case takes (`stolen`, robbed id -> the item ids, kept as st.stolen) is
+        -- what the mend's hand-off moves out of reach (Bot.handoffsFor)
+        local robbed, keeps, spoiled, locked, stolen = {}, {}, {}, {}, {}
+        local function took(th)
+            stolen[th.target] = stolen[th.target] or {}
+            if th.item then stolen[th.target][th.item] = true end
+        end
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             local robbedHere = {}
@@ -2488,6 +2498,7 @@ function M.plan(Bot, board, sight, style, opts)
                 if th.lock and o.p > M.DUST then
                     locked[th.target] = locked[th.target] or {}
                     locked[th.target][th.thief] = true
+                    took(th)
                 end
                 -- a holder the same way surely kills loses the item with its life: that way's
                 -- death is the plan's cost, not a theft as well
@@ -2495,6 +2506,7 @@ function M.plan(Bot, board, sight, style, opts)
                 if th.spoils and not th.drops and not dies and o.p > M.DUST then
                     spoiled[th.target] = spoiled[th.target] or {}
                     spoiled[th.target][th.thief] = true
+                    took(th)
                 end
             end
             for _, u in ipairs(hitOf[o.way]) do
@@ -2658,7 +2670,7 @@ function M.plan(Bot, board, sight, style, opts)
                 if byId[id] and not winByDeath(st, id) then owed[id] = true end
             end
         end
-        st.thieves, st.lockThieves = spoiled, locked
+        st.thieves, st.lockThieves, st.stolen = spoiled, locked, stolen
         -- each door the plan opens that memory says brings reds, before the strikers its front
         -- needs stand ready (Bot's releasesOf): what that door's units lost before is lost again
         -- (#766: vanilla Ch14's (22,17) door, Rennac and the two chests he loots)
@@ -3083,7 +3095,7 @@ function M.plan(Bot, board, sight, style, opts)
                 local out = {}
                 for _, t in ipairs(menuOf[p.id] or {}) do out[#out + 1] = t end
                 local u = Bot.handoffsFor and byId[p.id]
-                for _, a in ipairs(u and Bot.handoffsFor(ctx, u) or {}) do
+                for _, a in ipairs(u and Bot.handoffsFor(ctx, u, (base.stolen or {})[p.id]) or {}) do
                     annotate(a, byId[a.unitId])
                     out[#out + 1] = { uid = a.unitId, a = a }
                 end

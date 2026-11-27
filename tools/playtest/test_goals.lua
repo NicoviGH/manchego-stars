@@ -651,7 +651,27 @@ do
     check(closer(seen, { blue(1, 0, 0), thief }), 0x90,
           "closer: a remembered closing names the board's red of that character and class")
     check(closer(seen, { blue(1, 0, 0), thief, twin }), nil,
-          "closer: two such reds name none")
+          "closer: two such reds name none, with no arrival to read")
+    -- vanilla Ch16: the west thief stands from the start, its twin (same character and class)
+    -- arrives on turn 11; the memory key tells them apart
+    local function keyed(memory, units, arrivedOn)
+        local sight = fakeSight({ open = open })
+        function sight.closings() return {}, {}, {} end
+        function sight.arrivalOf(u) return arrivedOn[u.id] end
+        local b = { units = units, turn = 8 }
+        local g = find(Goals.list(b, sight, { memory = memory }, { turn = 8, board = b }), "visit:4,4")
+        return g and g.closer
+    end
+    local west = { id = 0x70, charId = 0x64, classId = 13, x = 9, y = 9, faction = "red",
+                   onField = true, items = {} }
+    check(keyed(seen, { blue(1, 0, 0), twin, west }, { [0x91] = 11 }), 0x70,
+          "closer: of two such reds, the one of the closer's memory key")
+    local eastKey = dofile(here .. "board.lua").memoryKey(0x91, 0x64, 13, 11)
+    local east = Fakeline.memory({ arrivals = { { charId = 0x64, classId = 13, x = 9, y = 8,
+                                                  turn = 11 } },
+                                   closings = { { x = 4, y = 4, phase = 12, closerKey = eastKey } } })
+    check(keyed(east, { blue(1, 0, 0), west, twin }, { [0x91] = 11 }), 0x91,
+          "closer: the arrival of the closer's key, not the twin from the start")
     check(closer(seen, { blue(1, 0, 0), thief }, { ["4,4"] = 5 }, { ["4,4"] = 0x91 }), 0x90,
           "closer: the earlier remembered date names its own closer")
     local rb = { units = { blue(1, 0, 0), { id = 0x85, charId = 0x12, x = 5, y = 5, faction = "green",
