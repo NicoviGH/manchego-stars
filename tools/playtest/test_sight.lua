@@ -3929,6 +3929,36 @@ do
     setBag(mark, 0x0114, 0x016B); m.w32(mark + 0x0C, DROP | 1)
     Sight.moveItem(moveApi, gameCall, SY, bound, mark, 1, thief)
     check(m.u32(mark + 0x0C), 1, "moveItem: the last item's slot clears the target's drop flag")
+    m.w32(mark + 0x0C, 0)
+
+    -- an item off the game's steal list (AiGetItemStealRank's -1, signed as the register reads it)
+    -- spoils nothing: no thief is after it (replay l764c handed weapons around)
+    local listed = gameCall
+    local function signed(fn, args)
+        if fn == SY.AiGetItemStealRank and not STEAL_RANK[args[1]] then return -1 end
+        return listed(fn, args)
+    end
+    check(select(2, Sight.stealSpoils(signed, SY, 0x01)), false,
+          "stealSpoils: an item off the steal list spoils nothing")
+    check(select(2, Sight.stealSpoils(signed, SY, 0x6B)), true,
+          "stealSpoils: the Lockpick, above the boosters, spoils")
+
+    -- tradeItems (ADR 0483): a plan's Trade in the judged phase's bags, journaled as a theft's
+    -- move. A hand-off moves one item; with `back`, two full bags swap (both out before either in)
+    setBag(mark, 0x0114, 0x0165); setBag(thief, 0x2814)
+    order = {}
+    Sight.tradeItems(moveApi, gameCall, SY, bound, mark, 1, thief)
+    check(bagOf(mark) .. "/" .. bagOf(thief), "114,0,0,0,0/2814,165,0,0,0",
+          "tradeItems: the item leaves the holder for the taker's first free slot")
+    check(order[1] .. "," .. order[2], string.format("keep %X 5,keep %X 5", mark + IT, thief + IT),
+          "tradeItems: both bags are kept before the game's calls")
+    setBag(mark, 0x0101, 0x0102, 0x0103, 0x0104, 0x0165)
+    setBag(thief, 0x0201, 0x0202, 0x0203, 0x0204, 0x0205)
+    Sight.tradeItems(moveApi, gameCall, SY, bound, mark, 4, thief, 2)
+    check(bagOf(mark) .. "/" .. bagOf(thief), "101,102,103,104,203/201,202,204,205,165",
+          "tradeItems: two full bags swap the item for the one given back")
+    check(Sight.slotOf(m, Board, thief, 0x65, 1), 4, "slotOf: the item's slot by id and uses")
+    check(Sight.slotOf(m, Board, thief, 0x65, 2), nil, "slotOf: other uses are another item")
 
     -- pilfer: the thief stands on the act's tile, the item moves, and `lock` says whether the
     -- target opened a chest before and no longer does (a second opener keeps it)

@@ -355,7 +355,7 @@ end
 -- first board turn for that unit, or nil (botrun's stamps). A death is the play's, never kept.
 -- Every loss the attempts remember, once per memory: { kind = "tile"|"gone", k ("x,y" or a
 -- charId), t (its turn), from (the unit's own appearance when the play brought it: { charId,
--- classId, boardTurn }) }.
+-- classId, boardTurn }), by (a tile's closer, { charId, classId }, when the record names it) }.
 local function losses(memory)
     local out = {}
     for _, tl in ipairs(attempts(memory)) do
@@ -366,8 +366,10 @@ local function losses(memory)
             return { charId = u.charId, classId = u.classId, boardTurn = u.appeared.boardTurn }
         end
         for _, c in ipairs(tl.closings or {}) do
+            local u = byKey[c.closerKey]
             out[#out + 1] = { kind = "tile", k = tileKey(c.x, c.y), t = c.phase,
-                              from = from(byKey[c.closerKey]) }
+                              from = from(u),
+                              by = u and { charId = u.charId, classId = u.classId } or nil }
         end
         for _, u in ipairs(tl.units or {}) do
             if u.gone and u.gone.how == "left" then
@@ -378,8 +380,10 @@ local function losses(memory)
     return out
 end
 
+-- `closers` = { ["x,y"] = { charId, classId } }: who closed each tile at its earliest date, when
+-- the record names it (a retry's planner credits a kill of that unit, Goals.closings).
 function M.deadlines(memory, appeared)
-    local out = { tile = {}, gone = {} }
+    local out, closers = { tile = {}, gone = {} }, {}
     for _, l in ipairs(memo("losses", memory, losses)) do
         local t = l.t
         if l.from then
@@ -387,9 +391,12 @@ function M.deadlines(memory, appeared)
             t = now and now + (t - l.from.boardTurn) or nil
         end
         local into = out[l.kind]
-        if t and (not into[l.k] or t < into[l.k]) then into[l.k] = t end
+        if t and (not into[l.k] or t < into[l.k]) then
+            into[l.k] = t
+            if l.kind == "tile" then closers[l.k] = l.by end
+        end
     end
-    return { tiles = out.tile, gone = out.gone }
+    return { tiles = out.tile, gone = out.gone, closers = closers }
 end
 
 -- Where each unit walked, counted from its appearance (0 = its first board turn), from the latest

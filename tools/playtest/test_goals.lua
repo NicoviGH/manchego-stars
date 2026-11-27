@@ -629,6 +629,31 @@ do
     check(closes(door, nil, function(c, k) return c == 0x80 and k == 63 and 6 or nil end), 2,
           "brought: dated from its appearance this attempt")
     check(closes(door, nil, function() return nil end), nil, "brought: not appeared yet, no date")
+    -- ADR 0483: the goal names the looter that closes it, so a plan that kills it keeps the tile.
+    -- sight's own closing names its looter (closings' third answer); a remembered one names the
+    -- red on the board of the closer's character and class, and none when two such stand there
+    local function closer(memory, units, simulated, by)
+        local sight = fakeSight({ open = open })
+        function sight.closings() return simulated or {}, {}, by or {} end
+        local b = { units = units, turn = 8 }
+        local g = find(Goals.list(b, sight, { memory = memory }, { turn = 8, board = b }), "visit:4,4")
+        return g and g.closer
+    end
+    local thief = { id = 0x90, charId = 0x64, classId = 13, x = 9, y = 9, faction = "red",
+                    onField = true, items = {} }
+    local twin = { id = 0x91, charId = 0x64, classId = 13, x = 9, y = 8, faction = "red",
+                   onField = true, items = {} }
+    check(closer(nil, { blue(1, 0, 0), thief }, { ["4,4"] = 2 }, { ["4,4"] = 0x90 }), 0x90,
+          "closer: sight's closing names its looter")
+    local tKey = dofile(here .. "board.lua").memoryKey(0x70, 0x64, 13, nil)
+    local seen = Fakeline.memory({ enemies = { { id = 0x70, charId = 0x64, classId = 13 } },
+                                   closings = { { x = 4, y = 4, phase = 10, closerKey = tKey } } })
+    check(closer(seen, { blue(1, 0, 0), thief }), 0x90,
+          "closer: a remembered closing names the board's red of that character and class")
+    check(closer(seen, { blue(1, 0, 0), thief, twin }), nil,
+          "closer: two such reds name none")
+    check(closer(seen, { blue(1, 0, 0), thief }, { ["4,4"] = 5 }, { ["4,4"] = 0x91 }), 0x90,
+          "closer: the earlier remembered date names its own closer")
     local rb = { units = { blue(1, 0, 0), { id = 0x85, charId = 0x12, x = 5, y = 5, faction = "green",
                                            onField = true, items = {} } }, turn = 8 }
     local sight = fakeSight({})

@@ -2342,8 +2342,34 @@ do
         return ctx.tradeNeed[u.id] or nil
     end
 
+    -- A hand-off out of a thief's reach (ADR 0483, #688's items half): `u` gives a teammate the
+    -- item a thief on the field would cost us (sight.atRisk's first: a spoiler, else an opener),
+    -- or takes a teammate's, each pair once per teammate within `u`'s move and one. The planner's
+    -- judged phase plays the bags the Trade leaves (planner tradesIn), so a hand-off is worth what
+    -- the theft it moves out of reach costs, and nothing when no thief would take it (vanilla
+    -- Ch16 s4005: Colm, cornered at (19,1) with the Knight Crest, every tile of his robbed)
+    local function handoffs(ctx, u, gate, out)
+        local risk = ctx.sight.atRisk
+        if not risk then return end
+        local mine, reach = risk(u)[1], ctx.sight.mov(u) + 1
+        for _, t in ipairs(ctx.blues or {}) do
+            if t.id ~= u.id and not t.dead and Board.distance(u.x, u.y, t.x, t.y) <= reach then
+                local theirs = risk(t)[1]
+                for _, h in ipairs({ mine and { gives = true, key = mine } or false,
+                                     theirs and { gives = false, key = theirs } or false }) do
+                    local a = h and tradeAct(ctx, u, t, h, h.gives, gate)
+                    if a then
+                        a.handoff = true
+                        out[#out + 1] = a
+                    end
+                end
+            end
+        end
+    end
+
     -- The Trades on the army's key ways (#688): `u` takes the key its own way is fetched by
-    -- (tradeFor), and, holding one, hands it to each teammate whose way is fetched by it.
+    -- (tradeFor), and, holding one, hands it to each teammate whose way is fetched by it. Then
+    -- the hand-offs out of a thief's reach (handoffs).
     trades = function(ctx, u, gate, objective)
         local out = {}
         local h = need(ctx, u, objective)
@@ -2352,6 +2378,7 @@ do
             local n = t.id ~= u.id and not t.dead and need(ctx, t, objective)
             if n and n.holder.id == u.id then out[#out + 1] = tradeAct(ctx, u, t, n, true, gate) end
         end
+        handoffs(ctx, u, gate, out)
         return out
     end
 end

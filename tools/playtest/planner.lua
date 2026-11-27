@@ -613,8 +613,9 @@ local function score(act, st, W, style, odds, likeliest)
     elseif act.act == "trade" then
         -- a teammate's key handed over by Trade (bot.lua trades, #688): the act that opens the
         -- way, as the convoy's Take is. The holder holds that one key: a second Trade of it in
-        -- the plan is no act
-        v = v + W.breach
+        -- the plan is no act. A hand-off out of a thief's reach (act.handoff, ADR 0483) opens
+        -- no way: what it is worth is the theft the judged phase no longer plays
+        if not act.handoff then v = v + W.breach end
         fx.took = "trade:" .. (act.gives and act.unitId or act.targetId) .. ":" .. act.item .. "x" .. act.uses
         fx.blocked = st.took[fx.took] == true
     elseif act.obstacle or act.act == "door" then
@@ -765,7 +766,23 @@ end
 function M.staged(st)
     local ph = st.phase
     return { blues = ph.blues, waits = ph.waits, gone = ph.gone, reds = ph.reds, redWear = ph.redWear,
-             joined = ph.joined, opened = ph.opened, carry = ph.carry }
+             joined = ph.joined, opened = ph.opened, carry = ph.carry, trades = ph.trades }
+end
+
+-- The items a plan's Trades move, for the sandbox's bags (sight's stagePhase, ADR 0483): each
+-- Trade act as { holder, taker, item, uses, back } (bot.lua tradeAct: the actor takes from its
+-- target, or gives to it with `gives`). Pure.
+function M.tradesIn(acts)
+    local out = {}
+    for _, a in ipairs(acts) do
+        if a.act == "trade" then
+            local holder, taker = a.targetId, a.unitId
+            if a.gives then holder, taker = a.unitId, a.targetId end
+            out[#out + 1] = { holder = holder, taker = taker, item = a.item, uses = a.uses,
+                              back = a.back }
+        end
+    end
+    return out
 end
 
 -- The chance either of two independent events happens: 1 - (1 - a)(1 - b). The one fold of
@@ -1025,6 +1042,12 @@ function M.plan(Bot, board, sight, style, opts)
     -- down (TalkCommandUsability lists units on the map), so its goal is at its carrier's tile
     -- and a turn later (GAMMA) while carried; at the drop tile once dropped
     local function chanceOf(st, g, pos, read)
+        -- the looter that closes the tile dies in the plan: the tile stays open (ADR 0483;
+        -- vanilla Ch16's east thief looted (20,5) while no strike on it was worth anything)
+        if g.closer and st.gone[g.closer] then
+            g = copy(g)
+            g.closes = nil
+        end
         local c = g.kind == "recruit" and (st.carry or {})[g.unitId]
         read = read or turnsOn(st, pos)
         if not c then return Goals.chance(g, pos, Goals.GAMMA, read) end
@@ -1124,6 +1147,10 @@ function M.plan(Bot, board, sight, style, opts)
     -- it was sent to, else its way to the objective, and its turns there now. Progress is what a
     -- plan cuts from those turns, the game's own (sight.turnsTo, or through a door or wall)
     local assigned, goalOf = {}, {}
+    local chestAt = {}   -- "x,y" of every chest goal: a march there needs an opener (below)
+    for _, g in ipairs(goals) do
+        if g.kind == "chest" and g.tile then chestAt[g.tile.x .. "," .. g.tile.y] = true end
+    end
     for _, u in ipairs(ctx.blues) do
         local tile = (ctx.exploreGoal or {})[u.id] or (ctx.objectiveTile and ctx.objectiveTile(u))
         -- the tile's kind (a Talk assignment, Bot.candidates' exploring) says whether every read
@@ -1131,19 +1158,25 @@ function M.plan(Bot, board, sight, style, opts)
         local beside = tile and ctx.beside and ctx.beside(tile) or false
         local t = tile and turnsTo(u, tile, nil, beside)
         if t then
-            assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside }
+            assigned[#assigned + 1] = { u = u, tile = tile, turns = t, beside = beside,
+                                        chest = chestAt[tile.x .. "," .. tile.y] }
             goalOf[u.id] = assigned[#assigned]
         end
     end
     -- Not nearOn: progress sums what each unit cuts from its OWN assigned way (a unit's march
     -- counts though another is nearer the same goal), nearOn takes each goal's least over its
-    -- takers. The rank scores the first, the idle rule's new low reads the second (#698)
+    -- takers. The rank scores the first, the idle rule's new low reads the second (#698).
+    -- A march to a chest counts in the ways the phase leaves its unit an opener (st.opens: the
+    -- chance it lives and keeps one, set for a unit a thief robs of its last; ADR 0483): ranked
+    -- before the score, a march that hands the thief the key outranked the stay that kept it
+    -- (vanilla Ch16 s4005, replay l764a, turn 12: Eirika's stay was a turn behind)
     local function progress(st)
         local pos, out = positions(st), 0
         local read = turnsOn(st, pos)
         for _, a in ipairs(assigned) do
             local t = read(a.u, a.tile, pos[a.u.id], a.beside)
-            if t then out = out + (a.turns - t) end
+            local keep = a.chest and st.opens and st.opens[a.u.id] or 1
+            if t then out = out + (a.turns - t) * keep end
         end
         return out
     end
@@ -1393,6 +1426,9 @@ function M.plan(Bot, board, sight, style, opts)
                         -- act it frees the tile for (Bot.candidates' aside), which its own score
                         -- never sees either
                         or x.a.act == "rescue" or x.a.act == "drop" or x.a.why == "aside"
+                        -- a hand-off's worth is the theft the judged phase no longer plays
+                        -- (ADR 0483), which its own score never sees either
+                        or x.a.handoff
                         or (opens and opens[e.x .. "," .. e.y]) then
                     menu[#menu + 1] = x.a
                 end
@@ -2246,9 +2282,10 @@ function M.plan(Bot, board, sight, style, opts)
         -- phase stands each as a blue unit (sight's plan.joined), where the reds may strike it,
         -- so its death is read as a player unit's (`ours` below), never left out with the gone
         local joined = talkedIn(st.acts)
+        local trades = M.tradesIn(st.acts)
         st.phase = { blues = blues0, waits = M.waitsIn(planned, {}, blues0), gone = gone, reds = reds,
                      redWear = st.redWear, joined = joined,
-                     opened = st.opened, carry = st.carry }
+                     opened = st.opened, carry = st.carry, trades = trades }
         local ways = { { p = 1, gone = gone, reds = reds, hp = {}, dead = {} } }
         st.branched, st.floored = 0, 0
         for _, d in ipairs(dims) do
@@ -2322,7 +2359,8 @@ function M.plan(Bot, board, sight, style, opts)
             local s = phase and phase({ blues = blues, waits = M.waitsIn(planned, w.dead, blues), gone = w.gone,
                                         reds = w.reds, joined = joined,
                                         redWear = st.redWear, mass = w.p,
-                                        opened = st.opened, carry = st.carry }) or {}
+                                        opened = st.opened, carry = st.carry,
+                                        trades = trades }) or {}
             unsplit = unsplit + (s.unsplit or 0)
             unjoined = math.max(unjoined, s.unjoined or 0)
             cost.area_positional = cost.area_positional + (s.areaPositional or 0)
@@ -2441,13 +2479,19 @@ function M.plan(Bot, board, sight, style, opts)
         -- A theft of an item the game ranks above the stat boosters (th.spoils) by a thief that
         -- keeps it (not th.drops: its death gives it back, and clean is the end state) costs the
         -- clean clear whatever else it takes: a forfeit of its own (`spoiled`, robbed id -> its
-        -- thieves' ids, kept as st.thieves for the mend, ADR 0475).
-        local robbed, keeps, spoiled = {}, {}, {}
+        -- thieves' ids, kept as st.thieves for the mend, ADR 0475). A holder robbed of its last
+        -- opener in a way past DUST is the mend's too (`locked`, kept as st.lockThieves): the
+        -- beam never sees the chests it loses (vanilla Ch16 s4005, R5: Eirika's Chest Key).
+        local robbed, keeps, spoiled, locked = {}, {}, {}, {}
         for _, o in ipairs(outcomes) do
             local res, none = struckIn(o.strikes, hitOf[o.way])   -- none: no game-over unit dies
             local robbedHere = {}
             for _, th in ipairs(o.strikes.thefts or {}) do
                 if th.lock then robbedHere[th.target], robbed[th.target] = true, true end
+                if th.lock and o.p > M.DUST then
+                    locked[th.target] = locked[th.target] or {}
+                    locked[th.target][th.thief] = true
+                end
                 -- a holder the same way surely kills loses the item with its life: that way's
                 -- death is the plan's cost, not a theft as well
                 local dies = res[th.target] and res[th.target].d >= 1 - M.DUST
@@ -2617,7 +2661,7 @@ function M.plan(Bot, board, sight, style, opts)
                 if byId[id] and not winByDeath(st, id) then owed[id] = true end
             end
         end
-        st.thieves = spoiled
+        st.thieves, st.lockThieves = spoiled, locked
         -- each door the plan opens that memory says brings reds, before the strikers its front
         -- needs stand ready (Bot's releasesOf): what that door's units lost before is lost again
         -- (#766: vanilla Ch14's (22,17) door, Rennac and the two chests he loots)
@@ -2982,11 +3026,12 @@ function M.plan(Bot, board, sight, style, opts)
     -- took the plan under the cap with the robbed unit left beside its thief is not the last
     -- (vanilla Ch16, replay i730g: Eirika's mend took the plan under the cap with Colm still
     -- robbed, and his own mend, tried from the over-cap base, stayed over it)
+    -- (or robs a holder of its last chest opener, st.lockThieves: the same mend, ADR 0483)
     local function robbed(st)
         for _, f in ipairs(st.forfeited or {}) do
             if f:match("^stolen:") then return true end
         end
-        return false
+        return next(st.lockThieves or {}) ~= nil
     end
     -- (a robbed plan whose round changed nothing still stops: `best == base` below)
     for round = 1, M.MEND_ROUNDS do
@@ -3077,6 +3122,12 @@ function M.plan(Bot, board, sight, style, opts)
                 risky[#risky + 1] = { id = id, die = math.huge,
                                       thieves = (base.thieves or {})[id] or {} }
             end
+        end
+        -- a holder a thief robs of its last chest opener the same way, after the spoiled ones
+        -- and before any death (its chests are lost in the ways it is robbed in, ADR 0483); a
+        -- unit both spoiled and locked is tried once (`tried` below)
+        for _, id in ipairs(sortedKeys(base.lockThieves or {})) do
+            risky[#risky + 1] = { id = id, die = 2, thieves = base.lockThieves[id] }
         end
         -- a player unit whose counter may end the chapter (the boss striking it and dying)
         -- tries its other acts too: the beam cannot see that counter, so every plan it kept

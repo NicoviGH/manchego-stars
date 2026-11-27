@@ -334,6 +334,7 @@ function M.riding(state) return ((state or 0) & M.US_IN_BALLISTA) ~= 0 end
 M.AI_SCR_SIZE, M.AI_CMD_PILLAGE, M.AI_CMD_GOTO, M.AI_SCR_MAX = 0x10, 0x10, 0x03, 32
 -- include/constants/items.h; include/bmunit.h CA_STEAL, CA_BALLISTAE
 M.ITEM_CHESTKEY, M.ITEM_LOCKPICK, M.CA_STEAL, M.CA_BALLISTAE = 0x69, 0x6B, 0x04, 1 << 7
+M.ITEM_CHESTKEY_BUNDLE = 0x79   -- include/constants/items.h
 M.ITEM_GOLD = 0x77   -- include/constants/items.h: a chest of gold puts nothing in the bag
 -- The staves the game heals one ally with: bmitemuse.c DoItemUse sends Heal, Mend and Recover
 -- (0x4B-0x4D) and Physic (0x4E) to DoUseHealStaff, gSelectInfo_Heal's target selection, the one
@@ -2873,11 +2874,33 @@ function M.moveItem(api, call, S, Board, from, slot, to)
     if state & Board.US_DROP_ITEM ~= 0 and slot == count - 1 then
         api.write32(from + UNIT_STATE, state & ~Board.US_DROP_ITEM)
     end
+    M.tradeItems(api, call, S, Board, from, slot, to)
+    return raw & 0xFF
+end
+-- Inside a sandbox: the bags of units `from` and `to` (struct addresses) as the game's Trade
+-- leaves them, journaled as M.moveItem's: `from`'s item in `slot` (0-based) goes to `to`, and
+-- `back` (`to`'s slot, optional) comes to `from` in the same exchange, both taken out before
+-- either goes in, so two full bags swap. UnitRemoveItem packs a bag, UnitAddItem fills its first
+-- free slot, as the Trade screen's own result does (an order the screen lets a player choose is
+-- not kept: no rule we read depends on it). A theft's move (moveItem) is the same with no back.
+function M.tradeItems(api, call, S, Board, from, slot, to, back)
+    local mem = api.mem
+    local raw = mem.u16(from + Board.UNIT_ITEMS + slot * 2)
+    local rawBack = back and mem.u16(to + Board.UNIT_ITEMS + back * 2)
     api.keep16(from + Board.UNIT_ITEMS, Board.ITEM_COUNT)
     api.keep16(to + Board.UNIT_ITEMS, Board.ITEM_COUNT)
     call(S.UnitRemoveItem, { from, slot })
+    if rawBack then call(S.UnitRemoveItem, { to, back }) end
     call(S.UnitAddItem, { to, raw })
-    return raw & 0xFF
+    if rawBack then call(S.UnitAddItem, { from, rawBack }) end
+end
+-- The 0-based slot of the item `id` with `uses` in the bag of the unit struct at `addr`, or nil.
+function M.slotOf(mem, Board, addr, id, uses)
+    for i = 0, Board.ITEM_COUNT - 1 do
+        local raw = mem.u16(addr + Board.UNIT_ITEMS + i * 2)
+        if raw ~= 0 and (raw & 0xFF) == id and (raw >> 8) == uses then return i end
+    end
+    return nil
 end
 -- A theft played on the board, inside an open sandbox: the thief `e` stood on the act's tile
 -- (`standOn`), the item moved from the target's bag to its own (a theft never misses), so a later
@@ -4426,6 +4449,17 @@ function M.new(outer)
             standOn(b.unit, b.x, b.y)
             api.write8(b.unit.addr + UNIT_HP, b.hp)
         end
+        -- the plan's Trades (planner's tradesIn: { holder, taker, item, uses, back }): the bags
+        -- as they leave them, so a thief steals from the bag a hand-off left (ADR 0483). One
+        -- whose item is no longer where it names (an earlier write moved it) is skipped
+        for _, t in ipairs(plan.trades or {}) do
+            local h, k = byId[t.holder], byId[t.taker]
+            local slot = h and k and M.slotOf(mem, Board, h.addr, t.item, t.uses)
+            local back = slot and t.back and M.slotOf(mem, Board, k.addr, t.back.id, t.back.uses)
+            if slot and (back or not t.back) then
+                M.tradeItems(api, call, S, Board, h.addr, slot, k.addr, back)
+            end
+        end
         -- the ghosts (#713) after our units: a cell the plan stands a player unit on holds none
         placeGhosts(units())
         -- each recruit the plan Talks over (plan.joined, a subset of plan.gone) is blue from
@@ -4873,6 +4907,9 @@ function M.new(outer)
     -- Goals.closings folds it in (#724). All are estimates, as the chest closings are: a
     -- recruit's moves and its escape phase are the ones he makes with our units hidden (or, for
     -- the second look, where they stand now); the planner uses them as the deadline it is.
+    -- The third answer is { ["x,y"] = the field looter's unit id } for each tile a looter on the
+    -- field takes (a wave's tile has none): a plan that kills it keeps the tile (planner's
+    -- chanceOf, ADR 0483).
     -- closings() by what it reads: the turn, k, the waves, each looter or watched unit, and
     -- each player unit, as they stand (one an act kills, moves or hurts is a new read). newPhase()
     -- runs before every decision.
@@ -4894,16 +4931,17 @@ function M.new(outer)
             end
         end
         local ck = M.closingsKey(turn0, k, waves, looters, open, blockers, s.mapKey(), watch)
-        if closingsAt[ck] then return closingsAt[ck].out, closingsAt[ck].paths end
+        if closingsAt[ck] then return closingsAt[ck].out, closingsAt[ck].paths, closingsAt[ck].by end
         -- a Rogue's chest fills his bag (M.playPick): each chest's item read now, in its own
         -- sandbox, so the replay's reads are the memo's and never borrow the AI's scratch
         for _, c in ipairs(commands) do
             if c.cmd == M.TILE_COMMAND_CHEST then s.chestItem(c.x, c.y) end
         end
-        local out, paths = {}, {}
-        local function close(x, y, phase)
+        local out, paths, by = {}, {}, {}
+        -- `id`: the field's looter that takes the tile (by[key]); a wave's has none
+        local function close(x, y, phase, id)
             local key = x .. "," .. y
-            if open[key] and (not out[key] or phase < out[key]) then out[key] = phase end
+            if open[key] and (not out[key] or phase < out[key]) then out[key], by[key] = phase, id end
         end
         sandbox(function(call, proc)
             local byId = {}
@@ -4912,7 +4950,7 @@ function M.new(outer)
             -- The enemy phases played, from the board as the sandbox it runs in found it: the units
             -- of `who` decide in the game's own order, `at` = each watched one's latest tile (a
             -- path of it is written to `into`), an escape is gone (`gone`, and out["unit:<id>"]),
-            -- `onPillage(x, y, phase)` is asked of a looter's pillage, and `tileOnly` skips the
+            -- `onPillage(x, y, phase, id)` is asked of a looter's pillage, and `tileOnly` skips the
             -- battle simulation a decision to attack would run (only the tile it moves to is read).
             local function replay(who, at, into, gone, onPillage, tileOnly)
                 for phase = 1, next(who) and k or 0 do
@@ -4929,7 +4967,7 @@ function M.new(outer)
                                     out["unit:" .. id] = out["unit:" .. id] or phase
                                     who[id], gone[id] = nil, true
                                 elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE and onPillage then
-                                    onPillage(x, y, phase)
+                                    onPillage(x, y, phase, id)
                                 else
                                     -- a Rogue's door or chest opens (both looks: a shut door
                                     -- held Rennac still); a chest it takes closes in the first
@@ -4938,7 +4976,7 @@ function M.new(outer)
                                     -- did not list is no full chest, so puts nothing in)
                                     local px, py, chest = M.playPick(api, call, S, Board, e,
                                         function(cx, cy) return s.chestItem(cx, cy, true) end)
-                                    if chest and onPillage then close(px, py, phase) end
+                                    if chest and onPillage then close(px, py, phase, id) end
                                 end
                             end
                         end
@@ -4967,8 +5005,8 @@ function M.new(outer)
                 for _, o in ipairs(all) do
                     if o.faction ~= "red" and o.onField then M.hideUnit(api, o) end
                 end
-                replay(looter, at, paths, gone, function(x, y, phase)
-                    close(x, y, phase)
+                replay(looter, at, paths, gone, function(x, y, phase, id)
+                    close(x, y, phase, id)
                     -- the tile is taken: AiPillageAction opens a chest (it empties) or runs the
                     -- village's tile change, which the replay does not play; a terrain off the AI's
                     -- loot lists (cp_utility.c gTerrainList_Lootable*) keeps it from being chosen
@@ -5021,8 +5059,8 @@ function M.new(outer)
                 end)
             end)
         end)
-        closingsAt[ck] = { out = out, paths = paths }
-        return out, paths
+        closingsAt[ck] = { out = out, paths = paths, by = by }
+        return out, paths, by
     end
 
     function s.terrain(x, y) return grid(mem, S.gBmMapTerrain, x, y) end
@@ -5033,6 +5071,46 @@ function M.new(outer)
             seen.redCount = sandbox(function(call) return call(S.CountRedUnits, {}) end)
         end
         return seen.redCount
+    end
+    -- The items of player unit `u` a thief on the field would cost us (ADR 0483): none while no
+    -- red on the field has CA_STEAL (its character's or class's attributes, as s.readsReds reads
+    -- ballistae); else each item the game ranks above the stat boosters (M.stealSpoils, the
+    -- record's line) or that opens a chest (a Chest Key, a Lockpick, a key bundle). -> { { id,
+    -- uses } }, the spoilers first, the hand-offs Bot offers by Trade. Read once per board and unit.
+    function s.atRisk(u)
+        seen.atRisk = seen.atRisk or {}
+        if seen.atRisk[u.id] then return seen.atRisk[u.id] end
+        if seen.thiefOnField == nil then
+            seen.thiefOnField = false
+            for _, o in ipairs(units()) do
+                local chptr, clptr = mem.u32(o.addr), mem.u32(o.addr + UNIT_CLASS)
+                local attrs = chptr ~= 0 and clptr ~= 0
+                    and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
+                if o.faction == "red" and o.onField and not o.dead and (attrs & M.CA_STEAL) ~= 0 then
+                    seen.thiefOnField = true
+                end
+            end
+        end
+        local out = {}
+        if seen.thiefOnField and #(u.items or {}) > 0 then
+            -- the spoilers first, then the openers, each in bag order
+            out = sandbox(function(call)
+                local spoil, open = {}, {}
+                for _, it in ipairs(u.items) do
+                    local opener = it.id == M.ITEM_CHESTKEY or it.id == M.ITEM_LOCKPICK
+                        or it.id == M.ITEM_CHESTKEY_BUNDLE
+                    if select(2, M.stealSpoils(call, S, it.id)) then
+                        spoil[#spoil + 1] = { id = it.id, uses = it.uses }
+                    elseif opener then
+                        open[#open + 1] = { id = it.id, uses = it.uses }
+                    end
+                end
+                for _, it in ipairs(open) do spoil[#spoil + 1] = it end
+                return spoil
+            end)
+        end
+        seen.atRisk[u.id] = out
+        return out
     end
     -- Whether the chapter has fog (gPlaySt.chapterVisionRange > 0): botrun's gate for reading
     -- the arrivals (s.arrivalUnits) before any plan's sandbox opens.
@@ -5857,8 +5935,13 @@ end
 -- Inside a sandbox: `item`'s AiGetItemStealRank and whether the game's own list ranks it above
 -- ITEM_BOOSTER_SKL, so its theft spoils a clean clear (ADR 0379). The one reading of that line:
 -- the record's (stealRanks) and the forecast's (pilfer, which the planner forfeits on).
+-- An item off the list (AiGetItemStealRank's -1; gAiStealPriorityItemList holds no weapon) is
+-- one no thief is after, so it spoils nothing. The register reads -1 signed: compared as it came,
+-- every weapon read as ranked above the boosters (replay l764c handed weapons around, ADR 0483).
+-- Its unsigned word is read the same way.
 function M.stealSpoils(call, S, item)
     local rank = call(S.AiGetItemStealRank, { item })
+    if rank < 0 or rank >= 0x80000000 then return -1, false end
     return rank, rank < call(S.AiGetItemStealRank, { M.ITEM_BOOSTER_SKL })
 end
 

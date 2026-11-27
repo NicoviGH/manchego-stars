@@ -553,6 +553,8 @@ local function sightOf(o)
         end
         return out
     end
+    -- the items a thief on the field would cost us, per unit (sight.atRisk, ADR 0483)
+    if o.atRisk then s.atRisk = function(u) return o.atRisk[u.id] or {} end end
     -- the convoy's door key for each unit (sight.convoyKey): { id, uses }
     -- (a chest's, when the lock is asked for: o.convoyChestKey, #699; o.chestOpeners hold one)
     if o.convoyKey or o.convoyChestKey then
@@ -591,7 +593,7 @@ local function sightOf(o)
     -- always has the read where it has villages and chests (none: no looter)
     -- and o.paths, where each watched recruit stands after each enemy phase (its second answer)
     if o.closings or o.explorable then
-        s.closings = function() return o.closings or {}, o.paths end
+        s.closings = function() return o.closings or {}, o.paths, o.closers end
     end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then
@@ -6166,6 +6168,41 @@ do
     Planner.BEAM, Planner.FINAL = beam, final
     check(narrow ~= "0,1" and #(narrowPlan and narrowPlan.forfeited or { 1 }) == 0, true,
           "theft: the mend moves the robbed unit off the thief's tile when the beam kept only its stay")
+    -- ... and so it does for a theft of the holder's last chest opener, which forfeits nothing
+    -- but the chests it would open (vanilla Ch16 s4005, R5 tries 1-3, turn 12: every plan judged
+    -- marched Eirika into the east thief's reach, it stole her Chest Key, and all three (20,y)
+    -- chests read 0 after the phase; she was out of its reach where she stood)
+    Planner.BEAM, Planner.FINAL = 1, 1
+    local keyed = stands(0x69, true)
+    Planner.BEAM, Planner.FINAL = beam, final
+    check(keyed == "0,0" or keyed == "1,0", true,
+          "theft: the mend moves a key holder off the thief's tile when the beam kept only its stay")
+    -- ... and a march to a chest counts only in the ways the holder keeps an opener: the chest
+    -- is at (6,0), out of this turn's reach, and A's most forward tile (2,0) is the one the thief
+    -- robs it on. The march there is progress the rank puts before the score, so it outranked
+    -- the stay that kept the key (vanilla Ch16 s4005, replay l764a, turn 12: Eirika's stay was
+    -- judged by the mend and ranked a turn behind)
+    local function marches(lock)
+        local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+                    explorable = { { x = 6, y = 0, kind = "chest" } },
+                    canExplore = { [0x01] = { ["6,0"] = "chest" } },
+                    field = fieldsOf({ ["6,0"] = { ["0,0"] = 6, ["1,0"] = 5, ["2,0"] = 4,
+                                                   ["3,0"] = 3, ["4,0"] = 2, ["5,0"] = 1,
+                                                   ["6,0"] = 0 } }),
+                    enemyPhase = function(plan)
+                        for _, b in ipairs(plan.blues) do
+                            if b.x == 2 and b.y == 0 and lock ~= nil then
+                                return { thefts = { { thief = 0x81, target = b.unit.id,
+                                                      item = 0x69, lock = lock } } }
+                            end
+                        end
+                        return {}
+                    end }
+        return at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500)))
+    end
+    check(marches(nil), "2,0", "theft: with no thief, A marches to its most forward tile")
+    check(marches(false), "2,0", "theft: a theft that opens nothing leaves A's march alone")
+    check(marches(true), "1,0", "theft: a key holder's march stops short of the thief's tile")
 
     -- a way that surely kills the holder loses the item with its life: that way's death is the
     -- cost, not "stolen:1" on top of it (the plan that leaves A on the thief's tile)
@@ -6259,6 +6296,77 @@ do
     Planner.BEAM, Planner.FINAL = beam, final
     check(plan and #(plan.forfeited or { 1 }) == 0 and a and a.act == "attack" and a.targetId == 0x81,
           true, "theft: a cornered holder's thief is struck down by another unit, through the mend")
+end
+
+-- A holder with no tile out of the thief's reach hands its spoiling item to a teammate by Trade
+-- (ADR 0483, #688's items half; vanilla Ch16 s4005: Colm cornered at (19,1) with the Knight
+-- Crest, every tile of his robbed). H holds 0x6D on (5,5), its only tile; T stands beside it.
+-- The judged phase steals from whoever holds the item, and a Trade the plan makes moves it
+-- (plan.trades), so the hand-off forfeits nothing. With no item at risk no hand-off is offered.
+do
+    local H = blue(0x02, 1, 5, 5, { minRange = false, items = { { id = 0x6D, uses = 1 } } })
+    local T = blue(0x03, 2, 5, 7, { minRange = false, items = {} })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local function plan(atRisk)
+        local o = {
+            reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
+            atRisk = atRisk,
+            enemyPhase = function(p)
+                local holder = 0x02
+                for _, t in ipairs(p.trades or {}) do
+                    if t.holder == 0x02 and t.item == 0x6D then holder = t.taker end
+                end
+                if holder ~= 0x02 then return {} end
+                return { thefts = { { thief = 0x81, target = 0x02, item = 0x6D, lock = false,
+                                      spoils = true } } }
+            end,
+        }
+        return Planner.plan(B, boardOf(H, T, X), sightOf(o), gifted("careful", 500))
+    end
+    local _, robbed = plan(nil)
+    check(robbed and robbed.forfeited and robbed.forfeited[1], "stolen:2",
+          "hand-off: with no item at risk named, the cornered holder is robbed")
+    local _, saved = plan({ [0x02] = { { id = 0x6D, uses = 1 } } })
+    local traded
+    for _, a in ipairs(saved and saved.considered and saved.considered[1] and saved.considered[1].acts or {}) do
+        if a:match(">trade@") then traded = a end
+    end
+    check(saved and #(saved.forfeited or { 1 }) == 0 and traded ~= nil, true,
+          "hand-off: the holder hands the item to the teammate beside it and forfeits nothing")
+    check(Planner.tradesIn({ { act = "trade", unitId = 2, targetId = 3, gives = true, item = 0x6D,
+                               uses = 1 },
+                             { act = "trade", unitId = 3, targetId = 2, item = 0x69, uses = 1,
+                               back = { id = 1, uses = 30 } },
+                             { act = "wait", unitId = 4 } })[2].holder, 2,
+          "tradesIn: a take's holder is its target")
+end
+
+-- A looter about to take a chest (sight.closings' third answer names it) is worth killing: the
+-- plan that kills it keeps the chest open (ADR 0483; vanilla Ch16 s4005, replay l764b: the east
+-- thief looted (20,5) on turn 14 while every strike on it read as worth nothing). D can kill the
+-- looter X (20 HP) from (0,0) or the bigger Y (40 HP) from (0,4); the chest at (0,9) closes after
+-- this enemy phase, by X. Named as X's closing, D kills X; with no looter named, the bigger kill.
+do
+    local D = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local X = red(0x81, 1, 0, { hp = 20, minRange = false })
+    local Y = red(0x82, 1, 4, { hp = 40, minRange = false })
+    local function target(closers)
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 0, 3 }, { 0, 4 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } },
+                              [0x82] = { ["0,4"] = fc { hit = 100, dmg = 50, hits = 1, killsTarget = true } } } },
+            explorable = { { x = 0, y = 9, kind = "chest" } },
+            canExplore = { [0x01] = { ["0,9"] = "chest" } },
+            closings = { ["0,9"] = 1 }, closers = closers,
+        }
+        local beam, final = Planner.BEAM, Planner.FINAL
+        Planner.BEAM, Planner.FINAL = 1, 1
+        local a = Planner.plan(B, boardOf(D, X, Y), sightOf(o), gifted("careful", 5000))
+        Planner.BEAM, Planner.FINAL = beam, final
+        return a and a.act == "attack" and a.targetId
+    end
+    check(target(nil), 0x82, "looter: with no looter named, D takes the bigger kill")
+    check(target({ ["0,9"] = 0x81 }), 0x81, "looter: D kills the looter that would take the chest")
 end
 
 -- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with
@@ -11395,7 +11503,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,joined,opened,redWear,reds,waits",
+    check(table.concat(keys, ","), "blues,carry,gone,joined,opened,redWear,reds,trades,waits",
           "lookahead: the staged board, nothing more")
 end
 
