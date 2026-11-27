@@ -420,12 +420,14 @@ class Workers(unittest.TestCase):
         self.assertEqual(mine[0]['instrument'], 'i+v2')
 
     def test_bot_commit_is_heads_sha_and_dirty_when_a_bot_file_differs(self):
-        # #764: a hash cannot be traced to a commit; the record also names HEAD
+        # #764: a hash cannot be traced to a commit; the record also names HEAD, and a dirty
+        # tree names the bot files that differ (a dirty run's code is in no commit)
         with tempfile.TemporaryDirectory() as root:
             def git(*a):
                 return subprocess.run(['git', '-C', root, '-c', 'user.name=t', '-c',
                                        'user.email=t@t'] + list(a), check=True,
                                       capture_output=True, text=True).stdout.strip()
+            self.assertEqual(mc.bot_commit(root, root), 'unknown')   # not a repo yet
             git('init', '-q')
             for name in ('bot.lua', 'harness.lua', 'run.sh', 'gen_symbols.py', 'test_bot.lua'):
                 with open(os.path.join(root, name), 'w') as fh:
@@ -439,16 +441,23 @@ class Workers(unittest.TestCase):
             self.assertEqual(mc.bot_commit(root, root), head)
             with open(os.path.join(root, 'bot.lua'), 'w') as fh:
                 fh.write('changed\n')
-            self.assertEqual(mc.bot_commit(root, root), head + '+dirty')
+            self.assertEqual(mc.bot_commit(root, root), head + '+dirty:bot.lua')
+            with open(os.path.join(root, 'jobs.lua'), 'w') as fh:
+                fh.write('new, not committed\n')
+            self.assertEqual(mc.bot_commit(root, root), head + '+dirty:bot.lua,jobs.lua')
 
     def test_every_record_a_worker_leaves_names_the_bot_commit(self):
-        with mock.patch.object(mc, 'bot_commit', return_value='abc123def456'):
-            recs = mc.records_of({}, 'BOTRUN {"outcome": "won"}\nCAMPAIGN {"outcome": "played"}',
+        # the commit the task launched on (launch's setdefault), never one read after the game
+        with mock.patch.object(mc, 'bot_commit', return_value='later0000000'):
+            task = {'bot_commit': 'abc123def456'}
+            recs = mc.records_of(task, 'BOTRUN {"outcome": "won"}\nCAMPAIGN {"outcome": "played"}',
                                  '/tmp/w', '/nonexistent.log')
-            none = mc.records_of({}, '', '/tmp/w', '/nonexistent.log')
+            none = mc.records_of(task, '', '/tmp/w', '/nonexistent.log')
         self.assertEqual([r['bot_commit'] for r in recs + none], ['abc123def456'] * 3)
-        # an older record has none and still reads
-        self.assertIsNone({'outcome': 'won'}.get('bot_commit'))
+        # resume's end line names it, and a record from before #764 still reads
+        rec = {'campaign': 'c', 'resumed_from': 'b', 'outcome': 'won', 'why': 'w'}
+        self.assertTrue(mc.end_line(dict(rec, bot_commit='abc123def456')).endswith('[bot abc123def456]'))
+        self.assertTrue(mc.end_line(rec).endswith('[bot unrecorded]'))
 
     def test_a_campaign_run_sh_cut_short_ends_crashed_in_its_words(self):
         # #665: run.sh's wall net cut 19 of 20 laps mid-chapter; campaign.lua never wrote its
@@ -3254,12 +3263,12 @@ class Replay(unittest.TestCase):
         d = tempfile.mkdtemp()
         self.addCleanup(shutil.rmtree, d)
         with mock.patch.object(mc.subprocess, 'run', run):
-            mc.launch({'seed': 1, 'instrument': 'i', 'diag': {'ref': 3}}, 'tag',
+            mc.launch({'seed': 1, 'instrument': 'i', 'bot_commit': 'b', 'diag': {'ref': 3}}, 'tag',
                       os.path.join(d, 'log'))
         self.assertEqual(json.loads(seen['PT_DIAG']), {'ref': 3})
         seen.clear()
         with mock.patch.object(mc.subprocess, 'run', run):
-            mc.launch({'seed': 1, 'instrument': 'i', 'bench': [2]}, 'tag',
+            mc.launch({'seed': 1, 'instrument': 'i', 'bot_commit': 'b', 'bench': [2]}, 'tag',
                       os.path.join(d, 'log'))
         self.assertEqual(json.loads(seen['PT_BENCH']), [2])
 

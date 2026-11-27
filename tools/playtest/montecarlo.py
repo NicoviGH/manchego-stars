@@ -375,6 +375,8 @@ def launch(task, tag, log_path):
     if task.get('mode'):
         env['PT_DIFFICULTY'] = task['mode']
     env['PT_INSTRUMENT'] = task_instrument(task)
+    if 'bot_commit' not in task:   # the code this game starts on (#764)
+        task['bot_commit'] = bot_commit()
     if task.get('diag'):   # a diagnostic replay (`replay`): harness.lua prints DIAG lines only
         env['PT_DIAG'] = json.dumps(task['diag'])
     if task.get('pinned'):   # a snapshot's check (`suite`): one PINNED line, nothing played
@@ -479,7 +481,7 @@ def records_of(task, text, where, log_path):
         recs.append(end)
     attempt = (camp or {}).get('attempt')
     bot = any(is_bot(r) for r in recs)
-    commit = bot_commit()
+    commit = task.get('bot_commit') or bot_commit()
     for r in recs:
         r['run_dir'] = where
         r['bot_commit'] = commit
@@ -1050,36 +1052,40 @@ def bot_hash(root=HERE):
     return h.hexdigest()[:12]
 
 
-_BOT_COMMIT = []   # bot_commit()'s answer for this process, once computed
-
-
-def bot_commit(root=None, repo=None):
+def bot_commit(root=HERE, repo=REPO):
     """The checkout's commit the bot code played from (a record's `bot_commit`, #764): HEAD's
-    first 12 characters, plus '+dirty' when a file bot_hash covers differs from HEAD (edited,
-    or a new file not yet committed). `instrument` keys cells and staleness but is a hash no
-    commit answers to; this field only names, it is never compared. The covered files are
-    bot_hash's own (matrix.driver_source + harness.lua), not a second list. Computed once per
-    process when called bare; 'unknown' when git cannot say. An older record has no field."""
-    bare = root is None and repo is None
-    if bare and _BOT_COMMIT:
-        return _BOT_COMMIT[0]
+    first 12 characters, plus '+dirty:' and the covered files that differ from HEAD (edited,
+    or new and not yet committed), since a dirty run's code is in no commit and the names are
+    all that can be said of it. `instrument` keys cells and staleness but is a hash no commit
+    answers to; this field only names, it is never compared. The covered files are bot_hash's
+    own (matrix.driver_source + harness.lua), not a second list. Read when a task launches
+    (launch), as PT_INSTRUMENT is, so a tree edited mid-sweep labels each game by the code
+    it started on. 'unknown' when git cannot say. An older record has no field."""
     import matrix
-    root = root or HERE
-    repo = repo or REPO
+    sys.path.insert(0, os.path.dirname(HERE))
+    import build_tree   # its _git strips the GIT_* a hook or a parent git sets (ADR: gotchas)
     names = sorted(matrix.driver_source(root)) + ['harness.lua']
-    paths = [os.path.join(root, n) for n in names if os.path.exists(os.path.join(root, n))]
+    names = [n for n in names if os.path.exists(os.path.join(root, n))]
+    if not names:   # `--` with no path would ask about the whole repo
+        return 'unknown'
     try:
-        def git(*a):
-            return subprocess.run(['git', '-C', repo] + list(a), check=True,
-                                  capture_output=True, text=True).stdout
-        out = git('rev-parse', 'HEAD').strip()[:12]
-        if git('status', '--porcelain', '--', *paths).strip():
-            out += '+dirty'
+        out = build_tree._git(repo, 'rev-parse', 'HEAD', capture=True)[:12]
+        # edited since HEAD (staged or not), then new and not yet committed
+        changed = (build_tree._git(root, 'diff', '--name-only', 'HEAD', '--', *names, capture=True)
+                   + '\n' + build_tree._git(root, 'ls-files', '--others', '--exclude-standard',
+                                             '--', *names, capture=True))
     except (OSError, subprocess.CalledProcessError):
-        out = 'unknown'
-    if bare:
-        _BOT_COMMIT.append(out)
-    return out
+        return 'unknown'
+    dirty = sorted(set(os.path.basename(l) for l in changed.split() if l))
+    return out + ('+dirty:' + ','.join(dirty) if dirty else '')
+
+
+def end_line(rec):
+    """resume's line for one campaign's end: its outcome and the bot commit that played it
+    (`unrecorded` for a record from before #764)."""
+    return '%s (from %s): %s%s (%s) [bot %s]' % (
+        rec.get('campaign'), rec.get('resumed_from'), 'scout lap ' if rec.get('scout') else '',
+        rec.get('outcome'), rec.get('why'), rec.get('bot_commit') or 'unrecorded')
 
 
 def cell_stamp(env, mode, bot):
@@ -3287,9 +3293,7 @@ def resume_main(args, pool=None):
         crashed += rec.get('outcome') == 'crashed'
         timed_out += rec.get('outcome') == 'timeout'
         # a scout lap's end says so: its `done` is never a clean game (ADR 0409)
-        print('%s (from %s): %s%s (%s) [bot %s]' % (
-            rec.get('campaign'), rec.get('resumed_from'), 'scout lap ' if rec.get('scout') else '',
-            rec.get('outcome'), rec.get('why'), rec.get('bot_commit') or 'unrecorded'), flush=True)
+        print(end_line(rec), flush=True)
     if crashed or timed_out:
         print('%d crashed, %d timed out' % (crashed, timed_out), flush=True)
     return 1 if crashed or timed_out else 0
