@@ -2854,7 +2854,7 @@ function M.pilfer(api, call, S, Board, standOn, e, act)
     -- a dropper's last item is its drop: the loot goes after it, so what was last (an earlier
     -- theft's loot) is no longer given back, and a spoiling one is lost by this theft
     local drops = M.dropsLoot(api.mem.u32(e.addr + UNIT_STATE), Board)
-    local before = drops and Board.items(api.mem, e.addr) or {}
+    local before = drops and Board.items(e.addr) or {}
     local displaced = before[#before]
     local item = M.moveItem(api, call, S, Board, addr, act.slot, e.addr)
     local _, spoils = M.stealSpoils(call, S, item)
@@ -5043,7 +5043,7 @@ function M.new(outer)
     -- the convoy's key for `terrain` (a door's by default; a chest's for the chest goals, #699)
     function s.convoyKey(u, terrain)
         terrain = terrain or M.TERRAIN_DOOR
-        return M.convoyKey(Board, mem, S, u, function(id) return opensWith(u, id, terrain) end)
+        return M.convoyKey(Board, u, function(id) return opensWith(u, id, terrain) end)
     end
 
     -- The first item of teammate `m`'s bag that would open `terrain` for `u` (opensWith: the
@@ -5711,9 +5711,9 @@ end
 -- the convoy holds none, or when the convoy is not the game's (Board.convoyFault). What the
 -- Supply command's Take would hand it (prep_itemsupply.c: Take refuses a full bag).
 -- sight.convoyKey.
-function M.convoyKey(Board, mem, S, u, opens)
-    if #(u.items or {}) >= Board.ITEM_COUNT or Board.convoyFault(mem, S) then return nil end
-    for _, c in ipairs(Board.convoyItems(mem, S)) do
+function M.convoyKey(Board, u, opens)
+    if #(u.items or {}) >= Board.ITEM_COUNT or Board.convoyFault() then return nil end
+    for _, c in ipairs(Board.convoyItems()) do
         if opens(c.id) then return { id = c.id, uses = c.uses } end
     end
     return nil
