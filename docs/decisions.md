@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-480 decisions. Read this index, then open the two or three you need — the whole
+481 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -352,6 +352,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0092` | [Gold availability follows vanilla FE8 — no per-chapter clear bonus](decisions/0092-gold-availability-follows-vanilla-fe8-no-per-chapter-clear.md) | 2026-06-17 | — |
 | `0345` | [A chapter's in-map shops are its map donor's](decisions/0345-a-chapter-s-shops-are-its-map-donor-s.md) | 2026-10-14 | #493 |
 | `0350` | [Scene gold is paid in a scene, with vanilla's own lines](decisions/0350-scene-gold-is-paid-in-the-scene-vanilla-pays-it.md) | 2026-10-16 | #495 |
+| `0484` | [The shop buys the keys a chapter's locks still want, after the arms](decisions/0484-the-shop-buys-the-keys-the-locks-still-want.md) | 2026-11-27 | #711 #764 #693 #510 |
 
 ---
 

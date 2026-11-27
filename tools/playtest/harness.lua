@@ -4428,16 +4428,30 @@ INSPECT.campaignApi = function(game)
     -- Priced by the game for each unit that could buy, on the map: GetItemPurchasePrice reads
     -- the buyer (a Silver Card halves it) and charges half again while BM_FLAG_PREPSCREEN is
     -- set, and the bot buys on the map.
+    -- Inside a sandbox: fn(addr, it) -> which lock non-weapon `it` ({ id, uses }) opens for the
+    -- unit at `addr` ({ doors, chests }, Sight.keyReader: the game's own key check), nil for a
+    -- weapon, which is never a key. The one read of a key's locks for api.stock's stock and
+    -- api.convoy's convoy (Bot.shop's keys, Bot.supply's takeKeys; #699, #711).
+    local function lockReads(call)
+        local keys = INSPECT.Sight.keyReader(INSPECT.keyIo(), call, SYM, BOARD)
+        return function(addr, it)
+            if INSPECT.itemFacts(it.id).kind == "weapon" then return nil end
+            return keys(addr, it)
+        end
+    end
     api.stock = function()
         if shops then return shops end
         local buyers = units()
         local list = stockItems(chapter())
         INSPECT.gameCalls(function(call)
+            -- which lock each stock item opens for each buyer (Bot.shop's keys, #711)
+            local opens = lockReads(call)
             for _, s in ipairs(list) do
                 local item = call(SYM.MakeNewItem, { s.item })
-                s.price = {}
+                s.price, s.opens = {}, {}
                 for _, u in ipairs(buyers) do
                     s.price[u.charId] = call(SYM.GetItemPurchasePrice, { u.addr, item })
+                    s.opens[u.charId] = opens(u.addr, { id = s.item, uses = item >> 8 })
                 end
             end
         end)
@@ -4914,17 +4928,14 @@ INSPECT.campaignApi = function(game)
                 if memo[key] == nil then memo[key] = INSPECT.unitItemFacts(call, addr, it, not full) end
                 return memo[key]
             end
-            local keys = INSPECT.Sight.keyReader(INSPECT.keyIo(), call, SYM, BOARD)
+            local opens = lockReads(call)
             local function forAll(it)
                 local f = {}
                 for _, u in ipairs(all) do
                     local x = facts(u.addr, it)
-                    f[u.charId] = { usable = x.usable, promotes = x.promotes, gains = x.gains }
-                    -- which lock the item opens for this unit (Bot.supply's key take, #699);
-                    -- a weapon is never a key
-                    if INSPECT.itemFacts(it.id).kind ~= "weapon" then
-                        f[u.charId].opens = keys(u.addr, it)
-                    end
+                    f[u.charId] = { usable = x.usable, promotes = x.promotes, gains = x.gains,
+                                    -- which lock it opens for this unit (Bot.supply's key take)
+                                    opens = opens(u.addr, it) }
                 end
                 return f
             end

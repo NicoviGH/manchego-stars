@@ -445,6 +445,8 @@ def records_of(task, text, where, log_path):
         p = prep.pop((r.get('chapter'), r.get('attempt')), None)
         if p:
             r['supply'], r['buys'] = p.get('supply') or [], p.get('buys') or []
+            # the lock uses the bags and convoy left unopened, the shop's keys (#711)
+            r['short'] = p.get('short') or {}
         # every record says it: a chapter with no line (a Lua error cut it short) is unknown
         r['stale'] = stale_start(bots.get(r.get('chapter')), r.get('instrument'))
     ends = [c for c in lines if c.get('chapter') is None]

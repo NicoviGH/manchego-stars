@@ -177,7 +177,7 @@
 --   the later joiner, even if a slot stays empty.
 --   reason = { why = "forced"|"claim"|"covers"|"fill", demands = {ids} (covers),
 --   carried = bool }. No transfer rule is decided yet, so `give` is always empty.
--- Bot.shop(gold, stock, party) -> {{ unit = charId, item }...}, one entry per purchase in the
+-- Bot.shop(gold, stock, party, short) -> {{ unit = charId, item }...}, one entry per purchase in the
 --   order made, each naming the unit it is for (FE8's shop screen buys into the inventory of
 --   the unit that opened it, bmshop.c StartShopScreen). party is the deployed roster entries,
 --   in roster order (the order Bot.arms reads them in). One Vulnerary (the cheapest) per unit
@@ -187,6 +187,7 @@
 --   a tome with 0 uses, counts as none), the cheapest stock item of that type it can use. A
 --   purchase gold cannot cover, or a full bag has no room for, is skipped and the later ones are
 --   still tried; a unit with nothing usable in hand keeps a slot free of a Vulnerary for its arms.
+--   Bot.shop(gold, stock, party, short): then the keys `short` (Bot.supply's) still wants, last.
 -- Bot.armed(unit) -> bool: it holds a weapon or staff it can use, with uses left.
 -- Bot.arms(gold, stock, roster, convoy) -> { [charId] = { { id, uses }... } }: the weapons
 --   and staves the convoy, then the shop, would give each unit that is not armed, in their
@@ -194,11 +195,12 @@
 --   the units before it took it). The pick reads such a unit as holding them (harness.lua
 --   api.needs), so a unit the supply or the shop can arm ranks as armed, by the game's own
 --   numbers, not as the unarmed unit it is now.
--- Bot.supply(party, convoy, benched) -> acts: before the shop, what the roster (benched units
---   too) gives the convoy because it cannot use it this chapter, and the weapons the fielded
---   units take from it. Bot.uses(party, convoy, style) -> acts: after the shop, the
---   seals and boosters they take and use; style.sealAt is the level a seal is used at (#639).
---   Their docstrings have the rules.
+-- Bot.supply(party, convoy, benched, demands) -> acts, short: before the shop, what the roster
+--   (benched units too) gives the convoy because it cannot use it this chapter, and the weapons
+--   and keys the fielded units take from it; `short`, the lock uses still wanted per kind.
+--   Bot.uses(party, convoy, style) -> acts: after the shop, the seals and boosters they take
+--   and use; style.sealAt is the level a seal is used at (#639). Their docstrings have the
+--   rules.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
 -- Bot.fullBag(held, new, convoyFull) -> slot, why: a unit given an item with no room (FE8's
 --   chooser, convoymenu.c) sends one item to the convoy -- or discards it when the convoy is
@@ -4731,10 +4733,23 @@ local function wants(u, stock)
     return out
 end
 
+-- `party` as { u, i } entries, the unit with the most free slots first (`roomOf(u)`), ties to
+-- party order: who takes a key from the convoy (takeKeys) or is bought one (Bot.shop).
+local function roomiest(party, roomOf)
+    local order = {}
+    for i, u in ipairs(party) do order[#order + 1] = { u = u, i = i, room = roomOf(u) } end
+    table.sort(order, function(a, b)
+        if a.room ~= b.room then return a.room > b.room end
+        return a.i < b.i
+    end)
+    return order
+end
+
 -- The shop's spend order, the one owner (Bot.arms asks it too, so the two cannot drift): bag
 -- room is FE8's five slots (Board.ITEM_COUNT), spent by every purchase in order; a unit with no
--- usable weapon or staff keeps one slot free of a Vulnerary for what arms it.
-function M.shop(gold, stock, party)
+-- usable weapon or staff keeps one slot free of a Vulnerary for what arms it. `short` (Bot.supply's
+-- second value; nil: no keys bought) is bought last.
+function M.shop(gold, stock, party, short)
     local out, room = {}, {}
     for _, u in ipairs(party) do room[u.charId] = Board.ITEM_COUNT - #u.items end
     local function buy(u, s)
@@ -4766,6 +4781,38 @@ function M.shop(gold, stock, party)
     local unarmed, armed = splitArmed(party, M.armed)
     spend(unarmed)
     spend(armed)
+    -- Then the keys the chapter's locks still want (`short`, Bot.supply's: what neither the bags
+    -- nor the convoy open; #711 item 2, vanilla Ch16 s4005: two Chest Keys and a two-use Lockpick
+    -- for four chests and a door, (20,1) skipped, a Chest Key on the vendor's shelf). Per kind in
+    -- name order, the cheapest stock item the game says opens it for the buyer (`opens`, api.stock:
+    -- Sight.keyOpens), by the unit with the most room (ties to party order), until its uses
+    -- cover the want or nothing more can be bought. After the arms, so a key never takes the
+    -- gold or the slot that arms a unit.
+    local kinds = {}
+    for kind, n in pairs(short or {}) do
+        if n > 0 then kinds[#kinds + 1] = kind end
+    end
+    table.sort(kinds)
+    for _, kind in ipairs(kinds) do
+        local want = short[kind]
+        while want > 0 do
+            local bought
+            for _, o in ipairs(roomiest(party, function(u) return room[u.charId] end)) do
+                local u = o.u
+                local s = cheapest(stock, u, function(s)
+                    return ((s.opens or {})[u.charId] or {})[kind] == true
+                end)
+                if s and room[u.charId] > 0 and s.price[u.charId] <= gold then
+                    buy(u, s)
+                    bought = s
+                    break
+                end
+            end
+            if not bought then break end
+            -- a key with no uses read still answers one lock, so the want always falls
+            want = want - math.max(1, bought.maxUses or 1)
+        end
+    end
     return out
 end
 
@@ -4873,8 +4920,10 @@ end
 -- narrowest opener is counted first, so a Chest Key answers chests before a Lockpick is. What is
 -- still wanted is taken from the convoy, one item per pass, by the unit with the most free slots
 -- then (ties to party order): the take costs it nothing, and a full bag gives first what
--- Bot.fullBag would send, so the next in order is tried when that gives nothing up.
+-- Bot.fullBag would send, so the next in order is tried when that gives nothing up. What the
+-- convoy cannot give either is returned, { [kind] = uses still wanted }: the shop buys it.
 local function takeKeys(L, party, demands)
+    local short = {}   -- kind -> the lock uses still wanted (the return)
     local spare = {}   -- a held item -> its uses not yet counted against a lock
     local function left(it)
         if spare[it] == nil then spare[it] = it.uses or 1 end
@@ -4905,21 +4954,13 @@ local function takeKeys(L, party, demands)
                 return a.i < b.i
             end)
             for _, h in ipairs(held) do want = spend(h.it, want) end
-            local order = {}
-            for i, u in ipairs(party) do
-                order[#order + 1] = { u = u, i = i }
-            end
             -- a pass takes one item for the unit with the most free slots; the next pass counts
             -- the slot the take used, so a second key goes to the next unit with room
             while want > 0 do
-                table.sort(order, function(a, b)
-                    local fa, fb = Board.ITEM_COUNT - #L.bags[a.u.charId],
-                                   Board.ITEM_COUNT - #L.bags[b.u.charId]
-                    if fa ~= fb then return fa > fb end
-                    return a.i < b.i
-                end)
                 local took = false
-                for _, o in ipairs(order) do
+                for _, o in ipairs(roomiest(party, function(u)
+                    return Board.ITEM_COUNT - #L.bags[u.charId]
+                end)) do
                     for i, it in ipairs(L.pool) do
                         local why = "the " .. d.kind .. " key"
                         if opens(o.u, it) and L.take(o.u.charId, i, why, "key") then
@@ -4932,8 +4973,11 @@ local function takeKeys(L, party, demands)
                 end
                 if not took then break end
             end
+            -- what neither the bags nor the convoy open: the shop's to buy (Bot.shop, #711)
+            if want > 0 then short[d.kind] = (short[d.kind] or 0) + want end
         end
     end
+    return short
 end
 
 -- Why a unit gives an item to the convoy before the shop, or nil when it keeps it: what it
@@ -4977,7 +5021,8 @@ end
 --   3. The key a chapter's chests or doors need when no fielded unit holds one (takeKeys;
 --      `demands` = api.needs', nil without a prep screen).
 -- A full bag gives first what Bot.fullBag would send. acts = { act = "give" | "take" | "use",
--- unit = charId, item = id, uses, seal = true (a use that promotes) | nil, why }.
+-- unit = charId, item = id, uses, seal = true (a use that promotes) | nil, why }. Second value:
+-- `short` = { [kind] = the lock uses neither the bags nor the convoy open }, Bot.shop's keys.
 function M.supply(party, convoy, benched, demands)
     local L = ledger(party, convoy, true, benched)
     local function giveBack(list, fielded)
@@ -4994,8 +5039,8 @@ function M.supply(party, convoy, benched, demands)
     giveBack(party, true)
     giveBack(benched, false)
     takeWeapons(L, party)
-    takeKeys(L, party, demands)
-    return L.acts
+    local short = takeKeys(L, party, demands)
+    return L.acts, short
 end
 
 -- Bot.uses(party, convoy, style) -> acts, after the shop (the same shapes as Bot.supply's): the

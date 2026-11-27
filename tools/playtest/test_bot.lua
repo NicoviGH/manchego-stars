@@ -2172,6 +2172,29 @@ local function test_shop_stops_at_gold()
     local NoUse = unitOf(4, 0x04, 1, { canUse = {} })
     check(flat(B.shop(10000, { stock[4] }, { NoUse })), "",
         "a weapon the game says the unit cannot use is never bought")
+    -- #711: the keys Bot.supply's `short` still wants, after the arms; the game's key read per
+    -- buyer (`opens`); one use each, so two chests buy two; a Lockpick only for whom it opens.
+    -- Vanilla Ch16 s4005: four chests, two Chest Keys and a two-use Lockpick, a key on the shelf
+    local keys = {
+        { item = 0x69, price = anyone(300), kind = "key", maxUses = 1,
+          opens = { [1] = { chests = true }, [2] = { chests = true }, [3] = { chests = true } } },
+        { item = 0x6B, price = anyone(1200), kind = "key", maxUses = 15,
+          opens = { [1] = { chests = false }, [2] = { chests = true } } },
+    }
+    local K1 = unitOf(1, 0x01, 1, { canUse = {} })
+    local K2 = unitOf(2, 0x02, 1, { canUse = {} })
+    K1.items, K2.items = { { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } },
+                         { { id = 0x6C, kind = "heal", vulnerary = true, uses = 3 } }
+    check(flat(B.shop(10000, keys, { K1, K2 }, { chests = 2 })), "1:105,2:105",
+          "keys: two chests short buy two Chest Keys, the cheapest opener, each by the roomiest unit")
+    check(flat(B.shop(10000, keys, { K1, K2 })), "", "keys: nothing short, none bought")
+    check(flat(B.shop(10000, keys, { K1, K2 }, { doors = 1 })), "", "keys: no stock opens doors")
+    check(flat(B.shop(10000, { keys[2] }, { K1, K2 }, { chests = 3 })), "2:107",
+          "keys: a Lockpick for the unit it opens for, its 15 uses cover three chests")
+    check(flat(B.shop(800, { stock[1], keys[1] }, { Cu }, { chests = 1 })), "3:108,3:105",
+          "keys: after the Vulnerary, with the gold left")
+    check(flat(B.shop(500, { stock[1], keys[1] }, { Cu }, { chests = 1 })), "3:108",
+          "keys: no gold left after the Vulnerary, no key")
 end
 test_shop_stops_at_gold()
 
@@ -2490,6 +2513,11 @@ do
         "take 1:69, take 1:69", "supply: two chest tiles and two keys in the convoy: two taken")
     check(acts(B.supply({ roomy, solo }, { chestKey }, nil, twoChests)), "take 1:69",
         "supply: two chest tiles and one key in the convoy: the one is taken")
+    -- what neither the bags nor the convoy open is the second value: the shop's keys (#711)
+    local _, short = B.supply({ roomy, solo }, { chestKey }, nil, twoChests)
+    check(short and short.chests, 1, "supply: one chest still wants a key, for the shop")
+    _, short = B.supply({ roomy, solo }, { chestKey, chestKey }, nil, twoChests)
+    check(short and next(short), nil, "supply: every chest answered, nothing short")
     -- a deployed Lockpick holder opens as many chests as the pick has uses left
     local twoUses = item(0x6C, { [1] = { opens = { doors = true, chests = true } } },
                          { kind = "key", uses = 2 })
