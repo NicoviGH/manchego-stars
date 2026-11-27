@@ -65,6 +65,7 @@ Replays of vanilla Ch19 s4002, attempt 1 (one game each, a lead not a rate):
 | `g788a` | the record's rule only | 5 (t3, t4, t7, t12, t12) | 9 | 6 of 6 |
 | `g788c` | + the value, both phases | 5, the same game | 9 | 6 of 6 |
 | `g788d` | + the tie-break | 3 (t3, t4, t5) | 8 | 6 of 6 |
+| `g788e` | + the fog read and the mend (this PR's head) | 3, the same game as `g788d` | 8 | 6 of 6 |
 
 The value alone changed no act on this start; the tie-break is what steered the plans toward
 Ch19's greens. R6 measures it over every start.
