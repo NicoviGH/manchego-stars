@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-27; main is 64d683ab + HANDOFF commits)
+## Next session starts here (2026-11-27; main is 38e65889 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -86,14 +86,20 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
-**2026-11-27: R5 is in and Ch14's fix is merged. The next steps are #764's body, "After R5".**
-- **R5: 11/34 clean vs R4's 8/34** (#764 comment 7223186698). Ch15 1->3/5, Ch16 1->2/5.
-- **Merged today:** PR #785 (records name their bot commit), PR #786 (the Ch16 pilfer crash,
-  #711), PR #787 (ADR 0481: a door that took a recruit waits for his talker, #766; Ch14 s4002
-  replays `t766b14`/`t766c14` clean on attempt 3).
-- **First job next session: After R5 item 2.** Size every other unclean R5 start by what alone
-  blocks it, from R5's traces, with one Sonnet trace-reader per chapter (the Ch14 brief is the
-  model: hypotheses with refuting tests, a count over every try). Fix the largest first, then R6.
+**2026-11-27 (late): R5 sized, the green rule merged. Next: the fix order on #764 (comment
+7226248041), Ch16's east thief first.**
+- **R5: 11/34 clean vs R4's 8/34** (#764 comment 7223186698). Merged today: PRs #785, #786,
+  #787 (Ch14's talker), and **PR #789** (38e65889, ADR 0482, #788).
+- **Sizing (After R5 item 2) is done:** one Sonnet trace reader per chapter, table on #764
+  comment 7224984293. Largest blockers: Ch16's east thief (8/9 tries), Ch10's Amelia (Talk route
+  loss read from enemies' current tiles, 8/9), Ch13 (no plan declines a boss kill while Cormag is
+  owed), Ch21 (Lyon assaulted with Ephraim hurt; (21,18) chest job dropped), Ch15 (Sleep staff).
+- **The clean rule (Nicolas, 2026-11-27):** every recruit, no blue death, no reward missed; a
+  green's death counts only if the green gates a reward, read from the ROM (the ending's
+  `CHECK_ALIVE`s). The planner charges greens the same way. Ch19 s4002 a1: 5 blue deaths -> 3
+  (`g788a` -> `g788e`); Ch19 is still unclean on blue deaths and chests (53 of 90 emptied by
+  thieves on phases 7-9).
+- **Next:** item 1 of #764's fix order (Ch16's east thief), one PR each down the list, then R6.
 - **Lessons:** a closed lid sleeps the Mac and pauses runs (pmset log); it is not a hang. Long runs
   go under `caffeinate -i` with the lid open. Never edit bot files while a replay plays from this
   checkout: each attempt loads them fresh.
