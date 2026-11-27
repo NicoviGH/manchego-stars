@@ -177,7 +177,7 @@
 --   the later joiner, even if a slot stays empty.
 --   reason = { why = "forced"|"claim"|"covers"|"fill", demands = {ids} (covers),
 --   carried = bool }. No transfer rule is decided yet, so `give` is always empty.
--- Bot.shop(gold, stock, party) -> {{ unit = charId, item }...}, one entry per purchase in the
+-- Bot.shop(gold, stock, party, short) -> {{ unit = charId, item }...}, one entry per purchase in the
 --   order made, each naming the unit it is for (FE8's shop screen buys into the inventory of
 --   the unit that opened it, bmshop.c StartShopScreen). party is the deployed roster entries,
 --   in roster order (the order Bot.arms reads them in). One Vulnerary (the cheapest) per unit
@@ -197,9 +197,10 @@
 --   numbers, not as the unarmed unit it is now.
 -- Bot.supply(party, convoy, benched, demands) -> acts, short: before the shop, what the roster
 --   (benched units too) gives the convoy because it cannot use it this chapter, and the weapons
---   and keys the fielded units take from it; `short`, the lock uses still wanted per kind. Bot.uses(party, convoy, style) -> acts: after the shop, the
---   seals and boosters they take and use; style.sealAt is the level a seal is used at (#639).
---   Their docstrings have the rules.
+--   and keys the fielded units take from it; `short`, the lock uses still wanted per kind.
+--   Bot.uses(party, convoy, style) -> acts: after the shop, the seals and boosters they take
+--   and use; style.sealAt is the level a seal is used at (#639). Their docstrings have the
+--   rules.
 -- Bot.route(options, style) -> style.route, validated as an index into options.
 -- Bot.fullBag(held, new, convoyFull) -> slot, why: a unit given an item with no room (FE8's
 --   chooser, convoymenu.c) sends one item to the convoy -- or discards it when the convoy is
@@ -4732,6 +4733,18 @@ local function wants(u, stock)
     return out
 end
 
+-- `party` as { u, i } entries, the unit with the most free slots first (`roomOf(u)`), ties to
+-- party order: who takes a key from the convoy (takeKeys) or is bought one (Bot.shop).
+local function roomiest(party, roomOf)
+    local order = {}
+    for i, u in ipairs(party) do order[#order + 1] = { u = u, i = i, room = roomOf(u) } end
+    table.sort(order, function(a, b)
+        if a.room ~= b.room then return a.room > b.room end
+        return a.i < b.i
+    end)
+    return order
+end
+
 -- The shop's spend order, the one owner (Bot.arms asks it too, so the two cannot drift): bag
 -- room is FE8's five slots (Board.ITEM_COUNT), spent by every purchase in order; a unit with no
 -- usable weapon or staff keeps one slot free of a Vulnerary for what arms it. `short` (Bot.supply's
@@ -4783,14 +4796,8 @@ function M.shop(gold, stock, party, short)
     for _, kind in ipairs(kinds) do
         local want = short[kind]
         while want > 0 do
-            local order = {}
-            for i, u in ipairs(party) do order[#order + 1] = { u = u, i = i } end
-            table.sort(order, function(a, b)
-                if room[a.u.charId] ~= room[b.u.charId] then return room[a.u.charId] > room[b.u.charId] end
-                return a.i < b.i
-            end)
             local bought
-            for _, o in ipairs(order) do
+            for _, o in ipairs(roomiest(party, function(u) return room[u.charId] end)) do
                 local u = o.u
                 local s = cheapest(stock, u, function(s)
                     return ((s.opens or {})[u.charId] or {})[kind] == true
@@ -4802,7 +4809,8 @@ function M.shop(gold, stock, party, short)
                 end
             end
             if not bought then break end
-            want = want - (bought.maxUses or 1)
+            -- a key with no uses read still answers one lock, so the want always falls
+            want = want - math.max(1, bought.maxUses or 1)
         end
     end
     return out
@@ -4946,21 +4954,13 @@ local function takeKeys(L, party, demands)
                 return a.i < b.i
             end)
             for _, h in ipairs(held) do want = spend(h.it, want) end
-            local order = {}
-            for i, u in ipairs(party) do
-                order[#order + 1] = { u = u, i = i }
-            end
             -- a pass takes one item for the unit with the most free slots; the next pass counts
             -- the slot the take used, so a second key goes to the next unit with room
             while want > 0 do
-                table.sort(order, function(a, b)
-                    local fa, fb = Board.ITEM_COUNT - #L.bags[a.u.charId],
-                                   Board.ITEM_COUNT - #L.bags[b.u.charId]
-                    if fa ~= fb then return fa > fb end
-                    return a.i < b.i
-                end)
                 local took = false
-                for _, o in ipairs(order) do
+                for _, o in ipairs(roomiest(party, function(u)
+                    return Board.ITEM_COUNT - #L.bags[u.charId]
+                end)) do
                     for i, it in ipairs(L.pool) do
                         local why = "the " .. d.kind .. " key"
                         if opens(o.u, it) and L.take(o.u.charId, i, why, "key") then

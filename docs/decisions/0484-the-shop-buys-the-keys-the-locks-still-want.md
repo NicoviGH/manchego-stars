@@ -9,13 +9,13 @@ issues: [711, 764, 693, 510]
 # The shop buys the keys a chapter's locks still want, after the arms
 
 **Decided (2026-11-27, #711 item 2, #764's fix order: Ch16's (20,1)).** Before a chapter, the
-prep step already counts each chests or doors demand's lock tiles against the openers the
+prep step already counts the lock tiles of each chests or doors demand against the openers the
 fielded bags hold, then takes what is missing from the convoy (`takeKeys`, #699, #711
 item 1). What the convoy cannot give either is now returned by `Bot.supply` as `short`
 (kind -> lock uses still wanted), and `Bot.shop` buys it. It buys last, after the Vulneraries and
 weapons, so a key never takes the gold or the bag slot that arms a unit. Per kind it buys the
-cheapest stock item the game says opens that lock for the buyer (`api.stock`'s `opens`,
-`Sight.keyOpens`, the read `api.convoy` uses), by the unit with the most room. It buys until the
+cheapest stock item the game says opens that lock for the buyer (`api.stock`'s `opens`, harness
+`lockReads` over `Sight.keyReader`: one read, shared with `api.convoy`), by the unit with the most room. It buys until the
 items' uses cover the want or nothing more can be bought. The record carries `short` beside
 `supply` and `buys`.
 
@@ -25,8 +25,9 @@ two uses, spent on the (3,9) door and (3,12), against four chests. (20,1) was mi
 an opener. The Port Kiris and Bethroen vendors sell the Chest Key (`worldmap_shop_data.c`). A
 player short of keys for the chests ahead buys them.
 
-**Proof.** Unit tests (`test_bot.lua` "keys:", "supply: one chest still wants a key") fail
-without it. Replay `k711a` (Ch16 s4005 a1-2) against main's `l764f`:
+**Proof.** Unit tests (`test_bot.lua` "keys:", "supply: one chest still wants a key"): run once
+against the reverted `bot.lua`, 4 of them failed. Replay `k711a` (Ch16 s4005 a1-2) against
+main's `l764f`:
 
 | Attempt | Run | Turns | Deaths | Chests we opened | Not clean for |
 |---|---|---|---|---|---|
@@ -35,9 +36,11 @@ without it. Replay `k711a` (Ch16 s4005 a1-2) against main's `l764f`:
 | 2 | main | 21 | 2 | 2 | 2 deaths, (20,1) |
 | 2 | k711a | 27 | 0 | 4 | the thief stole item 0x65 from Marisa, turn 14 |
 
-The prep bought one Chest Key (for charId 22), the one the count said was short. Both tries opened
-(20,1). What spoils them now is thefts: a1's west thief robbed Colm early, so (3,12) was never
-offered, and its east thief looted (20,5); a2 lost an item to a thief. Those are #764's thief
+What the replay shows: the prep bought one Chest Key (for charId 22), the one the count said was
+short, and both tries opened (20,1). What it does not show: a better chapter. Neither try is
+clean, both took more turns, and a1 opened fewer chests than main. What spoils them now is
+thefts: a1's west thief robbed Colm early, so (3,12) was never offered, and its east thief looted
+(20,5); a2 lost an item to a thief. Those are #764's thief
 items, not this record's.
 
 **Limits.** With no convoy (`HasConvoyAccess` false) `Bot.supply` does not run, so no shortfall
