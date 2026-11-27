@@ -50,10 +50,13 @@ game (an escort, paid `W.win` and protected under the cap), it is an owed recrui
 (`st.recruits`/`st.loose`: Ch2's Ross), or the ending tests it (`opts.gated`, botrun's read). An
 unread gate (nil) pays every green as before. The rule holds at every place a green's death
 enters: the first phase's value (`loss(W, st, g.charId) * die`, ADR 0381), the lookahead's second
-phase, and the rank's `green_die` tie-break (ADR 0384), both phases. Allied greens stay out of the
-cap's admission (only a game-over green is protected: `if gameOver[g.charId] then protect`).
-Unit tests `test_planner_pays_a_green_only_when_it_spoils_the_clear` and
-`test_lookahead_counts_a_green_and_ranks_the_list_once` fail without it.
+phase, the rank's `green_die` tie-break (ADR 0384) in both phases, the fog read (`rank.fog`,
+#713), and the mend, which tries no act to save a green that spoils nothing. Allied greens stay
+out of the cap's admission (only a game-over green is protected: `if gameOver[g.charId] then
+protect`). Tests in `test_bot.lua`, each failing without its site: the blocks headed
+`test_planner_pays_a_green_only_when_it_spoils_the_clear` and `test_green_paid_by_branch` (new),
+and assertions added to the existing `test_lookahead_counts_a_green_and_ranks_the_list_once`,
+`test_a_green_meets_the_fog_read` and `test_planner_mends_a_plan_that_loses_a_green_unit`.
 
 Replays of vanilla Ch19 s4002, attempt 1 (one game each, a lead not a rate):
 
