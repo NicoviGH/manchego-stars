@@ -78,7 +78,11 @@ same thief.
 | 2 | main | 18 | 2 | 0 | 2, Chest Key on turns 12, 13 |
 | 2 | l764e | 21 | 2 | 2: (20,5), (20,3) | 3, no Chest Key |
 
-- Neither try is clean: (20,1) is offered and skipped in both. Why is not read yet.
+- Neither try is clean, and (20,1) is missed in both. On a1 that is an opener shortage: 3
+  openings for 4 chests (two Chest Keys, and a Lockpick with 2 uses spent on the (3,9) door and
+  (3,12)). No Supply was offered all game, so the convoy held no key. The west thief drops its
+  loot (a2: its kill dropped (3,12)'s Tomahawk), so leaving (3,12) to it would free the Lockpick
+  for (20,1). That is the next item on #764, not this record's.
 - Each try made one Trade, on turn 12: Eirika's Chest Key to a teammate (charId 15 in a1,
   charId 5 in a2). No crest passed back and forth.
 - a2's two deaths (charIds 2 and 9, turns 5-6) are main's own, before the thief.
@@ -86,4 +90,5 @@ same thief.
   thief's tile on turn 12. The plan that struck the thief was judged, but ranked a turn of
   progress behind (`behind` 1 against 0, both 0 forfeits). So the thief lived to turn 17 and
   stole from charId 5 on turns 13-15. One striker per thief was enough to be in reach. It was not
-  enough to get the kill chosen.
+  enough to get the kill chosen. It cost nothing: all three thefts read `spoils: false`, so the
+  clean clear never ranks that kill ahead of progress, and nothing is built for it.
