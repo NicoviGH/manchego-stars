@@ -255,7 +255,8 @@ do
     table.sort(fr)
     check(r[1] and r[1].act .. " " .. r[1].x .. "," .. r[1].y, "door 22,17", "releases: the act and its tile")
     check(table.concat(fr, " "), "21,14 22,16", "releases: its own turn's foes; not the recruit who left, nor a later arrival")
-    check(r[1] and r[1].gone[0x1C], true, "releases: the unit it brought that left")
+    local g = r[1] and r[1].gone[0x1C]
+    check(g and g.x .. "," .. g.y, "22,12", "releases: the unit it brought that left, at the tile he arrived on")
     check(r[1] and r[1].tiles["22,5"], true, "releases: the tile its unit closed")
     check(r[1] and r[1].tiles["11,15"], nil, "releases: not a tile someone else closed")
     check(#Timeline.releases(nil), 0, "releases: no memory, none")

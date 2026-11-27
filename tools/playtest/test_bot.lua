@@ -2765,6 +2765,15 @@ do
             arrivals[3] = { charId = 0x93, classId = 11, x = 3, y = 0, turn = 2, by = door, timed = false }
         end
         local closings = { { x = 3, y = 0, phase = 3, closerKey = "a:144:9:2" } }
+        local L, pending
+        if opt.talker then
+            -- a recruit the door brought, who left the map (Rennac): L alone may Talk him over
+            -- he arrives at (4,0), one past the Fighter's (3,0) on the opened map
+            arrivals[#arrivals + 1] = { charId = 0x1C, classId = 13, x = 4, y = 0, turn = 2, by = door,
+                                        timed = false, gone = { how = "left", boardTurn = 4, x = 4, y = 0 } }
+            L = blue(0x04, 3, opt.talker[1], opt.talker[2], { minRange = false })
+            pending = { { charId = 0x1C, x = 4, y = 0, turn = 2, boardTurn = 3, by = door } }
+        end
         if opt.twoDoors then
             arrivals[2] = { charId = 0x91, classId = 9, x = 3, y = 4, turn = 2, by = door2, timed = false }
             closings[2] = { x = 3, y = 4, phase = 3, closerKey = "a:145:9:2" }
@@ -2773,6 +2782,8 @@ do
         -- the door's field on the shut map: the roofed room past it unreached
         local shutField = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["1,1"] = 2, ["7,1"] = 8,
                             ["7,2"] = 9, ["7,3"] = 10 }
+        -- (0,1): 5 from the door, so a Talk reaches the Fighter's tile from it and not his
+        if opt.talker then shutField["0,1"] = 5 end
         local openField = {}
         for k, v in pairs(shutField) do openField[k] = v end
         openField["3,0"], openField["4,0"] = 1, 2
@@ -2783,6 +2794,11 @@ do
             local f = { ["4,0"] = BOSS_SIDE, ["2,0"] = open and openField or shutField,
                         ["3,0"] = { ["3,0"] = 0, ["4,0"] = 1 } }
             if opt.twoDoors then f["2,4"] = door2Field end
+            if opt.talker then
+                -- L's own field: the meeting tile is the one it reaches nearest the arrival
+                local k = opt.talker[1] .. "," .. opt.talker[2]
+                f[k] = { [k] = 0, ["2,0"] = 3, ["1,0"] = 4 }
+            end
             if opt.village then f["8,1"] = { ["8,1"] = 0, ["7,1"] = 1 } end
             return fieldsOf(f)
         end
@@ -2804,6 +2820,7 @@ do
             obstacles = {}, doors = doors, openers = { [0x01] = true },
             -- S holds no key for the door (sight.locked): A alone opens it
             locked = { [0x02] = { ["2,0"] = "door" } },
+            talk = L and { [0x04] = { ["arrival:28"] = true } } or nil,
             explorable = explorable, canExplore = canExplore,
             change = function(c)
                 if c.opened and c.opened["2,0"] then return { field = fields(true) } end
@@ -2812,7 +2829,12 @@ do
         }
         local units = { A, S, E }
         if opt.twoDoors then units[#units + 1] = T end
+        if L then
+            units[#units + 1] = L
+            o.reach[0x04] = tiles({ opt.talker[1], opt.talker[2] })
+        end
         local copts = opt.stuck and { stuck = { [B.jobKey(0x02, nil, 2, 0)] = { id = 0x02, x = 2, y = 0, since = 0 } } }
+        if pending then copts = copts or {}; copts.pending = pending end
         local board = boardOf(table.unpack(units))
         board.turn = 2
         local _, ctx = B.candidates(board, sightOf(o), st, copts)
@@ -2856,6 +2878,31 @@ do
     check(r and tostring(r.staged) .. " " .. r.need, "false 3", "release: S still on its way, the door waits")
     a = case(1, { bigFront = true })
     check(a and a.act, "door", "release: every striker that can come is ready, the door opens")
+    -- the door once took a recruit (memory: he left): his talker is staged as a striker is. S is
+    -- ready; L, who alone may Talk him, stands 9 from the door: the door waits and L is sent to it.
+    -- L one move from it: the release is staged and the door opens (vanilla Ch14: R5's 14 misses
+    -- had L'Arachel 10-16 tiles back when Rennac came out, the one recruit 7)
+    a, ctx = case(1, { talker = { 7, 2 } })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. tostring(r.talkReady) .. " " .. r.ready, "false false 1",
+          "release: the strikers stand ready, the recruit's talker does not")
+    check(r and r.talkers and r.talkers[1] and r.talkers[1].u.id .. ":" .. r.talkers[1].gap, "4:5",
+          "release: the talker's gap, a Talk's reach of his arrival tile on the opened map")
+    check(a and a.act ~= "door", true, "release: the talker far, the door waits")
+    g = ctx.exploreGoal[0x04]
+    check(g and g.stage and g.x .. "," .. g.y, "2,0", "release: the talker is sent to the door")
+    -- L at (0,1) reaches the Fighters the door's turn, not him: still not ready (vanilla Ch14:
+    -- Rennac arrives five past the door, behind its four Fighters)
+    a, ctx = case(1, { talker = { 0, 1 } })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.talkReady) .. " " .. tostring(r.talkers[1] and r.talkers[1].gap), "false 1",
+          "release: a talker that reaches the front but not the recruit is not ready")
+    check(a and a.act ~= "door", true, "release: the talker a turn behind him, the door waits")
+    a, ctx = case(1, { talker = { 1, 1 } })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. tostring(r.talkReady), "true true",
+          "release: the talker one move from the door, the release is staged")
+    check(a and a.act, "door", "release: strikers and talker ready, the door opens")
     _, ctx = case(7, { lord = true })
     check(ctx.exploreGoal[0x02] == nil or not ctx.exploreGoal[0x02].stage, true,
           "release: a unit whose loss ends the game is never sent")

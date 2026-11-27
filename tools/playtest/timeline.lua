@@ -455,7 +455,10 @@ function compute.releases(memory)
                 end
                 mine[k] = mine[k] or { r = r, units = {} }
                 table.insert(mine[k].units, u)
-                if u.gone and u.gone.how == "left" then r.gone[u.charId] = true end
+                -- a recruit it brought who left: where he first stood (his talker's mark, Bot's releasesOf)
+                if u.gone and u.gone.how == "left" then
+                    r.gone[u.charId] = { x = u.appeared.x, y = u.appeared.y }
+                end
             end
         end
         for _, c in ipairs(tl.closings or {}) do
