@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-26; main is 8b2f0180 + HANDOFF commits)
+## Next session starts here (2026-11-27; main is 5c1e8f40 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -86,15 +86,23 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
-**Next (agreed with Nicolas, 2026-11-26), before #711 item 1:** make the job matcher and the
-death cap agree. On Ch21 s4009 the matcher keeps the (2,18) chest on Eirika, because bold's sure
-death (400 gold) is less than the chest (about 5,500 gold at its chance). Meanwhile the cap
-refuses every move on her way, so she holds at (12,18) for 20 turns until `goalQuiet` frees the
-job on turn 21. The proposed rule is that a job the cap will not let its unit walk is chance 0
-for that unit (read the way's stops against the cap: `legLive`'s stops, the cap's read). The job
-then goes on turn 1 to a unit that can make it (Syrene by Trade, say). No weight changes.
-Untested: prove it with a unit test plus one replay of Ch21 s4009 a1 against `r688b`. Then do one
-key per chest (#711 item 1), then items 5 and 6, then one R4 set over the batch.
+**2026-11-27: items 4-6 are closed out; R5 (one R4 set over items 1-4) is running.**
+- **The cap-bars rule was built, replayed and deleted** (`k688a`: lost, 18 turns, 7 deaths, vs
+  `r688b` won 38/0). Then an instrumented run (`d688m` = `r688b`) settled (2,18): every move
+  Eirika is offered there reads 0.98 death from the Draco Zombie, so the cap is right; safe
+  strikes on it exist but are cut from each unit's menu (PER_UNIT). Keeping every safe strike
+  (`x688a`) was worse (4 deaths, chest still missed). What would open it: stage strikers beside a
+  blocker until they can kill it in one turn (ADR 0478's shape). Not built: 2 of 26 unclean
+  starts. #688 comment 7207480955.
+- **Item 4's second half (#711 item 1) was already on main** (46d48de0, PR #718).
+- **Item 5 (Ch19 fallback turns): nothing to build** (#752 comment 7207553667). No pick bug; units
+  start the turn committed in reach. Ch19 is not one fix from clean: every try loses 6-10 greens
+  (Mansel, 0xCD Knights) and a blue, and misses 4-6 chests closed by enemies first.
+- **Item 6: PR #785** (records name the bot commit, `bot_commit`), reviewed clean, CI on its
+  head; waits for Nicolas's merge.
+- **R5:** main e536850f, R4's command and 34 starts, tags `r5a<N>`
+  (`resume --chapter N --last N --attempts 3 --scout --route 1 --seal-at 10`). Do not edit bot
+  files or switch branches in this checkout while it runs. Compare against R4's table (#768).
 
 **PR #774 (the clear job, ADR 0472) stays unmerged:** no gain on its replays and it helped kill
 Amelia (#767 comment of 2026-11-25 19:31). Nicolas's merge call is still open.
