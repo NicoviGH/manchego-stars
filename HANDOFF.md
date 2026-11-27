@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-27; main is 38e65889 + HANDOFF commits)
+## Next session starts here (2026-11-27; main is ebc58b86 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -86,13 +86,20 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
-**2026-11-27 (night): item 1 (Ch16's east thief) in progress on `feat/764-lock-theft-mend`
-(75cf19cd, ADR 0483, not pushed, no PR).** Status and replay table: #764 comment 7228174747.
-Built: the mend for a key holder, the looter's kill keeping its chest, hand-off by Trade (only in
-the mend, #688's items half), strikers at a thief's timed arrival, `stealSpoils` off-list fix.
-Replay `l764e` beats main on chests (3 vs 2, 2 vs 0) and loses no key, but is not clean.
-**Next on the branch:** the thief-kill plan ranks a turn of progress behind (`behind` 1 vs 0)
-and is not chosen (attempt 2, turn 12); then why (20,1) is skipped. Then review, PR, and item 2.
+**2026-11-27 (night, end): Ch16's item 1 and its keys are merged. Next: Ch16's thefts.**
+- **PR #790 merged (cea6061b, ADR 0483):** the thief answers. The mend for a key holder, a
+  looter's kill keeps its chest (a remembered closer is named by `sight.keyOf`, so Ch16's two
+  same-class thieves are told apart), a hand-off by Trade of the items the judged phase steals
+  (planner `st.stolen`), and strikers at a calendar thief's arrival. Replay `l764f`: 3 and 2 of 4
+  chests (main's R5: 2 and 0), no Chest Key stolen, not clean.
+- **PR #791 merged (ebc58b86, ADR 0484, #711 item 2):** the shop buys the keys a chapter's locks
+  still want, after the arms (`Bot.supply`'s `short`, `api.stock`'s `opens`). (20,1) was an
+  opener shortage: 3 openings for 4 chests. Replay `k711a`: one Chest Key bought, (20,1) opened
+  in both tries; a2 has 0 deaths and all 4 chests. Not clean: thefts.
+- **Next:** what spoils Ch16 s4005 now is thefts (`k711a` a1: the west thief robs Colm early, so
+  (3,12) is never offered, and the east thief loots (20,5); a2: item 0x65 stolen from Marisa on
+  turn 14). Read those turns first, then continue #764's fix order (comment 7226248041).
+  Findings and tables: #764 comment 7228174747, the PRs.
 
 **2026-11-27 (late): R5 sized, the green rule merged. Next: the fix order on #764 (comment
 7226248041), Ch16's east thief first.**
@@ -117,7 +124,7 @@ and is not chosen (attempt 2, turn 12); then why (20,1) is skipped. Then review,
 clear-blocker jobs on top of the stage job instead.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
-Recent tags: `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
+Recent tags: `l764e`/`l764f` (PR #790), `k711a`/`k711b` (PR #791), `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
 `i730b`-`i730j` (Ch16 s4005 theft replays, ADR 0475). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
 b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
