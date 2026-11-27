@@ -98,8 +98,8 @@ replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns)
   go under `caffeinate -i` with the lid open. Never edit bot files while a replay plays from this
   checkout: each attempt loads them fresh.
 
-**PR #774 (the clear job, ADR 0472) stays unmerged:** the recommendation (close it unmerged) is
-in #764's "Calls for Nicolas"; his call.
+**PR #774 (the clear job, ADR 0472) was closed unmerged** (Nicolas, 2026-11-27); R3 makes
+clear-blocker jobs on top of the stage job instead.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
 Recent tags: `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
