@@ -3211,17 +3211,21 @@ end
 -- the door brings the turn it opens. nil: u has no weapon, or no way there. Read on the map the
 -- door's change leaves (releasesOf): a roofed room's tiles take their floor only then (ADR 0477;
 -- on the shut map vanilla Ch14's corridor is unreached, and no unit ever read as a striker).
-local function strikeGap(ctx, u, r)
+-- `reach` given (a talker's Talk: 1) stands for the weapons' and needs none; `tiles` given (a
+-- recruit's arrival tile) stands for the front's.
+local function strikeGap(ctx, u, r, reach, tiles)
     -- the Weapon Select list's reach (sight.weapons), not sight.itemReach: that one counts a
     -- weapon the unit cannot strike with now, and a strike the door's turn needs one it can
-    local reach = 0
-    for _, w in ipairs(ctx.sight.weapons(u) or {}) do reach = math.max(reach, w.max or 0) end
+    if not reach then
+        reach = 0
+        for _, w in ipairs(ctx.sight.weapons(u) or {}) do reach = math.max(reach, w.max or 0) end
+    end
     if reach == 0 then return nil end
     local door = { x = r.x, y = r.y }
     local here = walkFrom(ctx, door, u.x, u.y, u)
     if not here then return nil end
     local best
-    for _, f in ipairs(r.front) do
+    for _, f in ipairs(tiles or r.front) do
         local d = walkFrom(ctx, door, f.x, f.y, u)
         if d and (not best or d < best) then best = d end
     end
@@ -3236,20 +3240,36 @@ end
 -- strikers 4-8 tiles back. Each: { x, y, key, need = the front's size, stake = { tiles, gone }
 -- (the open part of its losses), strikers = { { u, gap } } nearest first (strikeGap), ready =
 -- how many of them can strike its front this turn, less one when every unit that can open it
--- this turn is ready, full = ready >= need, staged = full, or every striker the stage job could
--- send is ready (sendStagers settles it) }. Read once
--- a decision, on the board before anyone acts: a striker that moves in this turn has acted.
+-- this turn is ready, talkers = { { u, gap, charId, atDoor } } nearest first: for each recruit
+-- it took (stake.gone: his arrival tile), each unit that may Talk him over (recruitsOf), gap a
+-- Talk's reach (1) of where he arrived, so 0 or less Talks him on the door's turn, atDoor its
+-- march to the door is a step or less (Rennac arrives at (22,12), five past the door and its four
+-- Fighters: a talker that reaches the Fighters is still a turn behind him), talkReady = every
+-- such recruit has one at gap 0 or less (or none can Talk him), full = ready >= need and
+-- talkReady, staged = full, or every unit the stage job could send is ready (sendStagers settles
+-- it) }. The talker is staged as a striker is: in the one Ch14 try that got Rennac, L'Arachel
+-- stood 7 tiles from where he was the turn after the door; in each of the 14 misses (R5, #766)
+-- the strikers were staged and she was 10-16 back, and he was gone in two turns. Read once a
+-- decision, on the board before anyone acts: a striker that moves in this turn has acted.
 local function releasesOf(ctx)
     local out = {}
     local memory = ctx.style and ctx.style.memory
     if not (memory and ctx.sight.doors and ctx.sight.march) then return out end
     local shut = {}
     for _, d in ipairs(ctx.sight.doors()) do shut[tileKey(d.x, d.y)] = true end
+    -- each owed recruit by charId: his ids here (an arrival's, a field unit's) and who may Talk
+    -- him over (recruitsOf), the one scan the stake and the talkers both read
     local openRecruit, openTile = {}, {}
-    for _, t in pairs(ctx.pendingRecruits or {}) do openRecruit[t.charId] = true end
-    for _, u in ipairs(ctx.onField or {}) do
-        if (ctx.recruitTalkers or {})[u.id] then openRecruit[u.charId] = true end
+    local function owe(t)
+        local talkers = (ctx.recruitTalkers or {})[t.id]
+        if not talkers then return end
+        local o = openRecruit[t.charId] or { ids = {}, talkers = {} }
+        openRecruit[t.charId] = o
+        o.ids[t.id] = true
+        for _, id in ipairs(talkers) do o.talkers[id] = true end
     end
+    for _, id in ipairs(Board.sortedKeys(ctx.pendingRecruits or {})) do owe(ctx.pendingRecruits[id]) end
+    for _, u in ipairs(ctx.onField or {}) do owe(u) end
     if ctx.sight.explorable then
         for _, t in ipairs(openTiles(ctx)) do openTile[tileKey(t.x, t.y)] = true end
     end
@@ -3261,30 +3281,42 @@ local function releasesOf(ctx)
                 if openTile[k] then stake.tiles[k], any = true, true end
             end
             for c in pairs(r.gone) do
-                if openRecruit[c] then stake.gone[c], any = true, true end
+                if openRecruit[c] then stake.gone[c], any = r.gone[c], true end
             end
             if any then
-                -- each unit's gap, on the map the door's change leaves (sight.changed). Every game
-                -- sight has `changed`; only a test's fake without a change lacks it, and reads its
-                -- own one map
+                -- each unit's strike gap, and each owed recruit's talkers' Talk gap (a Talk's
+                -- reach of his arrival tile), on the map the door's change leaves (sight.changed).
+                -- Every game sight has `changed`; only a test's fake without a change lacks it,
+                -- and reads its own one map
                 local function gaps()
-                    local out = {}
-                    for _, u in ipairs(ctx.actors) do out[u.id] = strikeGap(ctx, u, r) end
-                    return out
+                    local out, talk = {}, {}
+                    for _, u in ipairs(ctx.actors) do
+                        out[u.id] = strikeGap(ctx, u, r)
+                        for c, at in pairs(stake.gone) do
+                            if openRecruit[c].talkers[u.id] then
+                                talk[c] = talk[c] or {}
+                                talk[c][u.id] = strikeGap(ctx, u, r, 1, { at })
+                            end
+                        end
+                    end
+                    return { strike = out, talk = talk }
                 end
-                local gap
+                local both
                 if ctx.sight.changed then
-                    gap = ctx.sight.changed({ opened = { [key] = true } }, gaps)
+                    both = ctx.sight.changed({ opened = { [key] = true } }, gaps)
                 else
-                    gap = gaps()
+                    both = gaps()
                 end
+                local gap = both.strike
                 -- the door's opening spends its opener's act: a unit that lacks nothing for this
                 -- door (lockAt) and stands about a move from it. When every such unit is among
                 -- the ready, one of them opens it and strikes nothing
                 local door = { x = r.x, y = r.y }
                 local strikers, ready, openers, readyOpeners = {}, 0, 0, 0
+                local toDoor = {}
                 for _, u in ipairs(ctx.actors) do
                     local near = walkFrom(ctx, door, u.x, u.y, u)
+                    toDoor[u.id] = near
                     local opens = not lockAt(ctx, u, r.x, r.y) and near ~= nil
                         and near <= ctx.sight.mov(u) + 1
                     if opens then openers = openers + 1 end
@@ -3299,9 +3331,32 @@ local function releasesOf(ctx)
                 end
                 if openers > 0 and readyOpeners == openers then ready = ready - 1 end
                 table.sort(strikers, soonestThenSlot("gap", "u"))
+                -- each recruit it took: his talkers, and whether one stands a Talk's reach of him
+                local talkers, talkReady, owes = {}, true, {}
+                for c in pairs(stake.gone) do owes[c] = openRecruit[c].ids end
+                for _, u in ipairs(ctx.actors) do
+                    for c in pairs(stake.gone) do
+                        local g = both.talk[c] and both.talk[c][u.id]
+                        if g then
+                            talkers[#talkers + 1] = { u = u, gap = g, charId = c,
+                                                      -- no way to the door: it can come no nearer
+                                                      atDoor = toDoor[u.id] == nil or toDoor[u.id] <= 1 }
+                        end
+                    end
+                end
+                for c in pairs(stake.gone) do
+                    local any, ok = false, false
+                    for _, t in ipairs(talkers) do
+                        if t.charId == c then any, ok = true, ok or t.gap <= 0 end
+                    end
+                    if any and not ok then talkReady = false end
+                end
+                table.sort(talkers, soonestThenSlot("gap", "u"))
+                local full = ready >= #r.front and talkReady
                 out[#out + 1] = { x = r.x, y = r.y, key = key, need = #r.front, stake = stake,
-                                  strikers = strikers, ready = ready,
-                                  full = ready >= #r.front, staged = ready >= #r.front }
+                                  strikers = strikers, ready = ready, talkers = talkers,
+                                  owes = owes,
+                                  talkReady = talkReady, full = full, staged = full }
             end
         end
     end
@@ -3335,10 +3390,54 @@ local function sendStagers(ctx, barred)
                     n = n + 1
                 end
             end
+            -- each recruit it took with no talker ready: his nearest talker that is free or on
+            -- his own Talk job (its first job "talk>" his id: that goal is past this door, the
+            -- door is its way there), never one another job holds. A lord or a barred unit is not
+            -- sent, the strikers' bars: with none sent the door is not held for him (staged below),
+            -- as a door the army cannot fully strike is opened with what it has
+            local function sending(c)
+                for _, t in ipairs(r.talkers) do
+                    local g = ctx.exploreGoal[t.u.id]
+                    if t.charId == c and g and g.stage and g.x == r.x and g.y == r.y then return true end
+                end
+                return false
+            end
+            for c in pairs(r.stake.gone) do
+                local ready = false
+                for _, t in ipairs(r.talkers) do
+                    if t.charId == c and t.gap <= 0 then ready = true end
+                end
+                if not ready and not sending(c) then
+                    for _, t in ipairs(r.talkers) do
+                        local g, job = ctx.exploreGoal[t.u.id], ctx.jobs[t.u.id]
+                        local own = false
+                        if g and g.kind == RECRUIT and job and job[1] then
+                            for id in pairs(r.owes[c]) do
+                                if job[1].id == "talk>" .. tostring(id) then own = true end
+                            end
+                        end
+                        if t.charId == c and (not g or own)
+                            and not (lords[t.u.charId] or isBarred(barred or {}, t.u.id, r)) then
+                            ctx.exploreGoal[t.u.id] = { x = r.x, y = r.y, kind = Goals.STAGE, stage = true }
+                            ctx.jobs[t.u.id] = nil
+                            break
+                        end
+                    end
+                end
+            end
+            -- on its way: a striker short of striking, a talker short of the door (a talker
+            -- beside it that still cannot reach him has come as far as the stage job brings it:
+            -- waiting on it would hold the door for good)
             local onWay = 0
             for _, s in ipairs(r.strikers) do
                 local g = ctx.exploreGoal[s.u.id]
                 if s.gap > 0 and g and g.stage and g.x == r.x and g.y == r.y then onWay = onWay + 1 end
+            end
+            for _, t in ipairs(r.talkers) do
+                local g = ctx.exploreGoal[t.u.id]
+                if t.gap > 0 and not t.atDoor and g and g.stage and g.x == r.x and g.y == r.y then
+                    onWay = onWay + 1
+                end
             end
             r.staged = onWay == 0
         end
@@ -3348,7 +3447,8 @@ end
 local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
     -- each unit's chain of goals (jobs.lua), the first its exploreGoal: written for R3 (#767),
-    -- whose per-turn planner plays these jobs; nothing reads it before then
+    -- whose per-turn planner plays these jobs; until then only the plan trace reads it (its
+    -- `chosen`), and sendStagers clears a talker's chain when it sends it to a door
     ctx.jobs = {}
     ctx.tried = {}
     barred = barred or {}

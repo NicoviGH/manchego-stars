@@ -3366,11 +3366,12 @@ function M.plan(Bot, board, sight, style, opts)
     end
     table.sort(best.goals, function(a, b) return a.id < b.id end)
     -- each door memory says brings reds (Bot's releasesOf, #766): how many strikers its front
-    -- needs, how many stand ready, and whether a plan that opens it forfeits its stake
+    -- needs, how many stand ready, whether a recruit it took has a talker ready, and whether a
+    -- plan that opens it forfeits its stake
     best.releases = {}
     for _, r in ipairs(ctx.releases or {}) do
         best.releases[#best.releases + 1] = { x = r.x, y = r.y, need = r.need, ready = r.ready,
-                                              staged = r.staged }
+                                              talkReady = r.talkReady, staged = r.staged }
     end
     -- every job the strategy layer priced this decision (bot.lua notePrice), and which unit's
     -- chain took it (`chosen`: its place in the chain, ctx.jobs)
