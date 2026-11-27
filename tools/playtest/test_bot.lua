@@ -6958,7 +6958,7 @@ end
 -- An allied green breaks ties only among plans within a turn of the most progress: at 0.8 of a
 -- turn A blocks, and the plan predicts G's phase with it there; at four turns A keeps the
 -- ground and G is lost.
-local function greenBlock(block)
+local function greenBlock(block, opts)
     local A = blue(0x01, 0, 0, 0, { minRange = false })
     local G = blue(0x30, 5, 3, 3, { faction = "green", hp = 10, minRange = false })
     local X = red(0x81, 9, 9, { minRange = false })
@@ -6973,12 +6973,12 @@ local function greenBlock(block)
                        takenHits = 1, takenCrit = 0, targetHp = 10 } }
         end,
     }
-    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"))
+    local a, plan = Planner.plan(B, boardOf(A, G, X), sightOf(o), style("careful"), opts)
     local g
     for _, p in ipairs(plan and plan.predict or {}) do
         if p.id == 0x30 then g = p end
     end
-    return at(a), g and g.green and g.die
+    return at(a), g and g.green and g.die, plan and plan.rank and plan.rank.value
 end
 do
     local a, die = greenBlock(24)
@@ -6987,6 +6987,21 @@ do
     a, die = greenBlock(40)
     check(a, "0,0", "planner: a green unit is no reason to lose four turns of progress")
     check(die, 1, "planner: and its death is predicted")
+end
+
+-- test_planner_pays_a_green_only_when_it_spoils_the_clear (#788, ADR 0482): the same lost green G
+-- costs the plan's value W.death when the ending tests its life (opts.gated names it) or the gate
+-- is unread (nil), and nothing when the ending tests no green. Its death is still predicted.
+do
+    local W = Planner.WEIGHTS.careful   -- greenBlock plays careful
+    local _, die, unread = greenBlock(40)
+    local _, _, paid = greenBlock(40, { gated = { [0x30] = true } })
+    local a, dieFree, free = greenBlock(40, { gated = {} })
+    check(paid, unread, "planner: a gated green is paid as an unread gate pays it")
+    check(a, "0,0", "planner: an ungated green changes no act here")
+    check(dieFree, die, "planner: an ungated green's death is still predicted")
+    check(math.abs(free - paid - W.death * die) < 1e-6, true,
+          "planner: an ungated green's death costs the value nothing")
 end
 
 -- test_planner_mends_a_plan_that_loses_a_green_unit: A's march to (0,1) is its best act by its

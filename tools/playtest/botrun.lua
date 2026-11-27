@@ -1861,6 +1861,7 @@ function M.run(api)
                             return { stalled = stalled, sent = sent, stuck = stuck, tried = tried,
                                      idle = quiet >= M.GOAL_QUIET and not waitIsPlay(sight, turn),
                                      lows = lows,
+                                     gated = gated,
                                      explored = explore.explored(), lost = explore.lost(),
                                      unpaid = unpaidNow(),
                                      pending = pendingRecruits(sight),

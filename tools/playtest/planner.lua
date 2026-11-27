@@ -391,6 +391,16 @@ local function loss(W, st, charId)
     return st.gameOver[charId] and W.win or W.death
 end
 
+-- Whether a green's death is paid in a plan's value (#788, ADR 0482): when it spoils the clean
+-- clear, i.e. it ends the game (an escort, paid W.win), it is an owed recruit (ADR 0381: vanilla
+-- Ch2's Ross), or the chapter's ending tests its life (`gated`, botrun's api.gated: a reward it
+-- may gate). `gated` nil (unread) pays every green, ADR 0376's rule. Any other green's death is
+-- left to the rank's tie-break (green_die, ADR 0384) alone.
+function M.greenPaid(st, g, gated)
+    return gated == nil or st.gameOver[g.charId] or st.recruits[g.id] or st.loose[g.id]
+        or gated[g.charId] or false
+end
+
 -- The ledger goal an act takes (Goals' ids): a Talk its recruit, a Visit or a chest its tile;
 -- nil for any other act.
 local function takes(act)
@@ -2507,7 +2517,9 @@ function M.plan(Bot, board, sight, style, opts)
         -- death in the phase is read in full above
         st.predict = {}
         for _, g in ipairs(greens) do
-            judged = judged - loss(W, st, g.charId) * die[g.id]
+            if M.greenPaid(st, g, opts and opts.gated) then
+                judged = judged - loss(W, st, g.charId) * die[g.id]
+            end
             local by = sortedKeys(strikers[g.id])   -- a list: the record is logged as JSON
             st.predict[#st.predict + 1] = { id = g.id, charId = g.charId, x = g.x, y = g.y,
                                             hp = g.hp, die = die[g.id], taken = taken[g.id],

@@ -44,8 +44,13 @@ and F4-F7 (item 0x55, `EventScr_089F79D4`), index 24 (Ch10b) 89 8A 8B
 so Ch19's greens gate nothing. Unit tests: `test_sight.lua` (aliveChecks), `test_botrun.lua`
 (`test_a_green_death_spoils_the_clear_only_when_the_ending_tests_it`), each failing without the change.
 
-**Not changed: the planner.** It still pays a green's predicted death at a player unit's price
-in a plan's value (`planner.lua` `loss(W, st, g.charId) * die[g.id]`, ADR 0381), keeps the greens'
-summed death as a tie-break (`green_die`, ADR 0384), and leaves allied greens out of the cap's
-admission. Whether a green that gates nothing should still be paid in full is a play change, to
-be measured on its own.
+**The planner pays what the clear counts (same PR, Nicolas asked why not).** A green's
+predicted death costs a plan's value (`loss(W, st, g.charId) * die`, ADR 0381) only when
+`planner.greenPaid` holds: it ends the game (an escort, paid `W.win`), it is an owed recruit
+(`st.recruits`/`st.loose`: Ch2's Ross), or the ending tests it (`opts.gated`, botrun's read). An
+unread gate (nil) pays every green as before. Any other green's death is left to the rank's
+tie-break (`green_die`, ADR 0384), which is unchanged; allied greens stay out of the cap's
+admission (only a game-over green is protected, `planner.lua` `if gameOver[g.charId] then
+protect`). Since `green_die` ranks before `value`, the change acts mostly on which plans the search
+keeps, not on the pick among plans within a turn of progress. Unit test
+`test_planner_pays_a_green_only_when_it_spoils_the_clear` fails without it.
