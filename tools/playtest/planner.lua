@@ -3260,7 +3260,11 @@ function M.plan(Bot, board, sight, style, opts)
                         local f = first[u.id]
                         local was = f and f.die or 0
                         local more = (1 - was) * (second[u.id] or 0)
-                        rank.value = rank.value - loss(W, st, u.charId) * more
+                        -- a green is paid here as in the first phase: only when its death
+                        -- spoils the clear (M.greenPaid, #788)
+                        if not (f and f.green) or M.greenPaid(st, u, opts and opts.gated) then
+                            rank.value = rank.value - loss(W, st, u.charId) * more
+                        end
                         if u.maxhp then rank.value = rank.value - W.taken * (lost[u.id] or 0) end
                         if f and f.green and not protected[u.id] then
                             rank.green_die = rank.green_die + more

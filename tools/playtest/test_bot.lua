@@ -11417,6 +11417,21 @@ do
     }
     local a, plan = Planner.plan(B, boardOf(A, G, X, K), sightOf(o), gifted("careful", 1000))
     check(plan.lookahead.extended, true, "lookahead: extended")
+    -- #788: the second phase pays the green's death in the value only when it spoils the clear
+    -- (M.greenPaid): gated, it costs what it costs unread; ungated, nothing. green_die is kept
+    local function extendedValue(gated)
+        local _, p = Planner.plan(B, boardOf(A, G, X, K), sightOf(o), gifted("careful", 1000),
+                                  { gated = gated })
+        for _, c in ipairs(p.considered) do
+            if c.extended then return c.rank.value, c.rank.green_die, table.concat(c.acts, " ") end
+        end
+    end
+    local paid, paidDie, paidKey = extendedValue({ [0x30] = true })
+    local free, freeDie, freeKey = extendedValue({})
+    check(freeKey, paidKey, "lookahead #788: the same plan heads both")
+    check(free - paid > 0.99 * Planner.WEIGHTS.careful.death, true,
+          "lookahead #788: an ungated green's second-phase death costs the value nothing")
+    check(freeDie, paidDie, "lookahead #788: and green_die still counts it")
     for _, c in ipairs(plan.considered) do
         if c.extended then
             check(c.rank.green_die > 0.99, true, "lookahead: the green's second-phase death is paid")
