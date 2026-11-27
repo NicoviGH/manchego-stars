@@ -4284,6 +4284,11 @@ do
     check(m.u8(299 + 0x13), 30, "healFaction: another faction's unit is not healed")
     sight.healFaction({ [299] = bl }, "blue")
     check(m.u8(299 + 0x13), 90, "healFaction: our units heal at our phase, as the reds do at theirs")
+    -- steals (ADR 0483): a class's CA_STEAL, read off GetClassData (classId + 1 here) for an
+    -- arrival the board does not hold yet
+    m.w32(14 + 0x28, Sight.CA_STEAL)
+    check(sight.steals(13), true, "steals: a class with CA_STEAL steals")
+    check(sight.steals(9), false, "steals: a class without it does not")
 end
 
 -- #709: both reds' phases begin with the heal: stagePhase (enemyPhase's, and nextPhase's first) after

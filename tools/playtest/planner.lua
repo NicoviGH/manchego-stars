@@ -1426,9 +1426,6 @@ function M.plan(Bot, board, sight, style, opts)
                         -- act it frees the tile for (Bot.candidates' aside), which its own score
                         -- never sees either
                         or x.a.act == "rescue" or x.a.act == "drop" or x.a.why == "aside"
-                        -- a hand-off's worth is the theft the judged phase no longer plays
-                        -- (ADR 0483), which its own score never sees either
-                        or x.a.handoff
                         or (opens and opens[e.x .. "," .. e.y]) then
                     menu[#menu + 1] = x.a
                 end
@@ -3077,11 +3074,19 @@ function M.plan(Bot, board, sight, style, opts)
                 return entriesOf(talkers)
             end
             if p.thieves then
-                -- a robbed unit: its own other acts (out of the thief's reach), then every
-                -- unit's strike on a thief that robs it (dead, it steals nothing): vanilla Ch16,
-                -- replay i730h, turn 14: Colm cornered at (19,1), every tile of his robbed
+                -- a robbed unit: its own other acts (out of the thief's reach), then the Trades
+                -- that hand its item to a teammate (Bot.handoffsFor, ADR 0483: its worth is the
+                -- theft the judged phase no longer plays, so only here, where a theft is read),
+                -- then every unit's strike on a thief that robs it (dead, it steals nothing):
+                -- vanilla Ch16, replay i730h, turn 14: Colm cornered at (19,1), every tile of
+                -- his robbed
                 local out = {}
                 for _, t in ipairs(menuOf[p.id] or {}) do out[#out + 1] = t end
+                local u = Bot.handoffsFor and byId[p.id]
+                for _, a in ipairs(u and Bot.handoffsFor(ctx, u) or {}) do
+                    annotate(a, byId[a.unitId])
+                    out[#out + 1] = { uid = a.unitId, a = a }
+                end
                 for _, m in ipairs(baseMenus) do
                     if m.unit.id ~= p.id then
                         for _, a in ipairs(m.acts) do
@@ -3444,11 +3449,13 @@ function M.plan(Bot, board, sight, style, opts)
     table.sort(best.goals, function(a, b) return a.id < b.id end)
     -- each door memory says brings reds (Bot's releasesOf, #766): how many strikers its front
     -- needs, how many stand ready, whether a recruit it took has a talker ready, and whether a
-    -- plan that opens it forfeits its stake
+    -- plan that opens it forfeits its stake; a thief the calendar brings is one too (`arrival`,
+    -- its board turn, and `due`, whether its stage job is on: ADR 0483)
     best.releases = {}
     for _, r in ipairs(ctx.releases or {}) do
         best.releases[#best.releases + 1] = { x = r.x, y = r.y, need = r.need, ready = r.ready,
-                                              talkReady = r.talkReady, staged = r.staged }
+                                              talkReady = r.talkReady, staged = r.staged,
+                                              arrival = r.arrival, due = r.due }
     end
     -- every job the strategy layer priced this decision (bot.lua notePrice), and which unit's
     -- chain took it (`chosen`: its place in the chain, ctx.jobs)

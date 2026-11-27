@@ -29,7 +29,7 @@
 --   items     what the screen showed change hands: { kind = "theft"|"drop", turn, ... }
 --
 -- A retry's memory is the failed attempts' timelines, oldest first: style.memory = { attempts }.
--- Its readers are below (M.enemies, M.arrivals, M.holdTurns, M.deadlines, M.routes, M.routeOf,
+-- Its readers are below (M.enemies, M.arrivals, M.calendar, M.holdTurns, M.deadlines, M.routes, M.routeOf,
 -- M.threats);
 -- nothing else keeps a copy of what an earlier attempt saw.
 
@@ -417,6 +417,32 @@ function compute.routes(memory)
     end
     return out
 end
+-- Each unit the calendar brought (an arrival the game timed to a turn, not one our act brought:
+-- `brought`), once by its key (charId, class and first board turn, the same in every attempt),
+-- the latest attempt's sighting: { charId, classId, faction, x, y, boardTurn }, in key order.
+-- Not M.arrivals: that one keeps a character's latest arrival, and many units share a generic
+-- charId (vanilla Ch16's two thieves are both charId 100: one walks in at (1,8) on turn 6, the
+-- calendar brings the other to (21,13) on turn 12). Bot's releasesOf stages strikers at a red
+-- thief's (ADR 0483).
+function M.calendar(memory) return memo("calendar", memory, compute.calendar) end
+function compute.calendar(memory)
+    local byKey, keys = {}, {}
+    for _, tl in ipairs(attempts(memory)) do
+        for _, u in ipairs(tl.units or {}) do
+            local a = u.appeared
+            if a and not brought(u) then
+                if not byKey[u.key] then keys[#keys + 1] = u.key end
+                byKey[u.key] = { charId = u.charId, classId = u.classId, faction = u.faction,
+                                 x = a.x, y = a.y, boardTurn = a.boardTurn }
+            end
+        end
+    end
+    table.sort(keys)
+    local out = {}
+    for _, k in ipairs(keys) do out[#out + 1] = byKey[k] end
+    return out
+end
+
 
 -- A character's walk (M.routes' steps) by its charId and class, from the latest attempt that
 -- showed it walk, or nil: a unit's slot id is not the same over attempts, its character is

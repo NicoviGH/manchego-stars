@@ -322,7 +322,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0480` | [A job's way through a door is priced leg by leg](decisions/0480-a-jobs-way-through-a-door-is-priced-leg-by-leg.md) | 2026-11-26 | #688 #711 #764 #766 #510 |
 | `0481` | [A door that took a recruit waits for his talker](decisions/0481-a-door-that-took-a-recruit-waits-for-his-talker.md) | 2026-11-27 | #766 #764 #768 #510 |
 | `0482` | [A green's death spoils a clean clear only when the chapter's ending tests that green](decisions/0482-a-greens-death-spoils-a-clean-clear-only-when-the-ending-tests-it.md) | 2026-11-27 | #788 #764 #510 |
-| `0483` | [A thief is answered: the holder is kept back or hands the item off, and the looter's death keeps its chest](decisions/0483-a-thief-is-answered.md) | 2026-11-27 | #764 #711 #688 #510 |
+| `0483` | [A thief is answered: the holder is kept back or hands the item off, the looter's death keeps its chest, and strikers...](decisions/0483-a-thief-is-answered.md) | 2026-11-27 | #764 #711 #688 #510 |
 
 ---
 

@@ -555,6 +555,8 @@ local function sightOf(o)
     end
     -- the items a thief on the field would cost us, per unit (sight.atRisk, ADR 0483)
     if o.atRisk then s.atRisk = function(u) return o.atRisk[u.id] or {} end end
+    -- the classes that steal (sight.steals: a class's CA_STEAL, ADR 0483)
+    if o.steals then s.steals = function(classId) return o.steals[classId] or false end end
     -- the convoy's door key for each unit (sight.convoyKey): { id, uses }
     -- (a chest's, when the lock is asked for: o.convoyChestKey, #699; o.chestOpeners hold one)
     if o.convoyKey or o.convoyChestKey then
@@ -6333,12 +6335,72 @@ do
     end
     check(saved and #(saved.forfeited or { 1 }) == 0 and traded ~= nil, true,
           "hand-off: the holder hands the item to the teammate beside it and forfeits nothing")
+    -- the hand-off is the mend's, for a unit its judged phase robs: no board menu offers it, so a
+    -- quiet turn trades nothing (replay l764d: Trades passed crests back and forth all game)
+    local offered = 0
+    local o = { reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
+                atRisk = { [0x02] = { { id = 0x6D, uses = 1 } } } }
+    for _, c in ipairs(B.candidates(boardOf(H, T, X), sightOf(o), gifted("careful", 500))) do
+        for _, a in ipairs(c.acts) do
+            if a.act == "trade" then offered = offered + 1 end
+        end
+    end
+    check(offered, 0, "hand-off: no board menu offers it")
     check(Planner.tradesIn({ { act = "trade", unitId = 2, targetId = 3, gives = true, item = 0x6D,
                                uses = 1 },
                              { act = "trade", unitId = 3, targetId = 2, item = 0x69, uses = 1,
                                back = { id = 1, uses = 30 } },
                              { act = "wait", unitId = 4 } })[2].holder, 2,
           "tradesIn: a take's holder is its target")
+end
+
+-- test_a_thief_the_calendar_brings_is_met (ADR 0483): an earlier attempt saw the game bring a
+-- thief (class 13, which steals) to (9,0) on a board turn. S (MOV 1, reach 1) stands 9 from it:
+-- gap 7 this turn. With the arrival 11 turns off it has turns to spare and is not sent; 7 turns
+-- off, a move away now would make it late, so it is sent beside the tile (the stage job), and
+-- held there to the arrival though it could already strike in time. One thief, one striker.
+-- Never once it arrived, nor for a class that does not steal, nor a lord. Vanilla Ch16 s4005:
+-- the thief the game brings to (21,13) on turn 12 stole Eirika's Chest Key or looted the (20,y)
+-- chests in every try, and no unit struck it on its first turn.
+do
+    local function case(arrival, opt)
+        opt = opt or {}
+        local S = blue(0x02, 1, opt.sx or 0, 0, { mov = 1, weapons = { { slot = 0, min = 1, max = 1 } } })
+        local E = red(0x81, 14, 9, { isBoss = true, minRange = false })
+        local st = style("careful")
+        st.memory = Fakeline.memory({ arrivals = {
+            { charId = 100, classId = opt.classId or 13, x = 9, y = 0, turn = arrival, timed = true } } })
+        local f = {}
+        for x = 0, 9 do f[x .. ",0"] = 9 - x end
+        local o = { objective = { kind = "boss", gameOver = opt.lord and { 0x02 } or nil },
+                    reach = { [0x02] = tiles({ opt.sx or 0, 0 }) },
+                    field = fieldsOf({ ["9,0"] = f }), steals = { [13] = true } }
+        local board = boardOf(S, E)
+        board.turn = 1
+        local _, ctx = B.candidates(board, sightOf(o), st)
+        return ctx.releases and ctx.releases[1], ctx.exploreGoal[0x02]
+    end
+    local r, g = case(12)
+    check(r and r.need .. " " .. r.strikers[1].gap .. " " .. tostring(r.due), "1 -3 false",
+          "calendar thief: one striker needed, S with three moves to spare, not due")
+    check(g == nil or not g.stage, true, "calendar thief: S, with turns to spare, is not sent")
+    r, g = case(8)
+    check(r and r.strikers[1].gap .. " " .. tostring(r.due) .. " " .. tostring(r.staged), "1 true false",
+          "calendar thief: a move away now and S is late: due")
+    check(g and g.stage and g.kind .. " " .. g.x .. "," .. g.y, Goals.STAGE .. " 9,0",
+          "calendar thief: S is sent, met beside its tile")
+    r, g = case(8, { sx = 1 })
+    check(r and r.strikers[1].gap .. " " .. tostring(r.due) .. " " .. tostring(r.staged), "0 true true",
+          "calendar thief: S could strike in time, and is still due")
+    check(g and g.stage, true, "calendar thief: a ready stager is held to the arrival")
+    r, g = case(8, { sx = 2 })
+    check(r and r.strikers[1].gap .. " " .. tostring(r.due), "-1 false",
+          "calendar thief: a whole move to spare, not due yet")
+    check(case(1) == nil, true, "calendar thief: arrived, no release")
+    check(case(8, { classId = 9 }) == nil, true, "calendar thief: a class that does not steal, none")
+    r, g = case(8, { lord = true })
+    check(r and tostring(r.due) .. " " .. tostring(g ~= nil and g.stage == true), "false false",
+          "calendar thief: a lord is never sent")
 end
 
 -- A looter about to take a chest (sight.closings' third answer names it) is worth killing: the

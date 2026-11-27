@@ -3616,6 +3616,13 @@ function M.new(outer)
     local function units()
         return M.keptRead(seen, "units", function() return api.board().units end, open)
     end
+    -- The attributes of the unit struct at `addr`: its character's and its class's
+    -- (bmunit.h UNIT_CATTRIBUTES); 0 for a slot with no character or class.
+    local function attrsOf(addr)
+        local chptr, clptr = mem.u32(addr), mem.u32(addr + UNIT_CLASS)
+        return chptr ~= 0 and clptr ~= 0
+            and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
+    end
 
     -- The chapter's goal and tile commands, read once: its kind, the Defense map's end turn,
     -- every tile's location event, and the Seize tile (the one whose command is Seize, as
@@ -4121,10 +4128,7 @@ function M.new(outer)
     -- sub_803C364), or an AI script that can decide on one (M.scriptReadsReds).
     function s.readsReds(e)
         if M.riding(e.state) then return true end
-        local chptr, clptr = mem.u32(e.addr), mem.u32(e.addr + UNIT_CLASS)
-        local attrs = chptr ~= 0 and clptr ~= 0
-            and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
-        if (attrs & M.CA_BALLISTAE) ~= 0 then return true end
+        if (attrsOf(e.addr) & M.CA_BALLISTAE) ~= 0 then return true end
         for _, it in ipairs(e.items or {}) do
             if api.Board.staffRange(itemOf(it)) then return true end
         end
@@ -5072,6 +5076,21 @@ function M.new(outer)
         end
         return seen.redCount
     end
+    -- Whether a unit of class `classId` steals (CA_STEAL), for an arrival memory knows of and the
+    -- board does not hold yet (Bot's releasesOf): the class's attributes (GetClassData). A unit on
+    -- the field adds its character's (attrsOf); no vanilla character carries CA_STEAL
+    -- (data_characters.c) and the injector writes only CA_FEMALE there (inject/stats.py), so the
+    -- class is the whole read. Memoised for the chapter: class data is ROM.
+    local stealsOf = {}
+    function s.steals(classId)
+        if stealsOf[classId] == nil then
+            stealsOf[classId] = sandbox(function(call)
+                local cls = call(S.GetClassData, { classId })
+                return cls ~= 0 and (mem.u32(cls + CLASS_ATTRIBUTES) & M.CA_STEAL) ~= 0
+            end)
+        end
+        return stealsOf[classId]
+    end
     -- The items of player unit `u` a thief on the field would cost us (ADR 0483): none while no
     -- red on the field has CA_STEAL (its character's or class's attributes, as s.readsReds reads
     -- ballistae); else each item the game ranks above the stat boosters (M.stealSpoils, the
@@ -5083,10 +5102,8 @@ function M.new(outer)
         if seen.thiefOnField == nil then
             seen.thiefOnField = false
             for _, o in ipairs(units()) do
-                local chptr, clptr = mem.u32(o.addr), mem.u32(o.addr + UNIT_CLASS)
-                local attrs = chptr ~= 0 and clptr ~= 0
-                    and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
-                if o.faction == "red" and o.onField and not o.dead and (attrs & M.CA_STEAL) ~= 0 then
+                if o.faction == "red" and o.onField and not o.dead
+                        and (attrsOf(o.addr) & M.CA_STEAL) ~= 0 then
                     seen.thiefOnField = true
                 end
             end
@@ -5385,10 +5402,7 @@ function M.new(outer)
         if seen.canto[k] then return seen.canto[k] end
         local out = {}
         -- a unit with no character or class is no unit to move (and movOf reads the class)
-        local chptr, clptr = mem.u32(u.addr), mem.u32(u.addr + UNIT_CLASS)
-        local attrs = chptr ~= 0 and clptr ~= 0
-            and (mem.u32(chptr + CLASS_ATTRIBUTES) | mem.u32(clptr + CLASS_ATTRIBUTES)) or 0
-        if (attrs & M.CA_CANTO) ~= 0
+        if (attrsOf(u.addr) & M.CA_CANTO) ~= 0
                 and (mem.u32(u.addr + UNIT_STATE) & Board.US_HAS_MOVED) == 0 then
             local mov = movOf(u)
             out = sandbox(function(call)

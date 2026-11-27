@@ -1,15 +1,15 @@
 ---
 id: 483
-title: "A thief is answered: the holder is kept back or hands the item off, and the looter's death keeps its chest"
+title: "A thief is answered: the holder is kept back or hands the item off, the looter's death keeps its chest, and strikers meet one the calendar brings"
 date: "2026-11-27"
 section: "Combat System"
 issues: [764, 711, 688, 510]
 ---
 
-# A thief is answered: the holder is kept back or hands the item off, and the looter's death keeps its chest
+# A thief is answered: the holder is kept back or hands the item off, the looter's death keeps its chest, and strikers meet one the calendar brings
 
-**Decided (2026-11-27, #764's fix order item 1: Ch16's east thief).** Three changes to how the
-planner meets an enemy thief. Each was a separate cause of R5's unclean Ch16 tries, all from the
+**Decided (2026-11-27, #764's fix order item 1: Ch16's east thief).** Four changes to how the
+bot meets an enemy thief. Each was a separate cause of R5's unclean Ch16 tries, all from the
 same thief.
 
 1. **A key holder the thief robs is mended.** When the judged phase has a thief rob a unit of its
@@ -26,14 +26,28 @@ same thief.
    that looter as `closer`. A plan that kills the closer reads the goal with no closing date
    (planner's `chanceOf`). Before this, the date was read once per board, so a strike on the
    looter saved nothing.
-3. **A hand-off by Trade (#688's items half).** When a red with `CA_STEAL` is on the field,
-   `sight.atRisk(u)` lists the items of `u` a theft would cost: a spoiler (`stealSpoils`, the
-   record's line) first, then a chest opener. Bot offers a Trade that gives the first of them to
-   a teammate within its move and one, or takes a teammate's (`handoff`). The plan's Trades are
-   staged in the judged phase's bags (`planner.tradesIn` → sight's `stagePhase`, through
-   `sight.tradeItems`, which `moveItem` now shares). So the thief steals from the bag the Trade
+3. **A hand-off by Trade (#688's items half), offered only by the mend.** When a red with
+   `CA_STEAL` is on the field, `sight.atRisk(u)` lists the items of `u` a theft would cost: a
+   spoiler (`stealSpoils`, the record's line) first, then a chest opener. Where the mend tries a
+   robbed unit (both the spoiled and the lock-robbed case), it also tries the Trades that move
+   the first of them out: the robbed unit gives it to a teammate, or a teammate takes it
+   (`Bot.handoffsFor`, over `tradeAct`). No board menu offers them. The plan's Trades are staged
+   in the judged phase's bags (`planner.tradesIn` → sight's `stagePhase`, through
+   `sight.tradeItems`, which `moveItem` shares). So the thief steals from the bag the Trade
    leaves, and a hand-off is worth exactly the theft it moves out of reach. A hand-off earns no
-   breach weight and survives the per-unit menu cut, as a Rescue does.
+   breach weight.
+4. **Strikers meet a thief the calendar brings.** From attempt 2 on, memory knows a red the game
+   brought to a tile on a board turn (`Timeline.calendar`: one entry per unit key, since many
+   units share a generic charId). For each such red whose class steals (`sight.steals`, the
+   class's `CA_STEAL`; no vanilla character carries it and the injector writes none), Bot's
+   `releasesOf` adds a release at its tile, the door's shape (ADR 0478), so the same stage job
+   sends strikers beside it (`Goals.STAGE`).
+   - **Enough strikers: one per thief**, the door rule's (one per red in the front).
+   - A striker's gap is `strikeGap` to the tile, less the moves it has before that turn. The job
+     is **due** once a move away now would make the nearest sendable striker late. It then stays
+     due to the arrival (the gap falls by at most a move a turn), so a stager met early is held.
+   - No forfeit: no act of the army brings the thief, so the planner's `released` never matches.
+   - The record's `releases` carries `arrival` (its board turn) and `due`.
 
 **Why.** R5, vanilla Ch16, retries of five starts (#764 comment 7224984293). Read in the traces:
 - s4005, all three tries (and s4007 a1): the thief, arriving turn 11 at (21,13), stole Eirika's
@@ -48,4 +62,28 @@ same thief.
   chosen −185.3), but a turn of progress behind. She walked on and lost the key on turn 12.
 - `l764b`, part 1: she kept the key on turns 12–13. The thief looted (20,5) on turn 14 and stole
   the key the same turn. Won in 18 turns, 0 deaths, 2 of 4 chests (main's try: 16 turns, 2 of 4).
-- `l764c`, all three: see the PR.
+- `l764c`, parts 1-3 (hand-offs on every menu): handed weapons around (off-list items read as
+  spoilers; `stealSpoils` now reads AiGetItemStealRank's -1 as spoiling nothing).
+- `l764d`, parts 1-3: worse than main. No thefts, but Eirika held the key at (14,10) all game,
+  nobody killed the thief, and it looted all three (20,y) chests on turns 14-16 (1 of 4 chests).
+  One extra death (charId 9, turn 15). Hand-offs fired on quiet turns and passed crests (items
+  116, 124, 100) back and forth. Hence the hand-off moved into the mend, and part 4.
+
+**Replay `l764e`, all four parts, Ch16 s4005 attempts 1-2, against main's R5 (`r5b16`):**
+
+| Attempt | Run | Turns | Deaths | Chests (of 4) | Thefts |
+|---|---|---|---|---|---|
+| 1 | main | 16 | 0 | 2: (20,5), (3,12) | 4, Chest Key on turn 12 |
+| 1 | l764e | 18 | 0 | 3: (20,5), (20,3), (3,12) | 4, no Chest Key |
+| 2 | main | 18 | 2 | 0 | 2, Chest Key on turns 12, 13 |
+| 2 | l764e | 21 | 2 | 2: (20,5), (20,3) | 3, no Chest Key |
+
+- Neither try is clean: (20,1) is offered and skipped in both. Why is not read yet.
+- Each try made one Trade, on turn 12: Eirika's Chest Key to a teammate (charId 15 in a1,
+  charId 5 in a2). No crest passed back and forth.
+- a2's two deaths (charIds 2 and 9, turns 5-6) are main's own, before the thief.
+- a2's stage job was due on turns 10-11 and sent one striker (charId 23). It stood beside the
+  thief's tile on turn 12. The plan that struck the thief was judged, but ranked a turn of
+  progress behind (`behind` 1 against 0, both 0 forfeits). So the thief lived to turn 17 and
+  stole from charId 5 on turns 13-15. One striker per thief was enough to be in reach. It was not
+  enough to get the kill chosen.
