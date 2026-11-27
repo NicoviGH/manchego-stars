@@ -431,8 +431,8 @@ def records_of(task, text, where, log_path):
     names its run dir. A campaign the bot played that left no end line was cut by run.sh: its
     end is a `crashed` record in run.sh's words (#665). Each attempt's prep (a chapter line's
     `prep`: what the convoy gave and took and the shop bought) goes on that attempt's BOTRUN
-    record as `supply` and `buys`. A worker that left neither says why it has none, from its
-    log."""
+    record as `supply` and `buys`. Every record names the bot commit that played it
+    (`bot_commit`, #764). A worker that left neither says why it has none, from its log."""
     recs = parse_lines(text, BOTRUN)
     lines = parse_lines(text, CAMPAIGN)
     chapters = [c for c in lines if c.get('chapter') is not None]
@@ -479,8 +479,10 @@ def records_of(task, text, where, log_path):
         recs.append(end)
     attempt = (camp or {}).get('attempt')
     bot = any(is_bot(r) for r in recs)
+    commit = bot_commit()
     for r in recs:
         r['run_dir'] = where
+        r['bot_commit'] = commit
         if r.get('outcome') in NO_RESULT:
             r['log'], r['log_tail'] = log_path, log_tail(log_path)
         # the campaign crashed (load, arrive, save, cap) before its bot reported: the
@@ -490,7 +492,8 @@ def records_of(task, text, where, log_path):
     if recs:
         return recs
     return [{'outcome': 'crashed', 'attempt': attempt, 'seed': task.get('seed'), 'run_dir': where,
-             'campaign': (camp or {}).get('id'), 'log': log_path, 'log_tail': log_tail(log_path),
+             'bot_commit': commit, 'campaign': (camp or {}).get('id'), 'log': log_path,
+             'log_tail': log_tail(log_path),
              'env_status': unread(),
              'why': 'the worker left no BOTRUN or CAMPAIGN record%s'
                     % (' (%s)' % said if said else '')}]
@@ -1045,6 +1048,38 @@ def bot_hash(root=HERE):
     for name in sorted(files):
         h.update(name.encode() + b'\0' + files[name].encode())
     return h.hexdigest()[:12]
+
+
+_BOT_COMMIT = []   # bot_commit()'s answer for this process, once computed
+
+
+def bot_commit(root=None, repo=None):
+    """The checkout's commit the bot code played from (a record's `bot_commit`, #764): HEAD's
+    first 12 characters, plus '+dirty' when a file bot_hash covers differs from HEAD (edited,
+    or a new file not yet committed). `instrument` keys cells and staleness but is a hash no
+    commit answers to; this field only names, it is never compared. The covered files are
+    bot_hash's own (matrix.driver_source + harness.lua), not a second list. Computed once per
+    process when called bare; 'unknown' when git cannot say. An older record has no field."""
+    bare = root is None and repo is None
+    if bare and _BOT_COMMIT:
+        return _BOT_COMMIT[0]
+    import matrix
+    root = root or HERE
+    repo = repo or REPO
+    names = sorted(matrix.driver_source(root)) + ['harness.lua']
+    paths = [os.path.join(root, n) for n in names if os.path.exists(os.path.join(root, n))]
+    try:
+        def git(*a):
+            return subprocess.run(['git', '-C', repo] + list(a), check=True,
+                                  capture_output=True, text=True).stdout
+        out = git('rev-parse', 'HEAD').strip()[:12]
+        if git('status', '--porcelain', '--', *paths).strip():
+            out += '+dirty'
+    except (OSError, subprocess.CalledProcessError):
+        out = 'unknown'
+    if bare:
+        _BOT_COMMIT.append(out)
+    return out
 
 
 def cell_stamp(env, mode, bot):
@@ -3252,9 +3287,9 @@ def resume_main(args, pool=None):
         crashed += rec.get('outcome') == 'crashed'
         timed_out += rec.get('outcome') == 'timeout'
         # a scout lap's end says so: its `done` is never a clean game (ADR 0409)
-        print('%s (from %s): %s%s (%s)' % (rec.get('campaign'), rec.get('resumed_from'),
-                                           'scout lap ' if rec.get('scout') else '',
-                                           rec.get('outcome'), rec.get('why')), flush=True)
+        print('%s (from %s): %s%s (%s) [bot %s]' % (
+            rec.get('campaign'), rec.get('resumed_from'), 'scout lap ' if rec.get('scout') else '',
+            rec.get('outcome'), rec.get('why'), rec.get('bot_commit') or 'unrecorded'), flush=True)
     if crashed or timed_out:
         print('%d crashed, %d timed out' % (crashed, timed_out), flush=True)
     return 1 if crashed or timed_out else 0

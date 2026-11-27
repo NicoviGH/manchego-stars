@@ -419,6 +419,37 @@ class Workers(unittest.TestCase):
                              '/tmp/w', '/nonexistent.log')
         self.assertEqual(mine[0]['instrument'], 'i+v2')
 
+    def test_bot_commit_is_heads_sha_and_dirty_when_a_bot_file_differs(self):
+        # #764: a hash cannot be traced to a commit; the record also names HEAD
+        with tempfile.TemporaryDirectory() as root:
+            def git(*a):
+                return subprocess.run(['git', '-C', root, '-c', 'user.name=t', '-c',
+                                       'user.email=t@t'] + list(a), check=True,
+                                      capture_output=True, text=True).stdout.strip()
+            git('init', '-q')
+            for name in ('bot.lua', 'harness.lua', 'run.sh', 'gen_symbols.py', 'test_bot.lua'):
+                with open(os.path.join(root, name), 'w') as fh:
+                    fh.write('x\n')
+            git('add', '.')
+            git('commit', '-qm', 'c')
+            head = git('rev-parse', 'HEAD')[:12]
+            self.assertEqual(mc.bot_commit(root, root), head)
+            with open(os.path.join(root, 'test_bot.lua'), 'w') as fh:
+                fh.write('a test is no bot file\n')
+            self.assertEqual(mc.bot_commit(root, root), head)
+            with open(os.path.join(root, 'bot.lua'), 'w') as fh:
+                fh.write('changed\n')
+            self.assertEqual(mc.bot_commit(root, root), head + '+dirty')
+
+    def test_every_record_a_worker_leaves_names_the_bot_commit(self):
+        with mock.patch.object(mc, 'bot_commit', return_value='abc123def456'):
+            recs = mc.records_of({}, 'BOTRUN {"outcome": "won"}\nCAMPAIGN {"outcome": "played"}',
+                                 '/tmp/w', '/nonexistent.log')
+            none = mc.records_of({}, '', '/tmp/w', '/nonexistent.log')
+        self.assertEqual([r['bot_commit'] for r in recs + none], ['abc123def456'] * 3)
+        # an older record has none and still reads
+        self.assertIsNone({'outcome': 'won'}.get('bot_commit'))
+
     def test_a_campaign_run_sh_cut_short_ends_crashed_in_its_words(self):
         # #665: run.sh's wall net cut 19 of 20 laps mid-chapter; campaign.lua never wrote its
         # end, so resume printed and counted nothing and the lap looked finished
