@@ -3284,10 +3284,10 @@ local function releasesOf(ctx)
                 if openRecruit[c] then stake.gone[c], any = r.gone[c], true end
             end
             if any then
-                -- each unit's gap, on the map the door's change leaves (sight.changed). Every game
-                -- sight has `changed`; only a test's fake without a change lacks it, and reads its
-                -- own one map
-                -- and each owed recruit's talkers' gaps, a Talk's reach of his arrival tile
+                -- each unit's strike gap, and each owed recruit's talkers' Talk gap (a Talk's
+                -- reach of his arrival tile), on the map the door's change leaves (sight.changed).
+                -- Every game sight has `changed`; only a test's fake without a change lacks it,
+                -- and reads its own one map
                 local function gaps()
                     local out, talk = {}, {}
                     for _, u in ipairs(ctx.actors) do
@@ -3339,7 +3339,8 @@ local function releasesOf(ctx)
                         local g = both.talk[c] and both.talk[c][u.id]
                         if g then
                             talkers[#talkers + 1] = { u = u, gap = g, charId = c,
-                                                      atDoor = toDoor[u.id] ~= nil and toDoor[u.id] <= 1 }
+                                                      -- no way to the door: it can come no nearer
+                                                      atDoor = toDoor[u.id] == nil or toDoor[u.id] <= 1 }
                         end
                     end
                 end
@@ -3446,7 +3447,8 @@ end
 local function exploring(ctx, sent, barred, triedIn)
     ctx.exploreGoal = {}
     -- each unit's chain of goals (jobs.lua), the first its exploreGoal: written for R3 (#767),
-    -- whose per-turn planner plays these jobs; nothing reads it before then
+    -- whose per-turn planner plays these jobs; until then only the plan trace reads it (its
+    -- `chosen`), and sendStagers clears a talker's chain when it sends it to a door
     ctx.jobs = {}
     ctx.tried = {}
     barred = barred or {}

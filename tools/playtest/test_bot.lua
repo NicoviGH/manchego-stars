@@ -2828,7 +2828,8 @@ do
             obstacles = {}, doors = doors, openers = { [0x01] = true },
             -- S holds no key for the door (sight.locked): A alone opens it
             locked = { [0x02] = { ["2,0"] = "door" } },
-            talk = L and { [0x04] = { ["arrival:28"] = true }, [0x05] = { ["arrival:29"] = true } } or nil,
+            talk = L and { [0x04] = { ["arrival:28"] = true }, [0x05] = { ["arrival:29"] = true },
+                           [0x02] = opt.sTalks and { ["arrival:28"] = true } or nil } or nil,
             explorable = explorable, canExplore = canExplore,
             change = function(c)
                 if c.opened and c.opened["2,0"] then return { field = fields(true) } end
@@ -2932,6 +2933,17 @@ do
     check((g == nil or not g.stage) and r and tostring(r.staged) .. " " .. tostring(r.talkReady), "true false",
           "release: a lord talker is not sent, and the release is staged without him")
     check(a and a.act, "door", "release: no talker the stage job can send, the door opens")
+    -- L at (9,0): reached on the opened map only, no way to the door while it is shut. It can
+    -- come no nearer, so it does not hold the door for good either
+    _, ctx = case(1, { talker = { 9, 0 } })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. tostring(r.talkReady), "true false",
+          "release: a talker with no way to the shut door stages it")
+    -- S may Talk him too: sent as a striker, it is his talker on its way, and L is not sent as well
+    _, ctx = case(7, { talker = { 7, 2 }, sTalks = true })
+    local gs, gl = ctx.exploreGoal[0x02], ctx.exploreGoal[0x04]
+    check(tostring(gs and gs.stage) .. " " .. tostring(gl ~= nil and gl.stage == true), "true false",
+          "release: a striker sent that may Talk him is his talker; no second talker is sent")
     -- the talker beside the door, the recruit arriving farther than it reaches: it has come as far
     -- as staging brings it, so the door is not held for good
     _, ctx = case(1, { talker = { 1, 0 }, farRecruit = true })
