@@ -1812,6 +1812,24 @@ do
     for pid in pairs(Sight.aliveChecks(m, EV)) do got[#got + 1] = string.format("%X", pid) end
     table.sort(got)
     check(table.concat(got, " "), "F9 FA FB", "aliveChecks: every check, through a CALL, no slot")
+    -- endingChecks reads the group's +4C through GetChapterEventDataPointer (a fake sandbox)
+    local GROUP = 0x08004800
+    m.w32(GROUP + 0x4C, EV)
+    local api = { mem = m, chapter = function() return 7 end,
+                  SYM = { GetChapterEventDataPointer = 0x0800A000 } }
+    local asked
+    local function sandbox(f)
+        return f(function(addr, args) asked = { addr, args[1] }; return GROUP end)
+    end
+    local ending = Sight.endingChecks(api, sandbox)
+    check(string.format("%s %s %s %X %d", tostring(ending[0xF9]), tostring(ending[0xFA]),
+                        tostring(ending[0xFB]), asked[1], asked[2]),
+          "true true true 800A000 7", "endingChecks: the chapter's +4C script")
+    -- a walk the budget cut short is no read at all: nil, never a partial list
+    local budget = Sight.EV_WALK_BUDGET
+    Sight.EV_WALK_BUDGET = 2
+    check(Sight.endingChecks(api, sandbox), nil, "endingChecks: a truncated walk reads nil")
+    Sight.EV_WALK_BUDGET = budget
     m.w16(EV, 0x3320)   -- CHECKSTATE sub 0 (not CHECK_ALIVE): not read
     check(Sight.aliveChecks(m, EV)[0xFA], nil, "aliveChecks: another CHECKSTATE is no life test")
 end

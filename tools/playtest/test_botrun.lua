@@ -1297,8 +1297,9 @@ do
     check(joined and joined.from, "green", "it joined from green")
 end
 
--- The four-part clean clear (#510 step 9 design, part A): won, no blue unit lost (nor a green the ending tests, #788),
--- every owed recruit joined, every village and chest taken, each read off the game.
+-- The four-part clean clear (#510 step 9 design, part A): won, no blue unit lost (nor a green
+-- the ending tests, #788), every owed recruit joined, every village and chest taken, each read
+-- off the game.
 
 -- the rout, judged: nothing owed, nothing to explore
 local function judged(o)
@@ -1342,7 +1343,8 @@ do
     check(#r.clear.rewards_missing, 0, "clean: no reward missing")
 end
 
--- test_a_green_death_spoils_the_clear: a green ally falls in the enemy phase (design 11).
+-- test_a_green_death_spoils_the_clear: a green ally falls in the enemy phase (design 11). The
+-- harness here has no api.gated, so ADR 0376's rule holds: every green's death counts (#788).
 do
     local units = rout()
     units[#units + 1] = unit(0x41, 0, "green", 5, 5, 10)
@@ -1380,6 +1382,10 @@ do
     r = fell({ [0x41] = true })
     check(r.clear.lost[1] and r.clear.lost[1].charId, 0x41, "gated green: a loss for the clear")
     check(r.clean, false, "gated green: not clean")
+    -- a read the harness could not finish (api.gated -> nil): every green counts
+    r = fell(nil)
+    check(r.clear.lost[1] and r.clear.lost[1].charId, 0x41, "unread gate: the green a loss")
+    check(r.clean, false, "unread gate: not clean")
 end
 
 -- test_a_green_unit_a_script_unloads_is_not_lost: the chapter's ending clears its green units

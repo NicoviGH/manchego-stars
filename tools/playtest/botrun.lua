@@ -996,7 +996,7 @@ function M.run(api)
     -- run's end. Vanilla's endings leave an unrecruited one as a blue entry the roster test
     -- keeps out (EventScr_StrictLoadUniqueAlly: SET_HP 0 sets US_DEAD)
     local owed = nil
-    local gated = nil
+    local gated, gatedRead = nil, false
     -- the owed recruits an earlier attempt of this chapter saw arrive (Timeline.arrivals,
     -- ADR 0436): Bot.candidates' opts.pending, the goals of units not on the board yet
     -- Then the arrivals the chapter's own turn events script (sight.scriptedUnits, #724: a unit a
@@ -1291,8 +1291,9 @@ function M.run(api)
     local function changes(after)
         -- the greens whose death spoils the clean clear besides an escort (#788): the ones the
         -- chapter's ending tests for life, read once beside the owed recruits. A harness with no
-        -- api.gated leaves it nil, and then every green's death spoils it (ADR 0376's rule)
-        if api.gated and not gated then gated = api.gated() or {} end
+        -- api.gated, or a read it could not finish (nil), leaves it nil, and then every green's
+        -- death spoils it (ADR 0376's rule): never a pass on a read that failed
+        if api.gated and not gatedRead then gated, gatedRead = api.gated(), true end
         if api.recruits and not owed then
             local party = {}
             for _, c in ipairs(api.party()) do party[c] = true end
@@ -1315,8 +1316,9 @@ function M.run(api)
         lastBoard, actedIn = after, nil
     end
 
-    -- A blue or green unit lost spoils the clear (design 11: vanilla Ch6's Orion's Bolt is
-    -- given only if its three green villagers live), so both are deaths; a red one is a kill.
+    -- A blue or green unit lost is a death (a green the ending tests spoils the clear, #788:
+    -- vanilla Ch6's Orion's Bolt is given only if its three green villagers live); a red one is
+    -- a kill.
     -- A death or a kill is one the game ran UnitKill on (api.killed); `list`, the board's
     -- falls, gives a killer where the watch saw no fight, and the red units that left the
     -- field unkilled (`leftMap`). A slot the watch

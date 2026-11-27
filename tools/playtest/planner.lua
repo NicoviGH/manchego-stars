@@ -1949,10 +1949,10 @@ function M.plan(Bot, board, sight, style, opts)
                    area_positional = 0, area_truncated = 0,
                    look = { decisions = 1, triggered = 0, extended = 0, skipped_budget = 0,
                             calls = 0, cpu_s = 0, wear = 0, wear_cpu_s = 0, wear_skipped = 0 } }
-    -- a green unit lost spoils the clear as a player unit lost does (botrun's clean clear: vanilla
-    -- Ch2's Ross, a Talk recruit, killed on turn 2 in every style while only blue deaths were
-    -- paid), so the phase's strikes on one are paid at the same price. No plan moves one: it
-    -- meets the phase where it stands
+    -- a green unit's death is paid at a player unit's price (ADR 0381: vanilla Ch2's Ross, a
+    -- Talk recruit, killed on turn 2 in every style while only blue deaths were paid), though
+    -- only an escort or a green the ending tests spoils the clean clear (#788). No plan moves
+    -- one: it meets the phase where it stands
     local greens = {}
     -- A carried green is one too (board's carriedBy): carried it meets no strike, and a plan
     -- that drops it meets the phase on its drop tile

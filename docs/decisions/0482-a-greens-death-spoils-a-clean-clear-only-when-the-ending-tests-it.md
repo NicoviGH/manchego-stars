@@ -28,8 +28,12 @@ ROM, never a table, so Manchego Stars' own endings are covered by the same read.
   the spoiling ones.
 - Branches are not evaluated, so a green the ending tests for dialogue alone also counts. Vanilla
   has no such case: every ending test of a non-player unit guards a `GIVEITEMTO`.
-- A harness with no `api.gated` keeps ADR 0376's rule (every green counts), never a silent pass.
+- A harness with no `api.gated`, or a walk its budget cut short (`endingChecks` returns nil, never
+  a partial list), keeps ADR 0376's rule: every green counts, never a silent pass.
 - An owed recruit is still judged by `recruits_missing`, whatever its side.
+- The other reports are unchanged: `rec.greens.allied_deaths` lists every non-escort green that
+  died, gated or not (`rec.clear.lost` says which spoiled the clear), and montecarlo's
+  `protected_deaths` (the death rate) still counts blue units and escorts only.
 
 **Proof on the vanilla ROM** (a probe running `sight.aliveChecks` over the base ROM's bytes, the
 group from `gChapterDataAssetTable[gChapterDataTable[ch].mapEventDataId]`, the tables
@@ -40,5 +44,8 @@ and F4-F7 (item 0x55, `EventScr_089F79D4`), index 24 (Ch10b) 89 8A 8B
 so Ch19's greens gate nothing. Unit tests: `test_sight.lua` (aliveChecks), `test_botrun.lua`
 (`test_a_green_death_spoils_the_clear_only_when_the_ending_tests_it`), each failing without the change.
 
-**Not changed.** The planner: ADR 0384 already pays an allied green's survival only as a tie-break,
-and an escort's death as a forfeit.
+**Not changed: the planner.** It still pays a green's predicted death at a player unit's price
+in a plan's value (`planner.lua` `loss(W, st, g.charId) * die[g.id]`, ADR 0381), keeps the greens'
+summed death as a tie-break (`green_die`, ADR 0384), and leaves allied greens out of the cap's
+admission. Whether a green that gates nothing should still be paid in full is a play change, to
+be measured on its own.

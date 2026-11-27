@@ -1574,16 +1574,25 @@ function M.aliveChecks(mem, script)
     return out, truncated
 end
 
+-- Inside a sandbox: the word at `offset` in this chapter's struct ChapterEventGroup
+-- (include/chapterdata.h), the group from GetChapterEventDataPointer: an event list or a script.
+-- The one read of the group, eventSearch's and M.endingChecks'.
+local function chapterEvents(api, call, offset)
+    local group = call(api.SYM.GetChapterEventDataPointer, { api.chapter() })
+    return api.mem.u32(group + offset)
+end
+
 -- The units whose life the chapter's ending scene tests (#788): M.aliveChecks over
--- ChapterEventGroup +4C endingSceneEvents (include/chapterdata.h:147), the group from
--- GetChapterEventDataPointer. A green on it may gate a reward (Ch6's villagers, Ch10b's three,
--- Ch17a's four beside Syrene), so its death spoils a clean clear; any other green's does not.
--- -> { [charId] = true }, truncated.
+-- ChapterEventGroup +4C endingSceneEvents (include/chapterdata.h:147). A green on it may gate a
+-- reward (Ch6's villagers, Ch10b's three, Ch17a's four beside Syrene), so its death spoils a clean
+-- clear; any other green's does not. -> { [charId] = true }, or nil when the walk's budget cut it
+-- short: a partial read could miss a gated green, so the caller keeps ADR 0376's rule instead.
 local CHAPTER_ENDING = 0x4C
 function M.endingChecks(api, sandbox)
     return (sandbox or M.machine(api.cpu))(function(call)
-        local events = call(api.SYM.GetChapterEventDataPointer, { api.chapter() })
-        return M.aliveChecks(api.mem, api.mem.u32(events + CHAPTER_ENDING))
+        local got, truncated = M.aliveChecks(api.mem, chapterEvents(api, call, CHAPTER_ENDING))
+        if truncated then return nil end
+        return got
     end)
 end
 
@@ -2124,9 +2133,9 @@ end
 -- list at `offset` in its ChapterEventGroup (GetChapterEventDataPointer), ready for the game's
 -- SearchAvailableEvent -- the turn events (+00), the talks (+04), the location events (+08).
 local function eventSearch(api, call, info, offset)
-    local events = call(api.SYM.GetChapterEventDataPointer, { api.chapter() })
+    local list = chapterEvents(api, call, offset)
     for o = 0, EVENT_INFO_SIZE - 4, 4 do api.write32(info + o, 0) end
-    api.write32(info, api.mem.u32(events + offset))
+    api.write32(info, list)
 end
 
 -- Inside a sandbox: the scripts the chapter's event list at `offset` offers now, in the game's
