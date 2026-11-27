@@ -44,13 +44,24 @@ and F4-F7 (item 0x55, `EventScr_089F79D4`), index 24 (Ch10b) 89 8A 8B
 so Ch19's greens gate nothing. Unit tests: `test_sight.lua` (aliveChecks), `test_botrun.lua`
 (`test_a_green_death_spoils_the_clear_only_when_the_ending_tests_it`), each failing without the change.
 
-**The planner pays what the clear counts (same PR, Nicolas asked why not).** A green's
-predicted death costs a plan's value (`loss(W, st, g.charId) * die`, ADR 0381) only when
-`planner.greenPaid` holds: it ends the game (an escort, paid `W.win`), it is an owed recruit
+**The planner pays what the clear counts (same PR, Nicolas 2026-11-27: "why not as part of this
+PR?").** A green's predicted death costs a plan only when `planner.greenPaid` holds: it ends the
+game (an escort, paid `W.win` and protected under the cap), it is an owed recruit
 (`st.recruits`/`st.loose`: Ch2's Ross), or the ending tests it (`opts.gated`, botrun's read). An
-unread gate (nil) pays every green as before. Any other green's death is left to the rank's
-tie-break (`green_die`, ADR 0384), which is unchanged; allied greens stay out of the cap's
-admission (only a game-over green is protected, `planner.lua` `if gameOver[g.charId] then
-protect`). Since `green_die` ranks before `value`, the change acts mostly on which plans the search
-keeps, not on the pick among plans within a turn of progress. Unit test
-`test_planner_pays_a_green_only_when_it_spoils_the_clear` fails without it.
+unread gate (nil) pays every green as before. The rule holds at every place a green's death
+enters: the first phase's value (`loss(W, st, g.charId) * die`, ADR 0381), the lookahead's second
+phase, and the rank's `green_die` tie-break (ADR 0384), both phases. Allied greens stay out of the
+cap's admission (only a game-over green is protected: `if gameOver[g.charId] then protect`).
+Unit tests `test_planner_pays_a_green_only_when_it_spoils_the_clear` and
+`test_lookahead_counts_a_green_and_ranks_the_list_once` fail without it.
+
+Replays of vanilla Ch19 s4002, attempt 1 (one game each, a lead not a rate):
+
+| Tag | Bot | Blue deaths | Greens lost | Chests missed |
+|---|---|---|---|---|
+| `g788a` | the record's rule only | 5 (t3, t4, t7, t12, t12) | 9 | 6 of 6 |
+| `g788c` | + the value, both phases | 5, the same game | 9 | 6 of 6 |
+| `g788d` | + the tie-break | 3 (t3, t4, t5) | 8 | 6 of 6 |
+
+The value alone changed no act on this start; the tie-break is what steered the plans toward
+Ch19's greens. R6 measures it over every start.

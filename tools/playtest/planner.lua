@@ -394,8 +394,9 @@ end
 -- Whether a green's death is paid in a plan's value (#788, ADR 0482): when it spoils the clean
 -- clear, i.e. it ends the game (an escort, paid W.win), it is an owed recruit (ADR 0381: vanilla
 -- Ch2's Ross), or the chapter's ending tests its life (`gated`, botrun's api.gated: a reward it
--- may gate). `gated` nil (unread) pays every green, ADR 0376's rule. Any other green's death is
--- left to the rank's tie-break (green_die, ADR 0384) alone.
+-- may gate). `gated` nil (unread) pays every green, ADR 0376's rule. Any other green's death
+-- costs nothing, in the value or the rank's green_die tie-break (ADR 0384): its death is still
+-- predicted, and reported.
 function M.greenPaid(st, g, gated)
     return gated == nil or st.gameOver[g.charId] or st.recruits[g.id] or st.loose[g.id]
         or gated[g.charId] or false
@@ -2631,7 +2632,7 @@ function M.plan(Bot, board, sight, style, opts)
             -- without its chance every plan that risks the recruit at all ties, and one that
             -- lowers it ranks no higher (vanilla Ch2's Ross, 37% in every turn-1 plan, #510).
             -- The forfeit ranks first, so this only breaks ties among plans that forfeit alike
-            if not gameOver[g.charId] then
+            if not gameOver[g.charId] and M.greenPaid(st, g, opts and opts.gated) then
                 greenDie = greenDie + (die[g.id] or 0)
             end
         end
@@ -3266,7 +3267,8 @@ function M.plan(Bot, board, sight, style, opts)
                             rank.value = rank.value - loss(W, st, u.charId) * more
                         end
                         if u.maxhp then rank.value = rank.value - W.taken * (lost[u.id] or 0) end
-                        if f and f.green and not protected[u.id] then
+                        if f and f.green and not protected[u.id]
+                            and M.greenPaid(st, u, opts and opts.gated) then
                             rank.green_die = rank.green_die + more
                         end
                     end

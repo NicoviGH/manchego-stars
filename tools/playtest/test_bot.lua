@@ -6990,8 +6990,9 @@ do
 end
 
 -- test_planner_pays_a_green_only_when_it_spoils_the_clear (#788, ADR 0482): the same lost green G
--- costs the plan's value W.death when the ending tests its life (opts.gated names it) or the gate
--- is unread (nil), and nothing when the ending tests no green. Its death is still predicted.
+-- costs the plan's value W.death and counts in the green_die tie-break when the ending tests its
+-- life (opts.gated names it) or the gate is unread (nil); when the ending tests no green, neither.
+-- Its death is still predicted.
 do
     local W = Planner.WEIGHTS.careful   -- greenBlock plays careful
     local _, die, unread = greenBlock(40)
@@ -7002,6 +7003,10 @@ do
     check(dieFree, die, "planner: an ungated green's death is still predicted")
     check(math.abs(free - paid - W.death * die) < 1e-6, true,
           "planner: an ungated green's death costs the value nothing")
+    -- nor breaks ties: careful blocks for a gated green within a turn of progress (above), and
+    -- keeps the ground for one the ending does not test
+    check(greenBlock(24, { gated = { [0x30] = true } }), "1,0", "planner: blocks for a gated green")
+    check(greenBlock(24, { gated = {} }), "0,0", "planner: an ungated green breaks no tie")
 end
 
 -- test_planner_mends_a_plan_that_loses_a_green_unit: A's march to (0,1) is its best act by its
@@ -11431,7 +11436,8 @@ do
     check(freeKey, paidKey, "lookahead #788: the same plan heads both")
     check(free - paid > 0.99 * Planner.WEIGHTS.careful.death, true,
           "lookahead #788: an ungated green's second-phase death costs the value nothing")
-    check(freeDie, paidDie, "lookahead #788: and green_die still counts it")
+    check(paidDie > 0.99 and freeDie == 0, true,
+          "lookahead #788: and green_die counts it only when it spoils the clear")
     for _, c in ipairs(plan.considered) do
         if c.extended then
             check(c.rank.green_die > 0.99, true, "lookahead: the green's second-phase death is paid")
