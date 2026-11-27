@@ -2346,8 +2346,8 @@ do
     check(Sight.opensChests({ { id = 0x69 } }, 0, Board.ITEM_COUNT), true, "opensChests: a Chest Key")
     check(Sight.opensChests({ { id = 0x6B } }, 0, Board.ITEM_COUNT), false, "opensChests: a Lockpick, no CA_STEAL")
     check(Sight.opensChests({ { id = 0x6B } }, 4, Board.ITEM_COUNT), true, "opensChests: a Lockpick on a thief")
-    check(Sight.dropsLoot(Board.US_DROP_ITEM, Board), true, "dropsLoot: a thief with the drop flag gives its loot back")
-    check(Sight.dropsLoot(0, Board), false, "dropsLoot: a thief without it keeps its loot")
+    check(Sight.dropsLoot(Board.US_DROP_ITEM, Board.bind({}, {})), true, "dropsLoot: a thief with the drop flag gives its loot back")
+    check(Sight.dropsLoot(0, Board.bind({}, {})), false, "dropsLoot: a thief without it keeps its loot")
     check(Sight.opensChests({ { id = 1 }, { id = 2 }, { id = 3 }, { id = 4 }, { id = 0x69 } }, 0, Board.ITEM_COUNT),
         false, "opensChests: a full bag takes no loot")
 end
@@ -2990,20 +2990,32 @@ end
 -- the Supply screen's Take would hand it; none with a full bag, a convoy that is not the
 -- game's, or no such item. legal asks it again for the key the act names.
 do
-    local convoy, fault = {}, nil
-    local Bd = { ITEM_COUNT = 5, convoyItems = function() return convoy end,
-                 convoyFault = function() return fault end }
+    -- the harness's own board (Board.bind) over a fake memory: a convoy is its u16 slots, and
+    -- an item is the game's when its gItemData row names it (Board.convoyFault)
+    local bytes, CS = {}, { gConvoyItemArray = 0x1000, gItemData = 0x4000 }
+    local mem = { u8 = function(a) return bytes[a] or 0 end,
+                  u16 = function(a) return (bytes[a] or 0) | ((bytes[a + 1] or 0) << 8) end }
+    local function convoy(...)
+        for i = 0, Board.CONVOY_ITEM_COUNT * 2 - 1 do bytes[CS.gConvoyItemArray + i] = nil end
+        for i, v in ipairs({ ... }) do
+            local at = CS.gConvoyItemArray + (i - 1) * 2
+            bytes[at], bytes[at + 1] = v & 0xFF, v >> 8
+            local id = v & 0xFF
+            if id ~= 0 then bytes[CS.gItemData + id * Board.ITEMDATA_STRIDE + Board.ITEMDATA_NUMBER] = id end
+        end
+    end
+    local Bd = Board.bind(mem, CS)
     local opens = function(id) return id == 0x6A end
     local u = { items = { {}, {} } }
-    convoy = { { id = 0x14, uses = 30 }, { id = 0x6A, uses = 1 } }
-    local k = Sight.convoyKey(Bd, nil, {}, u, opens)
+    convoy(0x1E14, 0x016A)
+    local k = Sight.convoyKey(Bd, u, opens)
     check(k and (k.id .. "x" .. k.uses), "106x1", "convoyKey: the first item that opens a door")
-    check(Sight.convoyKey(Bd, nil, {}, { items = { {}, {}, {}, {}, {} } }, opens), nil,
+    check(Sight.convoyKey(Bd, { items = { {}, {}, {}, {}, {} } }, opens), nil,
           "convoyKey: none into a full bag")
-    fault = "a garbage slot"
-    check(Sight.convoyKey(Bd, nil, {}, u, opens), nil, "convoyKey: none from a convoy not the game's")
-    fault, convoy = nil, { { id = 0x14, uses = 30 } }
-    check(Sight.convoyKey(Bd, nil, {}, u, opens), nil, "convoyKey: none with no key in it")
+    convoy(0x1E14, 0, 0x016A)
+    check(Sight.convoyKey(Bd, u, opens), nil, "convoyKey: none from a convoy not the game's")
+    convoy(0x1E14)
+    check(Sight.convoyKey(Bd, u, opens), nil, "convoyKey: none with no key in it")
     local at = sightSrc:find('elseif a.act == "supply" then', 1, true)
     local branch = at and sightSrc:sub(at, sightSrc:find("elseif", at + 10, true)) or ""
     check(branch:find("key.id == a.item", 1, true) ~= nil and branch:find("key.uses == a.uses", 1, true) ~= nil,
@@ -3012,10 +3024,10 @@ do
     check(branch:find("s.convoyKey(u, a.terrain)", 1, true) ~= nil, true,
           "legal: the Take's key is read for the lock the act names")
     local chestOpens = function(id) return id == 0x69 end
-    convoy = { { id = 0x6A, uses = 1 }, { id = 0x69, uses = 1 } }
-    local ck = Sight.convoyKey(Bd, nil, {}, u, chestOpens)
+    convoy(0x016A, 0x0169)
+    local ck = Sight.convoyKey(Bd, u, chestOpens)
     check(ck and ck.id, 0x69, "convoyKey: the first item that opens a chest")
-    check(Sight.convoyKey(Bd, nil, {}, { items = { {}, {}, {}, {}, {} } }, chestOpens), nil,
+    check(Sight.convoyKey(Bd, { items = { {}, {}, {}, {}, {} } }, chestOpens), nil,
           "convoyKey: no chest key into a full bag")
 end
 
@@ -3856,7 +3868,10 @@ do
                           order[#order + 1] = string.format("keep %X %d", a, n)
                       end }
     setBag(mark, 0x0114, 0x016B, 0x2D6C); setBag(thief, 0x2814)
-    local item = Sight.moveItem(moveApi, gameCall, SY, Board, mark, 1, thief)
+    -- The board is the harness's own shape (Board.bind, api.Board): its readers take no mem,
+    -- so a call written for the raw module's signature fails here as it does in the game
+    local bound = Board.bind(m, SY)
+    local item = Sight.moveItem(moveApi, gameCall, SY, bound, mark, 1, thief)
     check(item, 0x6B, "moveItem: the Lockpick's id")
     -- a nested sandbox undoes only api writes: both bags are kept before the game's own calls
     check(table.concat(order, ","),
@@ -3867,11 +3882,11 @@ do
     -- ActionSteal clears the target's drop flag when the stolen slot was its last item
     local DROP = Board.US_DROP_ITEM
     setBag(mark, 0x0114, 0x016B); m.w32(mark + 0x0C, DROP | 1)
-    Sight.moveItem(moveApi, gameCall, SY, Board, mark, 0, thief)
+    Sight.moveItem(moveApi, gameCall, SY, bound, mark, 0, thief)
     check(m.u32(mark + 0x0C), DROP | 1,
           "moveItem: a slot that is not the last leaves the drop flag")
     setBag(mark, 0x0114, 0x016B); m.w32(mark + 0x0C, DROP | 1)
-    Sight.moveItem(moveApi, gameCall, SY, Board, mark, 1, thief)
+    Sight.moveItem(moveApi, gameCall, SY, bound, mark, 1, thief)
     check(m.u32(mark + 0x0C), 1, "moveItem: the last item's slot clears the target's drop flag")
 
     -- pilfer: the thief stands on the act's tile, the item moves, and `lock` says whether the
@@ -3881,32 +3896,32 @@ do
     local function standOn(e, x, y) stoodOn = { e.id, x, y } end
     local act = { steal = true, target = 5, slot = 1, tile = { x = 2, y = 3 } }
     setBag(mark, 0x0114, 0x016B); setBag(thief, 0)
-    local th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    local th = Sight.pilfer(moveApi, gameCall, SY, bound, standOn, { id = 0x81, addr = thief }, act)
     check(table.concat({ th.thief, th.target, th.item, tostring(th.lock),
                          table.concat(stoodOn, "/") }, ","), "129,5,107,true,129/2/3",
           "pilfer: the Lockpick's theft costs its holder the chests")
     check(th.spoils, true, "pilfer: a Lockpick ranks above the boosters, so its theft spoils")
     setBag(mark, 0x0114, 0x016B, 0x0169); setBag(thief, 0)
-    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    th = Sight.pilfer(moveApi, gameCall, SY, bound, standOn, { id = 0x81, addr = thief }, act)
     check(th.lock, false, "pilfer: a holder with a Chest Key left still opens chests")
     setBag(mark, 0x0114, 0x0169); setBag(thief, 0)
-    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief },
+    th = Sight.pilfer(moveApi, gameCall, SY, bound, standOn, { id = 0x81, addr = thief },
                       { steal = true, target = 5, slot = 1, tile = { x = 2, y = 3 } })
     check(th.item == 0x69 and th.lock, true,
           "pilfer: a stolen Chest Key costs its holder the chests")
     -- spoils: the game's rank against the Skl booster's (ADR 0379's line, M.stealSpoils)
     check(th.spoils, false, "pilfer: a Chest Key ranks below the boosters and spoils nothing")
     setBag(mark, 0x0114, 0x2D6C); setBag(thief, 0)
-    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    th = Sight.pilfer(moveApi, gameCall, SY, bound, standOn, { id = 0x81, addr = thief }, act)
     check(th.lock, false, "pilfer: an item that opens nothing costs no chest")
     -- drops: a thief with the drop flag gives its last item back, and the loot goes last
     -- (ADR 0475: clean is the end state); a spoiling item it held last before is lost instead
     setBag(mark, 0x0114, 0x016B); setBag(thief, 0x0101); m.w32(thief + 0x0C, DROP)
-    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    th = Sight.pilfer(moveApi, gameCall, SY, bound, standOn, { id = 0x81, addr = thief }, act)
     check(tostring(th.spoils) .. "," .. tostring(th.drops), "true,true",
           "pilfer: a dropper's spoiling loot is given back when it dies")
     setBag(mark, 0x0114, 0x0169); setBag(thief, 0x0101, 0x016B); m.w32(thief + 0x0C, DROP)
-    th = Sight.pilfer(moveApi, gameCall, SY, Board, standOn, { id = 0x81, addr = thief }, act)
+    th = Sight.pilfer(moveApi, gameCall, SY, bound, standOn, { id = 0x81, addr = thief }, act)
     check(tostring(th.spoils) .. "," .. tostring(th.drops), "true,false",
           "pilfer: a dropper's earlier spoiling loot, pushed out of its drop slot, is lost")
     m.w32(thief + 0x0C, 0)
