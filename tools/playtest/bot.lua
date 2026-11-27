@@ -2342,6 +2342,38 @@ do
         return ctx.tradeNeed[u.id] or nil
     end
 
+    -- The hand-offs of robbed unit `u`'s items out of a thief's reach (ADR 0483, #688's items
+    -- half): each item of its bag the judged phase's thefts take (`taken`, a set of item ids:
+    -- the planner's st.stolen, so a thief the calendar brings this phase counts, and a holder of a
+    -- Chest Key and a Crest hands off the one stolen), given by `u` to each teammate within its
+    -- move and one, or taken from it by each teammate within theirs, as { unit = the actor, a =
+    -- its act }. The planner's mend offers them for a unit its judged phase robs
+    -- (M.handoffsFor); the judged phase plays the bags the Trade leaves (planner tradesIn), so a
+    -- hand-off is worth what the theft it moves out of reach costs. On every unit's menu they
+    -- were offered on quiet turns too, and Trades passed crests back and forth (replay l764d)
+    M.handoffs = function(ctx, u, taken)
+        local s, out = ctx.sight, {}
+        local open = function() return true end
+        for _, it in ipairs(u.items or {}) do
+            if (taken or {})[it.id] then
+                local h = { key = { id = it.id, uses = it.uses } }
+                for _, t in ipairs(ctx.blues or {}) do
+                    local reach = math.max(s.mov(u), s.mov(t)) + 1
+                    if t.id ~= u.id and not t.dead and Board.distance(u.x, u.y, t.x, t.y) <= reach then
+                        for _, a in ipairs({ tradeAct(ctx, u, t, h, true, open) or false,
+                                             tradeAct(ctx, t, u, h, false, open) or false }) do
+                            if a then
+                                a.handoff, a.why = true, "trade"
+                                out[#out + 1] = { unit = a.unitId == u.id and u or t, a = a }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return out
+    end
+
     -- The Trades on the army's key ways (#688): `u` takes the key its own way is fetched by
     -- (tradeFor), and, holding one, hands it to each teammate whose way is fetched by it.
     trades = function(ctx, u, gate, objective)
@@ -2856,6 +2888,15 @@ end
 -- move there (vanilla E_19, 2026-11-16: "could not perform item").
 local function offeredAt(ctx, u, a) return exposed(ctx, u, { a })[1] end
 
+-- The planner's mend of a unit a thief robs (ADR 0483): the Trades that move the items its
+-- judged phase takes (`taken`, item ids) to a teammate (M.handoffs), each offered as the menus'
+-- acts are (exposed). ctx: M.candidates' second value.
+function M.handoffsFor(ctx, u, taken)
+    local out = {}
+    for _, h in ipairs(M.handoffs(ctx, u, taken)) do out[#out + 1] = offeredAt(ctx, h.unit, h.a) end
+    return out
+end
+
 -- The planner's heal swap: unit `u`'s own heal on `tile` (ctx: M.candidates' second value).
 function M.mendAt(ctx, u, tile)
     local m = ownHeal(ctx, u)
@@ -3232,6 +3273,69 @@ local function strikeGap(ctx, u, r, reach, tiles)
     return best and here + best - ctx.sight.mov(u) - reach
 end
 
+-- The thieves the calendar brings, as releases (ADR 0483): a red that steals (sight.steals, its
+-- class's CA_STEAL) an earlier attempt saw the game bring to a tile on a board turn still to come
+-- (Timeline.calendar; a timed arrival comes on the same turn every try). A person who lost a key
+-- to it knows to meet it: strikers in reach of its tile the turn it appears, as at a door that
+-- brings reds (vanilla Ch16 s4005: the thief the game brings to (21,13) on turn 12 stole
+-- Eirika's Chest Key or looted the (20,y) chests in every try, and no unit struck it on its
+-- first turn). One release per tile and turn, `out`'s entries in the door's shape, so the stage
+-- job (sendStagers) sends and the record reads them as it does a door's:
+--   need: the thieves it brings, one striker each (the door rule's: its front's size)
+--   strikers: each unit's strikeGap to the tile, less the moves it has before that turn
+--     (`left` - 1 of them past this one): 0 or less, it can strike there on the arrival's turn
+--     though it does not walk toward it now
+--   due: the job is on once a move away from the tile would make the need-th nearest striker
+--     late. It stays on to the arrival: that gap falls by at most a move a turn, as fast as the
+--     moves left do, so a stager met early is held, not freed to walk off (no plan's act brings
+--     the thief, so no forfeit holds anything for it, as the door's does)
+-- No stake, talkers or opener: no act of the army brings it (planner's `released` never
+-- matches).
+function M.arrivalsOf(ctx, memory, out)
+    if not (ctx.sight.steals and ctx.turn) then return end
+    local byTile, order = {}, {}
+    for _, a in ipairs(Timeline.calendar(memory)) do
+        local left = a.boardTurn and a.boardTurn - ctx.turn
+        if a.faction == "red" and left and left >= 1 and ctx.sight.steals(a.classId) then
+            local key = "arrive:" .. tileKey(a.x, a.y) .. "@" .. a.boardTurn
+            local r = byTile[key]
+            if not r then
+                r = { x = a.x, y = a.y, key = key, arrival = a.boardTurn, left = left, need = 0,
+                      front = { { x = a.x, y = a.y } }, stake = { tiles = {}, gone = {} },
+                      talkers = {}, owes = {}, talkReady = true }
+                byTile[key], order[#order + 1] = r, key
+            end
+            r.need = r.need + 1
+        end
+    end
+    table.sort(order)
+    for _, key in ipairs(order) do
+        local r = byTile[key]
+        local strikers, ready = {}, 0
+        for _, u in ipairs(ctx.actors) do
+            local g = strikeGap(ctx, u, r)
+            if g then
+                g = g - (r.left - 1) * ctx.sight.mov(u)
+                strikers[#strikers + 1] = { u = u, gap = g }
+                if g <= 0 then ready = ready + 1 end
+            end
+        end
+        table.sort(strikers, soonestThenSlot("gap", "u"))
+        r.strikers, r.ready = strikers, ready
+        -- the need-th nearest the job may send (never a lord: sendStagers' bar) is due once a
+        -- move away from the tile now would make it late: its gap is within one move of the line
+        local lords, last, n = M.gameOver(ctx.sight), nil, 0
+        for _, st in ipairs(strikers) do
+            if n < r.need and not lords[st.u.charId] then last, n = st, n + 1 end
+        end
+        r.due = last ~= nil and last.gap > -ctx.sight.mov(last.u)
+        -- `full` gates the stage job: never full while due, so the stagers stay sent
+        r.full = not r.due
+        r.staged = ready >= r.need
+        out[#out + 1] = r
+    end
+end
+
 -- The releases this board can still make (Timeline.releases, #766): a door an earlier attempt
 -- opened onto reds, still shut here, whose units lost something still open here (a tile they
 -- closed, a recruit who left). A person who lost those by opening it with the army back opens
@@ -3254,7 +3358,9 @@ end
 local function releasesOf(ctx)
     local out = {}
     local memory = ctx.style and ctx.style.memory
-    if not (memory and ctx.sight.doors and ctx.sight.march) then return out end
+    if not (memory and ctx.sight.march) then return out end
+    M.arrivalsOf(ctx, memory, out)
+    if not ctx.sight.doors then return out end
     local shut = {}
     for _, d in ipairs(ctx.sight.doors()) do shut[tileKey(d.x, d.y)] = true end
     -- each owed recruit by charId: his ids here (an arrival's, a field unit's) and who may Talk

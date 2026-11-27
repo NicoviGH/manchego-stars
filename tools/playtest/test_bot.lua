@@ -553,6 +553,8 @@ local function sightOf(o)
         end
         return out
     end
+    -- the classes that steal (sight.steals: a class's CA_STEAL, ADR 0483)
+    if o.steals then s.steals = function(classId) return o.steals[classId] or false end end
     -- the convoy's door key for each unit (sight.convoyKey): { id, uses }
     -- (a chest's, when the lock is asked for: o.convoyChestKey, #699; o.chestOpeners hold one)
     if o.convoyKey or o.convoyChestKey then
@@ -591,7 +593,7 @@ local function sightOf(o)
     -- always has the read where it has villages and chests (none: no looter)
     -- and o.paths, where each watched recruit stands after each enemy phase (its second answer)
     if o.closings or o.explorable then
-        s.closings = function() return o.closings or {}, o.paths end
+        s.closings = function() return o.closings or {}, o.paths, o.closers end
     end
     -- villages and chests: the open tiles, and the unit menu's check per unit and tile
     if o.explorable then
@@ -6166,6 +6168,41 @@ do
     Planner.BEAM, Planner.FINAL = beam, final
     check(narrow ~= "0,1" and #(narrowPlan and narrowPlan.forfeited or { 1 }) == 0, true,
           "theft: the mend moves the robbed unit off the thief's tile when the beam kept only its stay")
+    -- ... and so it does for a theft of the holder's last chest opener, which forfeits nothing
+    -- but the chests it would open (vanilla Ch16 s4005, R5 tries 1-3, turn 12: every plan judged
+    -- marched Eirika into the east thief's reach, it stole her Chest Key, and all three (20,y)
+    -- chests read 0 after the phase; she was out of its reach where she stood)
+    Planner.BEAM, Planner.FINAL = 1, 1
+    local keyed = stands(0x69, true)
+    Planner.BEAM, Planner.FINAL = beam, final
+    check(keyed == "0,0" or keyed == "1,0", true,
+          "theft: the mend moves a key holder off the thief's tile when the beam kept only its stay")
+    -- ... and a march to a chest counts only in the ways the holder keeps an opener: the chest
+    -- is at (6,0), out of this turn's reach, and A's most forward tile (2,0) is the one the thief
+    -- robs it on. The march there is progress the rank puts before the score, so it outranked
+    -- the stay that kept the key (vanilla Ch16 s4005, replay l764a, turn 12: Eirika's stay was
+    -- judged by the mend and ranked a turn behind)
+    local function marches(lock)
+        local o = { reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }, { 2, 0 }) },
+                    explorable = { { x = 6, y = 0, kind = "chest" } },
+                    canExplore = { [0x01] = { ["6,0"] = "chest" } },
+                    field = fieldsOf({ ["6,0"] = { ["0,0"] = 6, ["1,0"] = 5, ["2,0"] = 4,
+                                                   ["3,0"] = 3, ["4,0"] = 2, ["5,0"] = 1,
+                                                   ["6,0"] = 0 } }),
+                    enemyPhase = function(plan)
+                        for _, b in ipairs(plan.blues) do
+                            if b.x == 2 and b.y == 0 and lock ~= nil then
+                                return { thefts = { { thief = 0x81, target = b.unit.id,
+                                                      item = 0x69, lock = lock } } }
+                            end
+                        end
+                        return {}
+                    end }
+        return at(Planner.plan(B, boardOf(A, X), sightOf(o), gifted("careful", 500)))
+    end
+    check(marches(nil), "2,0", "theft: with no thief, A marches to its most forward tile")
+    check(marches(false), "2,0", "theft: a theft that opens nothing leaves A's march alone")
+    check(marches(true), "1,0", "theft: a key holder's march stops short of the thief's tile")
 
     -- a way that surely kills the holder loses the item with its life: that way's death is the
     -- cost, not "stolen:1" on top of it (the plan that leaves A on the thief's tile)
@@ -6259,6 +6296,162 @@ do
     Planner.BEAM, Planner.FINAL = beam, final
     check(plan and #(plan.forfeited or { 1 }) == 0 and a and a.act == "attack" and a.targetId == 0x81,
           true, "theft: a cornered holder's thief is struck down by another unit, through the mend")
+end
+
+-- A holder with no tile out of the thief's reach hands its spoiling item to a teammate by Trade
+-- (ADR 0483, #688's items half; vanilla Ch16 s4005: Colm cornered at (19,1) with the Knight
+-- Crest, every tile of his robbed). H holds 0x6E then 0x6D on (5,5), its only tile; T stands
+-- beside it. The judged phase steals 0x6D from whoever holds it, and a Trade the plan makes moves
+-- it (plan.trades), so handing off that item, the one the theft takes, forfeits nothing; handing
+-- off the bag's first (0x6E) would leave it robbed. A theft that names no item hands nothing off.
+do
+    local H = blue(0x02, 1, 5, 5, { minRange = false,
+                                    items = { { id = 0x6E, uses = 1 }, { id = 0x6D, uses = 1 } } })
+    local T = blue(0x03, 2, 5, 7, { minRange = false, items = {} })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local function plan(item)
+        local o = {
+            reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
+            enemyPhase = function(p)
+                local holder = 0x02
+                for _, t in ipairs(p.trades or {}) do
+                    if t.holder == 0x02 and t.item == 0x6D then holder = t.taker end
+                end
+                if holder ~= 0x02 then return {} end
+                return { thefts = { { thief = 0x81, target = 0x02, item = item, lock = false,
+                                      spoils = true } } }
+            end,
+        }
+        return Planner.plan(B, boardOf(H, T, X), sightOf(o), gifted("careful", 500))
+    end
+    local _, robbed = plan(nil)
+    check(robbed and robbed.forfeited and robbed.forfeited[1], "stolen:2",
+          "hand-off: a theft that names no item, the cornered holder is robbed")
+    local _, saved = plan(0x6D)
+    local traded
+    for _, a in ipairs(saved and saved.considered and saved.considered[1] and saved.considered[1].acts or {}) do
+        if a:match(">trade@") then traded = a end
+    end
+    check(saved and #(saved.forfeited or { 1 }) == 0 and traded ~= nil, true,
+          "hand-off: the holder hands the stolen item to the teammate beside it and forfeits nothing")
+    -- the hand-off is the mend's, for a unit its judged phase robs: no board menu offers it, so a
+    -- quiet turn trades nothing (replay l764d: Trades passed crests back and forth all game)
+    local offered = 0
+    local o = { reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) } }
+    for _, c in ipairs(B.candidates(boardOf(H, T, X), sightOf(o), gifted("careful", 500))) do
+        for _, a in ipairs(c.acts) do
+            if a.act == "trade" then offered = offered + 1 end
+        end
+    end
+    check(offered, 0, "hand-off: no board menu offers it")
+    -- a full-bag taker's give-back leaves its bag once (#790 re-review): two hand-offs to T that
+    -- each name T's one 0x01 as `back` are not both in a plan, nor a Take of 0x01 from T and a
+    -- hand-off giving it back; the judged phase could not stage the second
+    local W = { breach = 0 }
+    local give = function(from, item)
+        return { act = "trade", unitId = from, targetId = 3, gives = true, item = item, uses = 1,
+                 back = { id = 0x01, uses = 30 }, handoff = true, unitHp = 20 }
+    end
+    local _, first = Planner.score(give(2, 0x6D), { hp = {}, took = {} }, W)
+    local took = { [first.took] = true, [first.tookBack] = true }
+    local _, second = Planner.score(give(4, 0x6E), { hp = {}, took = took }, W)
+    check(second.blocked, true, "hand-off: a second Trade of the taker's one give-back is no act")
+    local _, take = Planner.score({ act = "trade", unitId = 5, targetId = 3, item = 0x01, uses = 30,
+                                    unitHp = 20 }, { hp = {}, took = {} }, W)
+    local _, after = Planner.score(give(2, 0x6D), { hp = {}, took = { [take.took] = true } }, W)
+    check(after.blocked, true, "hand-off: nor one whose give-back an earlier Take moved")
+    local _, other = Planner.score(give(4, 0x6E), { hp = {}, took = { [first.took] = true } }, W)
+    check(other.blocked, false, "hand-off: another item's Trade to the same taker, with no give-back taken, is an act")
+    check(Planner.tradesIn({ { act = "trade", unitId = 2, targetId = 3, gives = true, item = 0x6D,
+                               uses = 1 },
+                             { act = "trade", unitId = 3, targetId = 2, item = 0x69, uses = 1,
+                               back = { id = 1, uses = 30 } },
+                             { act = "wait", unitId = 4 } })[2].holder, 2,
+          "tradesIn: a take's holder is its target")
+end
+
+-- test_a_thief_the_calendar_brings_is_met (ADR 0483): an earlier attempt saw the game bring a
+-- thief (class 13, which steals) to (9,0) on a board turn. S (MOV 1, reach 1) stands 9 from it:
+-- gap 7 this turn. With the arrival 11 turns off it has turns to spare and is not sent; 7 turns
+-- off, a move away now would make it late, so it is sent beside the tile (the stage job), and
+-- held there to the arrival though it could already strike in time. One thief, one striker.
+-- Never once it arrived, nor for a class that does not steal, nor a lord. Vanilla Ch16 s4005:
+-- the thief the game brings to (21,13) on turn 12 stole Eirika's Chest Key or looted the (20,y)
+-- chests in every try, and no unit struck it on its first turn.
+do
+    local function case(arrival, opt)
+        opt = opt or {}
+        local S = blue(0x02, 1, opt.sx or 0, 0, { mov = 1, weapons = { { slot = 0, min = 1, max = 1 } } })
+        local E = red(0x81, 14, 9, { isBoss = true, minRange = false })
+        local st = style("careful")
+        st.memory = Fakeline.memory({ arrivals = {
+            { charId = 100, classId = opt.classId or 13, x = 9, y = 0, turn = arrival, timed = true } } })
+        local f = {}
+        for x = 0, 9 do f[x .. ",0"] = 9 - x end
+        local o = { objective = { kind = "boss", gameOver = opt.lord and { 0x02 } or nil },
+                    reach = { [0x02] = tiles({ opt.sx or 0, 0 }) },
+                    field = fieldsOf({ ["9,0"] = f }), steals = { [13] = true } }
+        local board = boardOf(S, E)
+        board.turn = 1
+        local _, ctx = B.candidates(board, sightOf(o), st)
+        return ctx.releases and ctx.releases[1], ctx.exploreGoal[0x02], board, sightOf(o), st
+    end
+    local r, g = case(12)
+    check(r and r.need .. " " .. r.strikers[1].gap .. " " .. tostring(r.due), "1 -3 false",
+          "calendar thief: one striker needed, S with three moves to spare, not due")
+    check(g == nil or not g.stage, true, "calendar thief: S, with turns to spare, is not sent")
+    r, g = case(8)
+    check(r and r.strikers[1].gap .. " " .. tostring(r.due) .. " " .. tostring(r.staged), "1 true false",
+          "calendar thief: a move away now and S is late: due")
+    check(g and g.stage and g.kind .. " " .. g.x .. "," .. g.y, Goals.STAGE .. " 9,0",
+          "calendar thief: S is sent, met beside its tile")
+    r, g = case(8, { sx = 1 })
+    check(r and r.strikers[1].gap .. " " .. tostring(r.due) .. " " .. tostring(r.staged), "0 true true",
+          "calendar thief: S could strike in time, and is still due")
+    check(g and g.stage, true, "calendar thief: a ready stager is held to the arrival")
+    r, g = case(8, { sx = 2 })
+    check(r and r.strikers[1].gap .. " " .. tostring(r.due), "-1 false",
+          "calendar thief: a whole move to spare, not due yet")
+    check(case(1) == nil, true, "calendar thief: arrived, no release")
+    check(case(8, { classId = 9 }) == nil, true, "calendar thief: a class that does not steal, none")
+    r, g = case(8, { lord = true })
+    check(r and tostring(r.due) .. " " .. tostring(g ~= nil and g.stage == true), "false false",
+          "calendar thief: a lord is never sent")
+    -- the planner's readers of a release: no act opens an arrival (its key is no door's), so no
+    -- plan forfeits for it; the plan record carries it as a door's row
+    local _, _, board, sight, st = case(8)
+    local _, plan = Planner.plan(B, board, sight, st)
+    local row = plan and plan.releases and plan.releases[1]
+    check(row and row.x .. "," .. row.y .. " " .. row.need, "9,0 1", "calendar thief: the record's row")
+    check(plan and plan.rank and plan.rank.forfeits, 0, "calendar thief: no plan forfeits for it")
+end
+
+-- A looter about to take a chest (sight.closings' third answer names it) is worth killing: the
+-- plan that kills it keeps the chest open (ADR 0483; vanilla Ch16 s4005, replay l764b: the east
+-- thief looted (20,5) on turn 14 while every strike on it read as worth nothing). D can kill the
+-- looter X (20 HP) from (0,0) or the bigger Y (40 HP) from (0,4); the chest at (0,9) closes after
+-- this enemy phase, by X. Named as X's closing, D kills X; with no looter named, the bigger kill.
+do
+    local D = blue(0x01, 0, 0, 0, { minRange = false, weapons = { { slot = 0, min = 1, max = 1 } } })
+    local X = red(0x81, 1, 0, { hp = 20, minRange = false })
+    local Y = red(0x82, 1, 4, { hp = 40, minRange = false })
+    local function target(closers)
+        local o = {
+            reach = { [0x01] = tiles({ 0, 0 }, { 0, 1 }, { 0, 2 }, { 0, 3 }, { 0, 4 }) },
+            fc = { [0x01] = { [0x81] = { ["0,0"] = fc { hit = 100, dmg = 30, hits = 1, killsTarget = true } },
+                              [0x82] = { ["0,4"] = fc { hit = 100, dmg = 50, hits = 1, killsTarget = true } } } },
+            explorable = { { x = 0, y = 9, kind = "chest" } },
+            canExplore = { [0x01] = { ["0,9"] = "chest" } },
+            closings = { ["0,9"] = 1 }, closers = closers,
+        }
+        local beam, final = Planner.BEAM, Planner.FINAL
+        Planner.BEAM, Planner.FINAL = 1, 1
+        local a = Planner.plan(B, boardOf(D, X, Y), sightOf(o), gifted("careful", 5000))
+        Planner.BEAM, Planner.FINAL = beam, final
+        return a and a.act == "attack" and a.targetId
+    end
+    check(target(nil), 0x82, "looter: with no looter named, D takes the bigger kill")
+    check(target({ ["0,9"] = 0x81 }), 0x81, "looter: D kills the looter that would take the chest")
 end
 
 -- test_planner_prices_a_small_risk: the enemy phase the AI plays strikes A at the village with
@@ -11395,7 +11588,7 @@ do
     local keys = {}
     for k in pairs(sight.asked[1]) do keys[#keys + 1] = k end
     table.sort(keys)
-    check(table.concat(keys, ","), "blues,carry,gone,joined,opened,redWear,reds,waits",
+    check(table.concat(keys, ","), "blues,carry,gone,joined,opened,redWear,reds,trades,waits",
           "lookahead: the staged board, nothing more")
 end
 

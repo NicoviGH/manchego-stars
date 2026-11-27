@@ -152,29 +152,60 @@ end
 -- attempt, ctx.appeared) for a tile still open: the earlier of the two, as M.scriptedCloses
 -- takes the earlier removal. ctx.turn is the board's turn; a remembered phase already past
 -- closes nothing (this attempt's play kept the tile so far).
-function M.closings(sight, style, ctx)
-    local out, paths = {}, {}
+-- Third answer: { ["x,y"] = the unit id of the looter that closes it }, sight's for its own
+-- closings, and for a remembered one the red unit on `board` (default ctx.board) of the
+-- closer's memory key (Timeline.deadlines' closers; with no key, of its character and class,
+-- and none when not exactly one stands there). A plan that kills it keeps the tile (planner's chanceOf, ADR 0483).
+function M.closings(sight, style, ctx, board)
+    board = board or ctx.board
+    local out, paths, by = {}, {}, {}
     if sight.closings then
         local watch = {}
         for id in pairs(ctx.recruitTalkers or {}) do watch[id] = true end
         -- style.waves: no caller sets it since the guide's claims stopped playing (ADR 0464); it
         -- is the slot #569's remembered waves would fill
-        out, paths = sight.closings(nil, style.waves, watch)
+        out, paths, by = sight.closings(nil, style.waves, watch)
     end
     -- a sight with no simulated closings still has the remembered ones
-    local lost = Timeline.deadlines(style.memory, ctx.appeared).tiles
+    local dl = Timeline.deadlines(style.memory, ctx.appeared)
+    local lost = dl.tiles
     if next(lost) then
         assert(ctx.turn, "Goals.closings: a remembered closing needs ctx.turn")
-        local copy = {}   -- sight keeps its answer for the board
+        local copy, byCopy = {}, {}   -- sight keeps its answers for the board
         for k, v in pairs(out) do copy[k] = v end
+        for k, v in pairs(by or {}) do byCopy[k] = v end
+        -- the red on the board that is a remembered closer, or nil: the one of its memory key
+        -- (sight.keyOf, the key the record named it by), since vanilla
+        -- Ch16's two thieves share a character and class (ADR 0483); with no key to read, the
+        -- one red of that character and class, and none when two stand there
+        local function onBoard(c)
+            local found
+            for _, u in ipairs(c and board and board.units or {}) do
+                if u.faction == "red" and not u.dead and u.charId == c.charId
+                        and u.classId == c.classId then
+                    if c.key and sight.keyOf then
+                        if sight.keyOf(u) == c.key then
+                            return u.id
+                        end
+                    elseif found then
+                        return nil
+                    else
+                        found = u.id
+                    end
+                end
+            end
+            return found
+        end
         for k, phase in pairs(lost) do
             -- enemy phase 1 is this turn's
             local at = phase - ctx.turn + 1
-            if at >= 1 and at < (copy[k] or math.huge) then copy[k] = at end
+            if at >= 1 and at < (copy[k] or math.huge) then
+                copy[k], byCopy[k] = at, onBoard(dl.closers[k])
+            end
         end
-        out = copy
+        out, by = copy, byCopy
     end
-    return out, paths or {}
+    return out, paths or {}, by or {}
 end
 
 -- The scripted removals (#724) folded into M.closings' answer for this board: a turn event's DISA
@@ -257,19 +288,25 @@ function M.spareKeys(sight, ctx, u, lock, tile, units)
 end
 
 -- The villages and chests still open, each with its worth in gold and when it closes:
--- { { id, kind, x, y, tile, gold, closes } }. Goals.list's, and Bot.candidates' exploring ranks who
--- is sent where by it.
-function M.openTiles(sight, style, ctx, closings)
+-- { { id, kind, x, y, tile, gold, closes, closer } }: `closer` the unit id of the looter that
+-- closes it (M.closings' third answer, nil when none is known). Goals.list's, and
+-- Bot.candidates' exploring ranks who is sent where by it.
+function M.openTiles(sight, style, ctx, closings, closers)
     local cost = sight.itemCost or function() return 0 end
     local explored = ctx.explored or {}
-    closings = closings or M.closings(sight, style, ctx)
+    if not closings then
+        local _
+        closings, _, closers = M.closings(sight, style, ctx)
+    end
+    closers = closers or {}
     local worth, house, out = prior(cost, style.villageGifts), prior(cost, style.houseGifts), {}
     for _, t in ipairs(sight.explorable and sight.explorable() or {}) do
         local k = key(t.x, t.y)
         if not explored[k] then
             out[#out + 1] = { id = t.kind .. ":" .. k, kind = t.kind, x = t.x, y = t.y,
                               tile = { x = t.x, y = t.y }, house = t.house,
-                              gold = t.house and house or worth, closes = closings[k] }
+                              gold = t.house and house or worth, closes = closings[k],
+                              closer = closings[k] and closers[k] or nil }
         end
     end
     -- a reward's item, shared over the open goals it needs
@@ -347,9 +384,9 @@ local function boardRead(board, sight, style, ctx)
     if r and r.board == board then return r end
     local byId = {}
     for _, u in ipairs(board.units) do byId[u.id] = u end
-    local open, walks = M.closings(sight, style, ctx)
+    local open, walks, closers = M.closings(sight, style, ctx, board)
     local closings, paths = M.scriptedCloses(sight, ctx, board, open, walks, style.memory)
-    r = { board = board, byId = byId, closings = closings, paths = paths }
+    r = { board = board, byId = byId, closings = closings, paths = paths, closers = closers }
     ctx.goalRead = r
     return r
 end
@@ -382,7 +419,7 @@ function M.list(board, sight, style, ctx)
         end
         return out
     end
-    for _, g in ipairs(M.openTiles(sight, style, ctx, r.closings)) do
+    for _, g in ipairs(M.openTiles(sight, style, ctx, r.closings, r.closers)) do
         g.takerUnits = takers(function(u)
             if sight.canExplore and sight.canExplore(u, g.tile.x, g.tile.y, g.kind) then
                 return true

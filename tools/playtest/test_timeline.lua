@@ -262,5 +262,26 @@ do
     check(#Timeline.releases(nil), 0, "releases: no memory, none")
 end
 
+-- calendar: each unit the game timed to a turn, by its key, never one our act brought (ADR 0483:
+-- vanilla Ch16's two thieves share charId 100; the one the calendar brings to (21,13) on turn 12
+-- is the one a retry stages strikers for, and Timeline.arrivals keeps only the character's latest)
+do
+    local door = { act = "door", x = 2, y = 2 }
+    local mem = Fakeline.memory(
+        { arrivals = { { charId = 100, classId = 13, x = 21, y = 13, turn = 12, timed = true },
+                       { charId = 100, classId = 13, x = 1, y = 8, turn = 6, timed = false },
+                       { charId = 0x80, classId = 9, x = 3, y = 2, turn = 4, by = door, timed = false } } },
+        { arrivals = { { charId = 100, classId = 13, x = 21, y = 13, turn = 12, timed = true } } })
+    local c = Timeline.calendar(mem)
+    check(#c, 1, "calendar: one timed arrival, once over the attempts; not a walk-in nor a door's")
+    check(c[1] and c[1].x .. "," .. c[1].y .. "@" .. c[1].boardTurn .. " " .. c[1].faction,
+          "21,13@12 red", "calendar: its tile, board turn and side")
+    local mixed = Fakeline.memory({ arrivals = {
+        { charId = 100, classId = 13, x = 21, y = 13, turn = 12, timed = true },
+        { charId = 100, classId = 13, x = 5, y = 5, turn = 14, timed = true } } })
+    check(#Timeline.calendar(mixed), 2, "calendar: two units of one charId are two arrivals")
+    check(#Timeline.calendar(nil), 0, "calendar: no memory, none")
+end
+
 print(string.format("%d tests, %d failures", tests, fails))
 if fails > 0 then os.exit(1) end
