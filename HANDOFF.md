@@ -86,6 +86,14 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
+**2026-11-27 (night): item 1 (Ch16's east thief) in progress on `feat/764-lock-theft-mend`
+(75cf19cd, ADR 0483, not pushed, no PR).** Status and replay table: #764 comment 7228174747.
+Built: the mend for a key holder, the looter's kill keeping its chest, hand-off by Trade (only in
+the mend, #688's items half), strikers at a thief's timed arrival, `stealSpoils` off-list fix.
+Replay `l764e` beats main on chests (3 vs 2, 2 vs 0) and loses no key, but is not clean.
+**Next on the branch:** the thief-kill plan ranks a turn of progress behind (`behind` 1 vs 0)
+and is not chosen (attempt 2, turn 12); then why (20,1) is skipped. Then review, PR, and item 2.
+
 **2026-11-27 (late): R5 sized, the green rule merged. Next: the fix order on #764 (comment
 7226248041), Ch16's east thief first.**
 - **R5: 11/34 clean vs R4's 8/34** (#764 comment 7223186698). Merged today: PRs #785, #786,
