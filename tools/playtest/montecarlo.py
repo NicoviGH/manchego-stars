@@ -1062,7 +1062,8 @@ def bot_commit(root=HERE, repo=REPO):
     (launch), as PT_INSTRUMENT is, so a tree edited mid-sweep labels each game by the code
     it started on. 'unknown' when git cannot say. An older record has no field."""
     import matrix
-    sys.path.insert(0, os.path.dirname(HERE))
+    if os.path.dirname(HERE) not in sys.path:
+        sys.path.insert(0, os.path.dirname(HERE))
     import build_tree   # its _git strips the GIT_* a hook or a parent git sets (ADR: gotchas)
     names = sorted(matrix.driver_source(root)) + ['harness.lua']
     names = [n for n in names if os.path.exists(os.path.join(root, n))]
@@ -1070,13 +1071,15 @@ def bot_commit(root=HERE, repo=REPO):
         return 'unknown'
     try:
         out = build_tree._git(repo, 'rev-parse', 'HEAD', capture=True)[:12]
-        # edited since HEAD (staged or not), then new and not yet committed
-        changed = (build_tree._git(root, 'diff', '--name-only', 'HEAD', '--', *names, capture=True)
+        # edited since HEAD (staged or not), then new and not yet committed; both name each
+        # file from `root`, as bot_hash does (diff's --relative; ls-files does so already)
+        changed = (build_tree._git(root, 'diff', '--name-only', '--relative', 'HEAD', '--', *names,
+                                   capture=True)
                    + '\n' + build_tree._git(root, 'ls-files', '--others', '--exclude-standard',
                                              '--', *names, capture=True))
     except (OSError, subprocess.CalledProcessError):
         return 'unknown'
-    dirty = sorted(set(os.path.basename(l) for l in changed.split() if l))
+    dirty = sorted(set(l for l in changed.split() if l))
     return out + ('+dirty:' + ','.join(dirty) if dirty else '')
 
 
