@@ -99,7 +99,8 @@ replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns)
   `CHECK_ALIVE`s). The planner charges greens the same way. Ch19 s4002 a1: 5 blue deaths -> 3
   (`g788a` -> `g788e`); Ch19 is still unclean on blue deaths and chests (53 of 90 emptied by
   thieves on phases 7-9).
-- **Next:** item 1 of #764's fix order (Ch16's east thief), one PR each down the list, then R6.
+- **Next:** item 1 of #764's fix order (Ch16's east thief, and Ch19's chests: same cause), one PR
+  each down the list, then R6; Ch19's blue deaths are re-sized on R6 (#764 comment of 2026-11-27).
 - **Lessons:** a closed lid sleeps the Mac and pauses runs (pmset log); it is not a hang. Long runs
   go under `caffeinate -i` with the lid open. Never edit bot files while a replay plays from this
   checkout: each attempt loads them fresh.
