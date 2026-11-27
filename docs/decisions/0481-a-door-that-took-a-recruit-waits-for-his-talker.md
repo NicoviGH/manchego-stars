@@ -19,8 +19,8 @@ door released him while his talker was out of reach.
 
 ## The rule
 
-- `Timeline.releases` keeps where each recruit an act brought first stood (`gone[charId] =
-  { x, y }`, his arrival tile), not only that he left.
+- `Timeline.releases` keeps the tile each recruit an act brought arrived on (`gone[charId] =
+  { x, y }`, the latest attempt's, as the front is), not only that he left.
 - `Bot` `releasesOf`: for each such recruit still owed here (`stake.gone`), his talkers
   (recruitsOf's `recruitTalkers`, on the field or the arrival memory names). Each talker's gap
   is `strikeGap` with a Talk's reach (1) to his arrival tile, on the map the door's change leaves.
@@ -29,10 +29,19 @@ door released him while his talker was out of reach.
 - The measure is his arrival tile, not the front. A talker who reaches the Fighters is still a
   turn behind him. The first build used the front, read `talkReady` true on the door's turn, and
   replayed R5 move for move (`t766a14`, 16/21/18 turns, Rennac lost each time).
-- `sendStagers`: when no talker is ready, it sends the nearest one that is free or holds a Talk
-  goal (kind `recruit`) to the door, met beside it. That Talk's goal tile is past the door, so the
-  door is its way there. The bars are the strikers' own: no lord, nothing the stuck record bars.
-  A talker on its way keeps the release unstaged, as a striker does.
+- `sendStagers` works per recruit. For each recruit with no ready talker and none already
+  sent, it sends his nearest talker that is free, or whose first job is his own Talk
+  (`talk>` + his id), to the door, met beside it. That Talk's goal is past the door, so the door
+  is its way there. It never takes a unit another job holds, nor a ready talker of another
+  recruit.
+- **A talker counts as on its way only while it is short of the door** (its march to the door
+  is more than a step). A talker that stands beside the door and still cannot reach him has come
+  as far as staging brings it. Waiting on it would hold the door for good.
+- **No lord and no barred unit is sent** (the strikers' bars). With no talker sent, the door is
+  not held for him: it is opened with what the army has, as ADR 0478 opens a door the army
+  cannot fully strike.
+- Strikers' and talkers' gaps are read in one `sight.changed` pass per door. The recruit scan
+  that finds the stake also names each recruit's ids and talkers.
 - No door, chapter or unit is named. The rule reads memory of an act that released a recruit
   who then left.
 
@@ -40,7 +49,10 @@ door released him while his talker was out of reach.
 
 - **Unit tests** (`test_bot.lua`, the release case): a talker 9 from the door and one that
   reaches the front but not the recruit both read not ready. In both cases the door waits and the
-  talker is sent. A talker one move away reads ready, and the door opens. The 5 talker checks
+  talker is sent. A talker one move away reads ready, and the door opens. With two recruits, the
+  unready one's talker is sent and the other's ready talker is not taken. A talker at the door
+  that cannot reach a far recruit stages the release. A lord talker is not sent, and the door
+  opens. The 5 talker checks
   fail on main, and the front-versus-arrival case fails under the front measure.
 - **Replay `t766b14`** (Ch14 s4002, which had no clean try in R5's three):
   - Attempt 1 has no memory: Rennac lost, as before.

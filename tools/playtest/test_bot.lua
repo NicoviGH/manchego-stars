@@ -2771,8 +2771,15 @@ do
             -- he arrives at (4,0), one past the Fighter's (3,0) on the opened map
             arrivals[#arrivals + 1] = { charId = 0x1C, classId = 13, x = 4, y = 0, turn = 2, by = door,
                                         timed = false, gone = { how = "left", boardTurn = 4, x = 4, y = 0 } }
+            if opt.farRecruit then arrivals[#arrivals].x = 9 end
             L = blue(0x04, 3, opt.talker[1], opt.talker[2], { minRange = false })
-            pending = { { charId = 0x1C, x = 4, y = 0, turn = 2, boardTurn = 3, by = door } }
+            pending = { { charId = 0x1C, x = arrivals[#arrivals].x, y = 0, turn = 2, boardTurn = 3, by = door } }
+            if opt.second then
+                -- a second recruit it took, at the Fighter's tile; M alone Talks him, from (1,1)
+                arrivals[#arrivals + 1] = { charId = 0x1D, classId = 13, x = 3, y = 0, turn = 2, by = door,
+                                            timed = false, gone = { how = "left", boardTurn = 4, x = 4, y = 0 } }
+                pending[2] = { charId = 0x1D, x = 3, y = 0, turn = 2, boardTurn = 3, by = door }
+            end
         end
         if opt.twoDoors then
             arrivals[2] = { charId = 0x91, classId = 9, x = 3, y = 4, turn = 2, by = door2, timed = false }
@@ -2783,10 +2790,10 @@ do
         local shutField = { ["0,0"] = 2, ["1,0"] = 1, ["2,0"] = 0, ["1,1"] = 2, ["7,1"] = 8,
                             ["7,2"] = 9, ["7,3"] = 10 }
         -- (0,1): 5 from the door, so a Talk reaches the Fighter's tile from it and not his
-        if opt.talker then shutField["0,1"] = 5 end
+        if opt.talker then shutField["0,1"], shutField["1,2"] = 5, 2 end
         local openField = {}
         for k, v in pairs(shutField) do openField[k] = v end
-        openField["3,0"], openField["4,0"] = 1, 2
+        openField["3,0"], openField["4,0"], openField["9,0"] = 1, 2, 9
         local door2Field = { ["2,4"] = 0, ["3,4"] = 1, ["7,1"] = 6, ["7,3"] = 7 }
         local explorable = { { x = 3, y = 0, kind = "chest" } }
         local canExplore = { [0x01] = { ["3,0"] = "chest" } }
@@ -2798,6 +2805,7 @@ do
                 -- L's own field: the meeting tile is the one it reaches nearest the arrival
                 local k = opt.talker[1] .. "," .. opt.talker[2]
                 f[k] = { [k] = 0, ["2,0"] = 3, ["1,0"] = 4 }
+                if opt.second then f["1,2"] = { ["1,2"] = 0, ["2,0"] = 2, ["1,0"] = 2 } end
             end
             if opt.village then f["8,1"] = { ["8,1"] = 0, ["7,1"] = 1 } end
             return fieldsOf(f)
@@ -2812,7 +2820,7 @@ do
             doors[2] = { x = 2, y = 4 }
         end
         local o = {
-            objective = { kind = "boss", gameOver = opt.lord and { 0x02 } or nil },
+            objective = { kind = "boss", gameOver = opt.lord and { 0x02 } or opt.talkerLord and { 0x04 } or nil },
             reach = { [0x01] = tiles({ 0, 0 }, { 1, 0 }),
                       [0x02] = opt.stuck and tiles({ sx, 1 }, { sx, 2 }) or tiles({ sx, 1 }),
                       [0x03] = tiles({ 7, 3 }) },
@@ -2820,7 +2828,7 @@ do
             obstacles = {}, doors = doors, openers = { [0x01] = true },
             -- S holds no key for the door (sight.locked): A alone opens it
             locked = { [0x02] = { ["2,0"] = "door" } },
-            talk = L and { [0x04] = { ["arrival:28"] = true } } or nil,
+            talk = L and { [0x04] = { ["arrival:28"] = true }, [0x05] = { ["arrival:29"] = true } } or nil,
             explorable = explorable, canExplore = canExplore,
             change = function(c)
                 if c.opened and c.opened["2,0"] then return { field = fields(true) } end
@@ -2832,6 +2840,10 @@ do
         if L then
             units[#units + 1] = L
             o.reach[0x04] = tiles({ opt.talker[1], opt.talker[2] })
+            if opt.second then
+                units[#units + 1] = blue(0x05, 4, 1, 2, { minRange = false })
+                o.reach[0x05] = tiles({ 1, 2 })
+            end
         end
         local copts = opt.stuck and { stuck = { [B.jobKey(0x02, nil, 2, 0)] = { id = 0x02, x = 2, y = 0, since = 0 } } }
         if pending then copts = copts or {}; copts.pending = pending end
@@ -2903,6 +2915,29 @@ do
     check(r and tostring(r.staged) .. " " .. tostring(r.talkReady), "true true",
           "release: the talker one move from the door, the release is staged")
     check(a and a.act, "door", "release: strikers and talker ready, the door opens")
+    -- two recruits behind it: M, at (1,2), may Talk the second and stands ready; L, far, the
+    -- first's. L is sent; M is never taken off for the other recruit (the nearest talker across
+    -- both is M)
+    _, ctx = case(1, { talker = { 7, 2 }, second = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.talkReady), "false", "release: one recruit of two with no talker ready")
+    g = ctx.exploreGoal[0x04]
+    check(g and g.stage and g.x .. "," .. g.y, "2,0", "release: the unready recruit's talker is sent")
+    local gm = ctx.exploreGoal[0x05]
+    check(gm == nil or not gm.stage, true, "release: the ready talker of the other recruit is not taken")
+    -- the only talker a lord: none is sent, and the door is not held for him
+    a, ctx = case(1, { talker = { 7, 2 }, talkerLord = true })
+    r = ctx.releases and ctx.releases[1]
+    g = ctx.exploreGoal[0x04]
+    check((g == nil or not g.stage) and r and tostring(r.staged) .. " " .. tostring(r.talkReady), "true false",
+          "release: a lord talker is not sent, and the release is staged without him")
+    check(a and a.act, "door", "release: no talker the stage job can send, the door opens")
+    -- the talker beside the door, the recruit arriving farther than it reaches: it has come as far
+    -- as staging brings it, so the door is not held for good
+    _, ctx = case(1, { talker = { 1, 0 }, farRecruit = true })
+    r = ctx.releases and ctx.releases[1]
+    check(r and tostring(r.staged) .. " " .. tostring(r.talkReady), "true false",
+          "release: a talker at the door that cannot reach him still stages it")
     _, ctx = case(7, { lord = true })
     check(ctx.exploreGoal[0x02] == nil or not ctx.exploreGoal[0x02].stage, true,
           "release: a unit whose loss ends the game is never sent")
