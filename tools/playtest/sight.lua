@@ -1849,19 +1849,6 @@ function M.scriptReadsReds(mem, scripts, index)
     return false
 end
 
--- Whether an AI decision opens the open chest `t` (an explorable tile, or nil) it stands on with a
--- Lockpick: AiTryDoSpecialItems runs before the pillage search (cp_script.c
--- AiScriptCmd_10_DoLooting), and its Lockpick step (cpextra_80407F0.c AiSpecialItemLockpick,
--- the one special item that targets chests: sAiSpecialItemFuncLut) decides a use-item act
--- (`action`) on the chest's tile with the Lockpick in its slot (`item`). It is no pillage
--- action, so the closings replay missed every Lockpick thief's chest (vanilla Ch16 s4005,
--- instrumented replay d785a: the east thief decided it on (20,3) every phase, and nothing
--- closed). Pure.
-function M.picksChest(Board, action, item, t)
-    return action == Board.AI_ACTION_USEITEM and item == M.ITEM_LOCKPICK
-        and t ~= nil and t.kind == "chest"
-end
-
 -- Whether a looter with `items` (ids) and class `attributes` takes chests as well as villages:
 -- AiGetChestUnlockItemSlot (cp_utility.c) -- a Chest Key, or a Lockpick on a CA_STEAL class;
 -- a full bag (`capacity` items: Board.ITEM_COUNT) takes nothing (it flags the unit to escape
@@ -2848,14 +2835,36 @@ function M.berserkKills(t, left) return t.berserk == true and left <= 0 end
 -- hit sets a status (Board.STATUS_STAVES) in the decided slot of the unit at `actor`. `D` =
 -- gAiDecision. -> { target = its id, status, tile = { x, y } }, or nil for any other act (a
 -- heal staff's included: it sets no status, and the judged phase does not play it)
+-- The item id in the decision's slot of the unit at `actor` (AiSetDecision's itemSlot). Read only
+-- for an act that names an item: another act leaves the slot stale.
+function M.decisionItem(mem, Board, D, actor)
+    return mem.u16(actor + Board.UNIT_ITEMS + mem.u8(D + Board.AI_DEC.SLOT) * 2) & 0xFF
+end
+
 function M.staffAct(mem, Board, D, actor)
     local DEC = Board.AI_DEC
     if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_STAFF then return nil end
-    local item = mem.u16(actor + Board.UNIT_ITEMS + mem.u8(D + DEC.SLOT) * 2) & 0xFF
+    local item = M.decisionItem(mem, Board, D, actor)
     local status = Board.STATUS_STAVES[item]
     if not status then return nil end
     return { target = mem.u8(D + DEC.TARGET), status = status,
              tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- A thief's Lockpick on an open chest as its decision names it: AiTryDoSpecialItems runs before
+-- the pillage search (cp_script.c AiScriptCmd_10_DoLooting), and its Lockpick step
+-- (cpextra_80407F0.c AiSpecialItemLockpick, the one special item that targets chests:
+-- sAiSpecialItemFuncLut) decides a use-item act on the chest's own tile with the Lockpick in its
+-- slot. It is no pillage, so the closings replay missed every Lockpick thief's chest (vanilla
+-- Ch16 s4005, instrumented replay d785a: the east thief decided it on (20,3) every phase, and
+-- nothing closed). A Door Key's or an Antitoxin's use-item act names another item. `open` =
+-- closings' open tiles by "x,y". -> { x, y } of the chest, or nil for any other act
+function M.lockpickAct(mem, Board, D, actor, open)
+    local DEC = Board.AI_DEC
+    if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_USEITEM then return nil end
+    if M.decisionItem(mem, Board, D, actor) ~= M.ITEM_LOCKPICK then return nil end
+    local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+    local t = open[x .. "," .. y]
+    return t and t.kind == "chest" and { x = x, y = y } or nil
 end
 -- An enemy thief's steal as its decision names it: AI_ACTION_STEAL (cp_battle.c
 -- AiAttemptStealActionWithinMovement: AiSetDecision's tile, target and the item's slot in the
@@ -4989,9 +4998,10 @@ function M.new(outer)
                                     out["unit:" .. id] = out["unit:" .. id] or phase
                                     who[id], gone[id] = nil, true
                                 elseif onPillage and (mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE
-                                        or M.picksChest(Board, mem.u8(D + DEC.ACTION),
-                                            mem.u16(e.addr + Board.UNIT_ITEMS + mem.u8(D + DEC.SLOT) * 2) & 0xFF,
-                                            open[x .. "," .. y])) then
+                                        or M.lockpickAct(mem, Board, D, e.addr, open)) then
+                                    -- a pillage, or a thief's Lockpick on a chest (ADR 0486).
+                                    -- The second look passes no onPillage: it reads paths only,
+                                    -- and closes neither (a village pillage included)
                                     onPillage(x, y, phase, id)
                                 else
                                     -- a Rogue's door or chest opens (both looks: a shut door

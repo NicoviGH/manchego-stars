@@ -11,7 +11,10 @@ issues: [764, 510]
 **Decided (2026-11-27, #764 fix order item 1: Ch16's east thief).** The closings forecast
 (`sight.closings`, its replay of the enemy phases) closes a chest when the AI's decision is a
 use-item act (`Board.AI_ACTION_USEITEM`, 6) made with a Lockpick on that open chest's own tile
-(`Sight.picksChest`), as well as for a pillage (4) and a Rogue's pick (13).
+(`Sight.lockpickAct`, which reads the decided slot's item through `Sight.decisionItem`, shared
+with `staffAct`), as well as for a pillage (4) and a Rogue's pick (13). The second look
+(`M.secondLook`) reads paths only and closes nothing, a village pillage included; a Lockpick is
+the same there.
 
 **Why.** A thief opens a chest with its Lockpick through the special-item step.
 `AiScriptCmd_10_DoLooting` (`cp_script.c`) runs `AiTryDoSpecialItems` before the pillage search.
@@ -25,15 +28,17 @@ forecast closed nothing. Readers of `k711a` had refuted the other causes: its AI
 `AiScr_AiB_PillageThenEscape`), fog (none), and absence from the board. No chest row of `k711a`'s
 attempt 1 had `closes_on`.
 
-**Proof.** `test_sight.lua` "picksChest:" (5 checks), plus a source pin that closings calls it.
-With `sight.lua`/`board.lua` reverted, both fail. One replay, `p786a` (Ch16 s4005, main plus this
+**Proof.** `test_sight.lua` "lockpickAct:" (5 checks on a decision in fake memory), plus a source
+pin that closings calls it. With main's `sight.lua`/`board.lua`, both fail. One replay, `p786a` (Ch16 s4005, main plus this
 change), against main's `k711a`:
 
 | Attempt | Run | Turns | Deaths | Chests the forecast reads closing (plan rows) | Not clean for |
 |---|---|---|---|---|---|
 | 1 | k711a | 21 | 0 | none | the east thief looted (20,5); (3,12) never offered |
 | 1 | p786a | 17 | 0 | (20,1) 3, (20,3) 3, (20,5) 3 | (20,1) and (20,3) skipped |
-| 2 | k711a | 27 | 0 | (20,5) 14 (source untested: likely the closer attempt 1 remembered) | the Knight Crest stolen from Marisa, turn 14 |
+| 2 | k711a | 27 | 0 | (20,5) 14, from attempt 1's remembered loot | the Knight Crest stolen from Marisa, turn 14 |
 | 2 | p786a | 15 | 0 | (20,1) 1, (20,3) 1, (20,5) 7 | (3,12) taken by the west thief |
 
-In both tries the east thief looted no chest. Why neither try is clean is on #764.
+Attempt 2's (20,5) on main is memory, not the forecast: its `closes_on` counts down from 13 on
+turn 1, before the thief arrives (end of turn 11). That is attempt 1's loot on turn 13, read
+back by `Timeline.deadlines`. In both tries on the branch the east thief looted no chest. Why neither try is clean is on #764.

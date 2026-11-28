@@ -2072,26 +2072,10 @@ do
           "closings: the second look is wired through M.secondLook")
     check(body ~= nil and body:find("M.hideUnit(", 1, true) ~= nil
           and body:find("| US_HIDDEN", 1, true) == nil, true, "closings: our units are hidden by M.hideUnit alone")
-    check(body ~= nil and body:find("M.picksChest(", 1, true) ~= nil, true,
-          "closings: a Lockpick's use-item act on a chest closes it (M.picksChest)")
+    check(body ~= nil and body:find("M.lockpickAct(", 1, true) ~= nil, true,
+          "closings: a Lockpick's use-item act on a chest closes it (M.lockpickAct)")
 end
 
--- picksChest: a thief's Lockpick opens a chest by a use-item act on its tile (AiSpecialItemLockpick),
--- not a pillage; vanilla Ch16 s4005 (d785a): the east thief's (20,3) was never read closed
-do
-    local P = Board.AI_ACTION_USEITEM
-    local chest, village = { kind = "chest" }, { kind = "visit" }
-    check(Sight.picksChest(Board, P, Sight.ITEM_LOCKPICK, chest), true,
-          "picksChest: a Lockpick used on an open chest's tile opens it")
-    check(Sight.picksChest(Board, P, 0x6C, chest), false,
-          "picksChest: another item used there (a Vulnerary) opens nothing")
-    check(Sight.picksChest(Board, P, Sight.ITEM_LOCKPICK, nil), false,
-          "picksChest: a Lockpick used off any open chest opens nothing (a door)")
-    check(Sight.picksChest(Board, P, Sight.ITEM_LOCKPICK, village), false,
-          "picksChest: nor on a village")
-    check(Sight.picksChest(Board, Board.AI_ACTION_COMBAT, Sight.ITEM_LOCKPICK, chest), false,
-          "picksChest: an attack from the tile opens nothing")
-end
 
 -- hideUnit: one owner of the hide, journaled, and its restore puts the word back.
 do
@@ -3863,6 +3847,21 @@ do
           "staffAct: the Sleep staff puts its target to sleep")
     check(decide(Board.AI_ACTION_STAFF, 0x1E4B), nil, "staffAct: a heal staff sets no status")
     check(decide(Board.AI_ACTION_COMBAT, 0x0553), nil, "staffAct: an attack is no staff act")
+    -- lockpickAct (ADR 0486): a thief's Lockpick on an open chest's tile is a use-item act; vanilla
+    -- Ch16 s4005 (d785a): the east thief's (20,3) was never read closed
+    local open = { ["7,9"] = { kind = "chest" }, ["1,1"] = { kind = "visit" } }
+    local function pick(action, item, x, y)
+        m.w8(D + DEC.ACTION, action); m.w8(D + DEC.SLOT, 1)
+        m.w8(D + DEC.X, x or 7); m.w8(D + DEC.Y, y or 9)
+        m.w16(actor + Board.UNIT_ITEMS + 2, item)
+        local t = Sight.lockpickAct(m, Board, D, actor, open)
+        return t and (t.x .. "," .. t.y)
+    end
+    check(pick(Board.AI_ACTION_USEITEM, 0x146B), "7,9", "lockpickAct: a Lockpick used on an open chest opens it")
+    check(pick(Board.AI_ACTION_USEITEM, 0x016C), nil, "lockpickAct: another item used there opens nothing")
+    check(pick(Board.AI_ACTION_USEITEM, 0x146B, 2, 2), nil, "lockpickAct: a Lockpick used off any open chest opens nothing")
+    check(pick(Board.AI_ACTION_USEITEM, 0x146B, 1, 1), nil, "lockpickAct: nor on a village")
+    check(pick(Board.AI_ACTION_COMBAT, 0x146B), nil, "lockpickAct: an attack from the tile opens nothing")
     -- a hit: the status for SetUnitStatus's five turns
     local api = { mem = m, write8 = m.w8 }
     m.w8(actor + 0x13, 20)
