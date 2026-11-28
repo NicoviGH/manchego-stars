@@ -3421,6 +3421,52 @@ function M.arrivalsOf(ctx, memory, out)
     end
 end
 
+-- A Talk as a release (#764, #730): the act turns its recruit blue where she stands, and every
+-- red that reaches her tile then strikes a player unit. The planner protects her under the cap
+-- from that phase (planner's `recruited`), so while those reds stand, every Talk reads over it
+-- and none is played; nothing sent the army to kill them first. A person kills what would
+-- strike the recruit, then Talks. One release per recruit on the field that a blue may Talk,
+-- in the door's shape, read on the board now (no memory: the reds are in sight), so the stage
+-- job (sendStagers) sends strikers to her and the record reads them as it does a door's:
+--   front: each red (not she, nor another recruit) whose threat reaches her tile
+--   need: the front's size, one striker each (the door rule's)
+--   strikers: each unit's strikeGap from her tile to the front; 0 or less, it can strike one
+--     this turn
+-- No stake, talkers or opener, and no forfeit (planner's `released` never matches): the cap
+-- already judges the Talk; this only brings the strikers. `full` once ready >= need, so a
+-- front the army cannot reach in full still has what it can send stay sent.
+function M.joinsOf(ctx, out)
+    if not (ctx.sight.threat and ctx.recruits) then return end
+    for _, t in ipairs(ctx.onField or {}) do
+        if ctx.recruits[t.id] and t.faction == "red" and not t.fogged then
+            local front = {}
+            for _, e in ipairs(ctx.enemies or {}) do
+                if e.id ~= t.id and not ctx.recruits[e.id] and reaches(ctx, e, t.x, t.y) then
+                    front[#front + 1] = { x = e.x, y = e.y }
+                end
+            end
+            if #front > 0 then
+                local r = { x = t.x, y = t.y, key = "join:" .. tostring(t.id), need = #front,
+                            front = front, stake = { tiles = {}, gone = {} }, talkers = {},
+                            owes = {}, talkReady = true }
+                local strikers, ready = {}, 0
+                for _, u in ipairs(ctx.actors) do
+                    local g = strikeGap(ctx, u, r)
+                    if g then
+                        strikers[#strikers + 1] = { u = u, gap = g }
+                        if g <= 0 then ready = ready + 1 end
+                    end
+                end
+                table.sort(strikers, soonestThenSlot("gap", "u"))
+                r.strikers, r.ready = strikers, ready
+                r.full = ready >= r.need
+                r.staged = r.full
+                out[#out + 1] = r
+            end
+        end
+    end
+end
+
 -- The releases this board can still make (Timeline.releases, #766): a door an earlier attempt
 -- opened onto reds, still shut here, whose units lost something still open here (a tile they
 -- closed, a recruit who left). A person who lost those by opening it with the army back opens
@@ -3442,6 +3488,7 @@ end
 -- decision, on the board before anyone acts: a striker that moves in this turn has acted.
 local function releasesOf(ctx)
     local out = {}
+    M.joinsOf(ctx, out)
     local memory = ctx.style and ctx.style.memory
     if not (memory and ctx.sight.march) then return out end
     M.arrivalsOf(ctx, memory, out)
