@@ -7846,10 +7846,28 @@ do
     check(table.concat(acts, " "), "attack#2@0,2 wait#nil@6,5",
           "sparing twin: and the second round's plan is A's twin with C moved")
     -- a recruit no act spares (A holds one weapon) costs one round more, no more: the round that
-    -- changes nothing ends the mend, so three rounds judge what two do
+    -- changes nothing ends the mend, so three rounds judge what two do. A regression pin on the
+    -- existing `best == base` stop, not a fail-without-fix test: main passes it too
     local one = { { slot = 0, min = 1, max = 1 } }
     check(select(2, withC(3, one)), select(2, withC(2, one)),
           "sparing twin: a recruit no act spares runs no third round")
+    -- an act re-listed on a board the plan changes (`needs`, menusFor) has no twin: the twin is
+    -- read on the decision's board, and the act's own re-listed menu has its board's gentle acts
+    local board, o = sparingStrikeScene()
+    local cands, ctx = B.candidates(board, sightOf(o), style("careful"))
+    local strike
+    for _, c in ipairs(cands) do
+        for _, x in ipairs(c.acts) do
+            if x.act == "attack" and x.why ~= "gentle" and x.targetId == 0x82 then strike = x end
+        end
+    end
+    local A = board.units[1]
+    check(played(strike and B.sparingTwin(ctx, A, strike)), "attack#2@0,2",
+          "sparing twin: the strike read on the decision's board has its twin")
+    local relisted = {}
+    for k, v in pairs(strike or {}) do relisted[k] = v end
+    relisted.needs = { opened = {}, gone = {} }
+    check(B.sparingTwin(ctx, A, relisted), nil, "sparing twin: a re-listed act (needs) has none")
 end
 
 -- The review of PR #735 (#730 fix 4): each case below fails without the line it names.
