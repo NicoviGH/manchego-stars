@@ -1849,6 +1849,19 @@ function M.scriptReadsReds(mem, scripts, index)
     return false
 end
 
+-- Whether an AI decision opens the open chest `t` (an explorable tile, or nil) it stands on with a
+-- Lockpick: AiTryDoSpecialItems runs before the pillage search (cp_script.c
+-- AiScriptCmd_10_DoLooting), and its Lockpick step (cpextra_80407F0.c AiSpecialItemLockpick,
+-- the one special item that targets chests: sAiSpecialItemFuncLut) decides a use-item act
+-- (`action`) on the chest's tile with the Lockpick in its slot (`item`). It is no pillage
+-- action, so the closings replay missed every Lockpick thief's chest (vanilla Ch16 s4005,
+-- instrumented replay d785a: the east thief decided it on (20,3) every phase, and nothing
+-- closed). Pure.
+function M.picksChest(Board, action, item, t)
+    return action == Board.AI_ACTION_USEITEM and item == M.ITEM_LOCKPICK
+        and t ~= nil and t.kind == "chest"
+end
+
 -- Whether a looter with `items` (ids) and class `attributes` takes chests as well as villages:
 -- AiGetChestUnlockItemSlot (cp_utility.c) -- a Chest Key, or a Lockpick on a CA_STEAL class;
 -- a full bag (`capacity` items: Board.ITEM_COUNT) takes nothing (it flags the unit to escape
@@ -4975,7 +4988,10 @@ function M.new(outer)
                                     -- gone this phase (idleMove took it off): it plays no more
                                     out["unit:" .. id] = out["unit:" .. id] or phase
                                     who[id], gone[id] = nil, true
-                                elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE and onPillage then
+                                elseif onPillage and (mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE
+                                        or M.picksChest(Board, mem.u8(D + DEC.ACTION),
+                                            mem.u16(e.addr + Board.UNIT_ITEMS + mem.u8(D + DEC.SLOT) * 2) & 0xFF,
+                                            open[x .. "," .. y])) then
                                     onPillage(x, y, phase, id)
                                 else
                                     -- a Rogue's door or chest opens (both looks: a shut door

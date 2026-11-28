@@ -2072,6 +2072,25 @@ do
           "closings: the second look is wired through M.secondLook")
     check(body ~= nil and body:find("M.hideUnit(", 1, true) ~= nil
           and body:find("| US_HIDDEN", 1, true) == nil, true, "closings: our units are hidden by M.hideUnit alone")
+    check(body ~= nil and body:find("M.picksChest(", 1, true) ~= nil, true,
+          "closings: a Lockpick's use-item act on a chest closes it (M.picksChest)")
+end
+
+-- picksChest: a thief's Lockpick opens a chest by a use-item act on its tile (AiSpecialItemLockpick),
+-- not a pillage; vanilla Ch16 s4005 (d785a): the east thief's (20,3) was never read closed
+do
+    local P = Board.AI_ACTION_USEITEM
+    local chest, village = { kind = "chest" }, { kind = "visit" }
+    check(Sight.picksChest(Board, P, Sight.ITEM_LOCKPICK, chest), true,
+          "picksChest: a Lockpick used on an open chest's tile opens it")
+    check(Sight.picksChest(Board, P, 0x6C, chest), false,
+          "picksChest: another item used there (a Vulnerary) opens nothing")
+    check(Sight.picksChest(Board, P, Sight.ITEM_LOCKPICK, nil), false,
+          "picksChest: a Lockpick used off any open chest opens nothing (a door)")
+    check(Sight.picksChest(Board, P, Sight.ITEM_LOCKPICK, village), false,
+          "picksChest: nor on a village")
+    check(Sight.picksChest(Board, Board.AI_ACTION_COMBAT, Sight.ITEM_LOCKPICK, chest), false,
+          "picksChest: an attack from the tile opens nothing")
 end
 
 -- hideUnit: one owner of the hide, journaled, and its restore puts the word back.
