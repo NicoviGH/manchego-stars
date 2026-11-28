@@ -585,6 +585,10 @@ Board.AI_DEC = { ACTION = 0x00, UNIT = 0x01, X = 0x02, Y = 0x03, TARGET = 0x06, 
 Board.AI_ACTION_COMBAT, Board.AI_ACTION_ESCAPE, Board.AI_ACTION_STEAL, Board.AI_ACTION_PILLAGE =
     1, 2, 3, 4
 Board.AI_ACTION_STAFF = 5
+-- A use-item decision (cp_common.h AI_ACTION_USEITEM). A thief's Lockpick on a chest is one:
+-- cpextra_80407F0.c AiSpecialItemLockpick decides it with UNIT_ACTION_STEAL (0x06, the same
+-- value) on the chest's own tile.
+Board.AI_ACTION_USEITEM = 6
 -- A Rogue's door or chest (cpextra_80407F0.c sub_8040C5C: xTarget/yTarget name the lock it
 -- opens from its move tile; cp_perform.c AiPickAction, then bmusemind.c ActionPick)
 Board.AI_ACTION_PICK = 13
@@ -743,6 +747,7 @@ function Board.bind(mem, SYM)
         fate = function(addr, was) return Board.fate(mem, SYM, addr, was) end,
         killer = function(uid, fighting) return Board.killer(mem, SYM, uid, fighting) end,
         AI_ACTION_STEAL = Board.AI_ACTION_STEAL, AI_ACTION_PILLAGE = Board.AI_ACTION_PILLAGE,
+        AI_ACTION_USEITEM = Board.AI_ACTION_USEITEM,
         -- sight.closings reads it off api.Board: without it the compare was nil == action, never
         -- true, and no recruit's escape was ever seen (#699)
         AI_ACTION_ESCAPE = Board.AI_ACTION_ESCAPE, AI_ACTION_PICK = Board.AI_ACTION_PICK,

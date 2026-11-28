@@ -2835,14 +2835,36 @@ function M.berserkKills(t, left) return t.berserk == true and left <= 0 end
 -- hit sets a status (Board.STATUS_STAVES) in the decided slot of the unit at `actor`. `D` =
 -- gAiDecision. -> { target = its id, status, tile = { x, y } }, or nil for any other act (a
 -- heal staff's included: it sets no status, and the judged phase does not play it)
+-- The item id in the decision's slot of the unit at `actor` (AiSetDecision's itemSlot). Read only
+-- for an act that names an item: another act leaves the slot stale.
+function M.decisionItem(mem, Board, D, actor)
+    return mem.u16(actor + Board.UNIT_ITEMS + mem.u8(D + Board.AI_DEC.SLOT) * 2) & 0xFF
+end
+
 function M.staffAct(mem, Board, D, actor)
     local DEC = Board.AI_DEC
     if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_STAFF then return nil end
-    local item = mem.u16(actor + Board.UNIT_ITEMS + mem.u8(D + DEC.SLOT) * 2) & 0xFF
+    local item = M.decisionItem(mem, Board, D, actor)
     local status = Board.STATUS_STAVES[item]
     if not status then return nil end
     return { target = mem.u8(D + DEC.TARGET), status = status,
              tile = { x = mem.u8(D + DEC.X), y = mem.u8(D + DEC.Y) } }
+end
+-- A thief's Lockpick on an open chest as its decision names it: AiTryDoSpecialItems runs before
+-- the pillage search (cp_script.c AiScriptCmd_10_DoLooting), and its Lockpick step
+-- (cpextra_80407F0.c AiSpecialItemLockpick, the one special item that targets chests:
+-- sAiSpecialItemFuncLut) decides a use-item act on the chest's own tile with the Lockpick in its
+-- slot. It is no pillage, so the closings replay missed every Lockpick thief's chest (vanilla
+-- Ch16 s4005, instrumented replay d785a: the east thief decided it on (20,3) every phase, and
+-- nothing closed). A Door Key's or an Antitoxin's use-item act names another item. `open` =
+-- closings' open tiles by "x,y". -> { x, y } of the chest, or nil for any other act
+function M.lockpickAct(mem, Board, D, actor, open)
+    local DEC = Board.AI_DEC
+    if mem.u8(D + DEC.ACTION) ~= Board.AI_ACTION_USEITEM then return nil end
+    if M.decisionItem(mem, Board, D, actor) ~= M.ITEM_LOCKPICK then return nil end
+    local x, y = mem.u8(D + DEC.X), mem.u8(D + DEC.Y)
+    local t = open[x .. "," .. y]
+    return t and t.kind == "chest" and { x = x, y = y } or nil
 end
 -- An enemy thief's steal as its decision names it: AI_ACTION_STEAL (cp_battle.c
 -- AiAttemptStealActionWithinMovement: AiSetDecision's tile, target and the item's slot in the
@@ -4969,14 +4991,20 @@ function M.new(outer)
                         if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
                             aiDecide(call, proc, e, all, nil, nil, tileOnly)
                             local x, y, escaped = idleMove(e)
+                            -- a thief's Lockpick on a chest (ADR 0486), closed on the chest the
+                            -- decision names. The second look passes no onPillage: it reads
+                            -- paths only, and closes neither this nor a village pillage
+                            local picked = onPillage and M.lockpickAct(mem, Board, D, e.addr, open)
                             if x then
                                 if at[id] then at[id] = { x = x, y = y } end
                                 if escaped then
                                     -- gone this phase (idleMove took it off): it plays no more
                                     out["unit:" .. id] = out["unit:" .. id] or phase
                                     who[id], gone[id] = nil, true
-                                elseif mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE and onPillage then
+                                elseif onPillage and mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                     onPillage(x, y, phase, id)
+                                elseif picked then
+                                    onPillage(picked.x, picked.y, phase, id)
                                 else
                                     -- a Rogue's door or chest opens (both looks: a shut door
                                     -- held Rennac still); a chest it takes closes in the first
