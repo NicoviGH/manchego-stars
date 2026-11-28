@@ -86,7 +86,13 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
-**2026-11-28 (latest): item 2's first half (Ch10's Amelia) is merged. Next: its second half, the talker's danger.**
+**2026-11-27 (latest): item 2's second half is PR #795 (ADR 0488), CI green, waiting for Nicolas's merge** (the auto-mode classifier refused `gh pr merge`).
+- **Root cause (#764 comment 7232559830, instrumented replay `d730c`):** in all 34 Talk plans the death over the cap was Amelia's own (0.75 to 0.98), not Franz's. Once Talked she is a 16 HP blue unit beside the ambush Mages, and no job sent the army to kill them first.
+- **The rule:** `Bot.joinsOf`: a Talkable red recruit whose tile reds reach is a release in the door's shape (`join:<id>`); the stage job sends strikers to her. No forfeit: the cap still judges the Talk. A loose recruit is no front.
+- **Replays `j764a`/`j764b` (Ch10 s4005 a1):** Amelia Talked over on turn 11 and lived; won in 17 turns, 0 deaths. Not clean: the Mercenary closed the (11,15) village.
+- **Next:** after the merge, Ch10's village (11,15) (unit 167 closes it in every replay), or R6 over the batch (#764's body, After R5 item 3).
+
+**2026-11-28 item 2's first half (Ch10's Amelia) is merged. Next: its second half, the talker's danger.**
 - **PR #794 (fcaf009e, ADR 0487):** when our counter may fell a recruit, the mend tries each struck
   unit's own planned act holding the weapon that spares her (`Bot.sparingTwin`, uncapped), and it
   goes on past the cap while the best plan still fells a recruit (`fells`, beside `robbed`).
