@@ -97,7 +97,8 @@ replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns)
   she died on turn 11, the last before the script removes her. Next is that half: why every Talk
   is over the cap (route loss reads enemies where they stand now, `bot.lua` routeLoss/legLive;
   also untested: which unit's death makes the over-cap Talk plans' max_die). #764 comment 7232245754.
-- **Open call for Nicolas** (on that comment): a recruit's forfeit is binary at 1e-9.
+- **Settled by data (#764 comment 7232371199): the recruit forfeit stays binary.** Small reads are
+  calibrated (1.4% realised at 0-2%), and recruits are not over-represented where a forfeit beat more ground.
 
 **2026-11-27: Ch16 s4005's thefts are fixed and merged. Next: #764 fix order item 2 (Ch10's Amelia).**
 - **PR #792 (ADR 0485):** a theft's hand-off gives a key only to a unit it opens for, and a
