@@ -4991,18 +4991,20 @@ function M.new(outer)
                         if e and M.playsAsSeen(Board, mem.u32(e.addr + UNIT_STATE), s.knows(e)) then
                             aiDecide(call, proc, e, all, nil, nil, tileOnly)
                             local x, y, escaped = idleMove(e)
+                            -- a thief's Lockpick on a chest (ADR 0486), closed on the chest the
+                            -- decision names. The second look passes no onPillage: it reads
+                            -- paths only, and closes neither this nor a village pillage
+                            local picked = onPillage and M.lockpickAct(mem, Board, D, e.addr, open)
                             if x then
                                 if at[id] then at[id] = { x = x, y = y } end
                                 if escaped then
                                     -- gone this phase (idleMove took it off): it plays no more
                                     out["unit:" .. id] = out["unit:" .. id] or phase
                                     who[id], gone[id] = nil, true
-                                elseif onPillage and (mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE
-                                        or M.lockpickAct(mem, Board, D, e.addr, open)) then
-                                    -- a pillage, or a thief's Lockpick on a chest (ADR 0486).
-                                    -- The second look passes no onPillage: it reads paths only,
-                                    -- and closes neither (a village pillage included)
+                                elseif onPillage and mem.u8(D + DEC.ACTION) == Board.AI_ACTION_PILLAGE then
                                     onPillage(x, y, phase, id)
+                                elseif picked then
+                                    onPillage(picked.x, picked.y, phase, id)
                                 else
                                     -- a Rogue's door or chest opens (both looks: a shut door
                                     -- held Rennac still); a chest it takes closes in the first

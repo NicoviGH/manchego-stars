@@ -2076,7 +2076,6 @@ do
           "closings: a Lockpick's use-item act on a chest closes it (M.lockpickAct)")
 end
 
-
 -- hideUnit: one owner of the hide, journaled, and its restore puts the word back.
 do
     local m = fakeMem()
