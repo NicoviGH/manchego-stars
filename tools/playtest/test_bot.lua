@@ -12520,9 +12520,10 @@ end
 -- her, so every Talk reads her death over the cap. The Talk is a release whose front is M; S,
 -- the one free armed unit, 9 tiles off, is sent to R (the stage job), met beside her. With no
 -- red reaching R there is no release; with S already in reach of M it is staged and not sent.
+-- A loose recruit (owed, no one may Talk it yet) that reaches R is no front: it is not a foe.
 -- Vanilla Ch10: three ambush Mages beside Amelia, and no unit sent to kill them first.
 do
-    local function case(sx, mage)
+    local function case(sx, mage, looseMage)
         local T = blue(0x01, 0, 0, 0, { minRange = false })
         local S = blue(0x02, 1, sx, 5, { weapons = { { slot = 0, min = 1, max = 1 } } })
         local R = red(0x81, 9, 5, { minRange = false })
@@ -12530,6 +12531,8 @@ do
         if mage then units[4] = red(0x82, 10, 5, { minRange = 1, maxRange = 2 }) end
         local o = {
             talk = { [0x01] = { [0x81] = true } },
+            -- the one-grid danger read: R's tile is covered while M stands
+            danger = mage and { ["9,5"] = 1 } or nil,
             reach = { [0x01] = tiles({ 0, 0 }), [0x02] = tiles({ sx, 5 }) },
             -- the march field from a tile: Manhattan, every tile open
             field = function(t)
@@ -12541,7 +12544,9 @@ do
                 return f
             end,
         }
-        local _, ctx = B.candidates(boardOf(table.unpack(units)), sightOf(o), style("careful"))
+        -- looseMage: M is a recruit the game still owes that no one may Talk yet (ADR 0452)
+        local copts = looseMage and { owedRecruits = { [0x82] = true } } or nil
+        local _, ctx = B.candidates(boardOf(table.unpack(units)), sightOf(o), style("careful"), copts)
         local join
         for _, r in ipairs(ctx.releases or {}) do
             if tostring(r.key):find("^join:") then join = r end
@@ -12562,6 +12567,9 @@ do
     check(r and tostring(r.full), "true", "join: S in reach of M, staged")
     g = ctx.exploreGoal[0x02]
     check(g and g.stage, nil, "join: a staged Talk sends no one")
+    r, ctx = case(0, true, true)
+    check(ctx.looseRecruits and ctx.looseRecruits[0x82], true, "join: M read as a loose recruit")
+    check(r, nil, "join: a loose recruit is no front, no release")
 end
 
 if fails > 0 then

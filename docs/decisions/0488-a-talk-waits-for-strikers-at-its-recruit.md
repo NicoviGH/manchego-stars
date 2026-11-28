@@ -1,14 +1,14 @@
 ---
 id: 488
 title: "A Talk waits for strikers at its recruit"
-date: "2026-11-28"
+date: "2026-11-27"
 section: "Combat System"
 issues: [764, 730, 510]
 ---
 
 # A Talk waits for strikers at its recruit
 
-**Decided (2026-11-28, #764 fix order item 2, second half: Ch10's Amelia; #730).** The stage
+**Decided (2026-11-27, #764 fix order item 2, second half: Ch10's Amelia; #730).** The stage
 job (ADR 0478) gets one more kind of release: a Talk. No scoring change and no new weight.
 
 **Why.** Replay `d730c` (Ch10 s4005 attempt 1, with a temporary log of every Talk plan's
@@ -24,8 +24,10 @@ Talks (#764: "sends a strong unit in first to kill that enemy").
 
 - **`Bot.joinsOf`**, read with the releases (`releasesOf`) once a decision, on the board now
   (the reds are in sight, so no memory is needed): for each red recruit on the field that a blue
-  may Talk over, its `front` is each red (not she, nor another recruit) whose threat reaches her
-  tile. With a front, it is a release in the door's shape, keyed `join:<id>`: `need` is the
+  may Talk over, its `front` is each red whose threat reaches her tile: not she, nor another
+  recruit, nor a loose one (owed, no one may Talk it yet, ADR 0452: still a recruit, never a foe
+  to kill). Only a tile the one-grid danger read covers has its reds' threat grids read, so a
+  recruit no red reaches costs nothing more. With a front, it is a release in the door's shape, keyed `join:<id>`: `need` is the
   front's size, `strikers` each unit's `strikeGap` from her tile to the front, `ready` those at
   0 or less, `full` = ready >= need.
 - **The stage job** (`sendStagers`) sends the `need` nearest free strikers to her, met beside
@@ -43,8 +45,10 @@ ordering repeats another. (5) No unit, chapter or tile is named in the code.
 
 ## Proof
 
-- `test_bot.lua` "a talk waits for strikers at its recruit": four checks fail without
-  `M.joinsOf` (the release, the striker's gap, the striker sent, and a staged one sending none).
+- `test_bot.lua` "a talk waits for strikers at its recruit", run against the reverted lines:
+  without `M.joinsOf`, four checks fail (the release read, the striker's gap, the striker sent,
+  and the staged release read); without the loose-recruit skip, "a loose recruit is no front"
+  fails. The other checks expect no release, so they hold either way.
 - Replay `j764a` (Ch10 s4005 attempt 1, the game `t730b` lost her in):
 
 | Run | Code | Amelia | Turns | Deaths |

@@ -326,7 +326,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0485` | [A hand-off moves a key only to a unit it opens for, and its giver opens no chest after it](decisions/0485-a-hand-off-moves-a-key-only-to-a-unit-it-opens-for.md) | 2026-11-27 | #764 #688 #510 |
 | `0486` | [A Lockpick thief's chest is read closed: the forecast reads the AI's use-item act](decisions/0486-a-lockpick-thief-s-chest-is-read-closed.md) | 2026-11-27 | #764 #510 |
 | `0487` | [The mend tries a struck unit's own act holding the weapon that spares a recruit](decisions/0487-the-mend-holds-the-sparing-weapon-on-the-plans-own-act.md) | 2026-11-28 | #730 #764 #510 |
-| `0488` | [A Talk waits for strikers at its recruit](decisions/0488-a-talk-waits-for-strikers-at-its-recruit.md) | 2026-11-28 | #764 #730 #510 |
+| `0488` | [A Talk waits for strikers at its recruit](decisions/0488-a-talk-waits-for-strikers-at-its-recruit.md) | 2026-11-27 | #764 #730 #510 |
 
 ---
 
