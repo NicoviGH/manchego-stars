@@ -6,7 +6,7 @@
 > this is the index. Add or edit the ADR, then regenerate:
 > `python3 tools/gen_decisions_index.py`. `tools/check.py` fails if it is stale.
 
-481 decisions. Read this index, then open the two or three you need — the whole
+482 decisions. Read this index, then open the two or three you need — the whole
 set is ~197,000 tokens and no session has ever needed all of it at once.
 
 **Contents:** [Engine & Tech Stack](#engine-tech-stack) · [Documentation Model](#documentation-model) · [Working Conventions (Definition of Done)](#working-conventions-definition-of-done) · [Combat System](#combat-system) · [Weapon & Magic Systems](#weapon-magic-systems) · [Economy](#economy) · [Distribution & Scope](#distribution-scope) · [Art & Audio](#art-audio) · [Class Mapping & Promotions](#class-mapping-promotions) · [Story & Dialogue](#story-dialogue) · [Operational Gotchas (durable)](#operational-gotchas-durable) · [Open Questions (not yet decided)](#open-questions-not-yet-decided)
@@ -323,6 +323,7 @@ fresh. Don't leave it in chat or agent memory only.
 | `0481` | [A door that took a recruit waits for his talker](decisions/0481-a-door-that-took-a-recruit-waits-for-his-talker.md) | 2026-11-27 | #766 #764 #768 #510 |
 | `0482` | [A green's death spoils a clean clear only when the chapter's ending tests that green](decisions/0482-a-greens-death-spoils-a-clean-clear-only-when-the-ending-tests-it.md) | 2026-11-27 | #788 #764 #510 |
 | `0483` | [A thief is answered: the holder is kept back or hands the item off, the looter's death keeps its chest, and strikers...](decisions/0483-a-thief-is-answered.md) | 2026-11-27 | #764 #711 #688 #510 |
+| `0485` | [A hand-off moves a key only to a unit it opens for, and its giver opens no chest after it](decisions/0485-a-hand-off-moves-a-key-only-to-a-unit-it-opens-for.md) | 2026-11-27 | #764 #688 #510 |
 
 ---
 

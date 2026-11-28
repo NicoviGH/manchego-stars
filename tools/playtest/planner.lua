@@ -2632,6 +2632,13 @@ function M.plan(Bot, board, sight, style, opts)
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.opens = {}
         for id in pairs(robbed) do st.opens[id] = keeps[id] or 0 end
+        -- a holder whose Trade hands away its last chest opener (bot.lua tradeAct's `spends`)
+        -- opens no chest after it, whatever the thief does (ADR 0485)
+        for _, a in ipairs(st.acts) do
+            if a.act == "trade" and a.spends then
+                st.opens[a.gives and a.unitId or a.targetId] = 0
+            end
+        end
         st.goalWorth = {}
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)

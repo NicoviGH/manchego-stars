@@ -568,6 +568,15 @@ local function sightOf(o)
     if o.bagKey then
         s.bagKey = function(u, m, lock) return ((o.bagKey[u.id] or {})[m.id] or {})[lock] end
     end
+    -- whether an item opens a lock kind for a unit (sight.keyOpens):
+    -- o.keyOpens[unit id][item id] = { doors = bool, chests = bool }
+    if o.keyOpens then
+        s.keyOpens = function(u, item, kind)
+            local k = (o.keyOpens[u.id] or {})[item] or {}
+            if kind == nil then return (k.doors or k.chests) == true end
+            return k[kind] == true
+        end
+    end
     -- the game's facts of a unit's bag and of a new item (sight.bagFacts): o.bagFacts[id] = held
     if o.bagFacts then
         s.bagFacts = function(u, new)
@@ -6396,6 +6405,52 @@ do
                                back = { id = 1, uses = 30 } },
                              { act = "wait", unitId = 4 } })[2].holder, 2,
           "tradesIn: a take's holder is its target")
+end
+
+-- A hand-off moves a key only to a unit it opens for (ADR 0485; vanilla Ch16 s4005, `k711a` a1,
+-- turn 8: Colm's Lockpick went to Eirika, a Lord, and (3,12) was never offered again). H, the
+-- thief, holds the Lockpick 0x6B on its only tile; T beside it is no thief. The judged phase
+-- steals 0x6B from whoever holds it. To T the Lockpick opens nothing: no hand-off is offered.
+-- To a T it opens for, the hand-off is offered, and spends H's last chest opener.
+do
+    local H = blue(0x02, 1, 5, 5, { minRange = false, items = { { id = 0x6B, uses = 5 } } })
+    local T = blue(0x03, 2, 5, 7, { minRange = false, items = {} })
+    local X = red(0x81, 9, 9, { minRange = false })
+    local function plan(takerOpens)
+        local o = {
+            reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
+            explorable = { { x = 5, y = 2, kind = "chest" } },
+            canExplore = { [0x02] = { ["5,2"] = "chest" } },
+            field = fieldsOf({ ["5,2"] = { ["5,5"] = 3, ["5,4"] = 2, ["5,3"] = 1, ["5,2"] = 0 } }),
+            keyOpens = { [0x02] = { [0x6B] = { doors = true, chests = true } },
+                         [0x03] = { [0x6B] = { doors = takerOpens, chests = takerOpens } } },
+            enemyPhase = function(p)
+                for _, t in ipairs(p.trades or {}) do
+                    if t.holder == 0x02 and t.item == 0x6B then return {} end
+                end
+                return { thefts = { { thief = 0x81, target = 0x02, item = 0x6B, lock = true,
+                                      spoils = true } } }
+            end,
+        }
+        return Planner.plan(B, boardOf(H, T, X), sightOf(o), gifted("careful", 500))
+    end
+    local function trades(p)
+        local n = 0
+        for _, c in ipairs(p and p.considered or {}) do
+            for _, a in ipairs(c.acts or {}) do
+                if a:match(">trade@") then n = n + 1 end
+            end
+        end
+        return n
+    end
+    local _, keyless = plan(false)
+    check(trades(keyless), 0, "hand-off: a key goes to no unit it opens nothing for")
+    local a, thief = plan(true)
+    check(trades(thief) > 0, true, "hand-off: a key goes to a unit it opens for")
+    check(a and a.act == "trade" and a.spends, true,
+          "hand-off: the Trade of the holder's last chest opener spends it")
+    check(goalAfter(thief, "chest:5,2"), 0,
+          "hand-off: the holder that handed away its last opener opens no chest after it")
 end
 
 -- test_a_thief_the_calendar_brings_is_met (ADR 0483): an earlier attempt saw the game bring a
