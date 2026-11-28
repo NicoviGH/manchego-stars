@@ -5161,7 +5161,8 @@ function M.new(outer)
 
     -- Whether `item` (an id) opens a lock of `kind` ("doors" | "chests", M.LOCK_TERRAIN's keys;
     -- nil for either) for `u` (opensWith: the game's own key check, as `u`). A Trade's hand-off
-    -- reads it on both ends: a Lockpick opens nothing for a non-thief (ADR 0485).
+    -- reads it on both ends: a Lockpick opens nothing for a non-thief (ADR 0485). opensWith
+    -- owns the check; this only names the lock kinds (holdsKey and locked ask a unit's own bag).
     function s.keyOpens(u, item, kind)
         for k, terrain in pairs(M.LOCK_TERRAIN) do
             if (kind == nil or kind == k) and opensWith(u, item, terrain) then return true end

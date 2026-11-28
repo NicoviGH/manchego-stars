@@ -795,6 +795,24 @@ function M.tradesIn(acts)
     return out
 end
 
+-- The chest openers a plan's Trades leave (ADR 0485), into `opens` (st.opens: unit id -> the
+-- chance it keeps one): in act order, a holder whose Trade hands away its last chest opener
+-- (bot.lua tradeAct's `spends`) opens none after it, and a taker the item opens a chest for
+-- (`restores`) is given back what an earlier Trade of the plan took. A taker is never made a
+-- chest's new taker here: the goals' takers are fixed when the decision starts. Pure.
+function M.opensAfterTrades(acts, opens)
+    local spent = {}
+    for _, a in ipairs(acts) do
+        if a.act == "trade" then
+            local holder, taker = a.targetId, a.unitId
+            if a.gives then holder, taker = a.unitId, a.targetId end
+            if a.spends then opens[holder], spent[holder] = 0, true end
+            if a.restores and spent[taker] then opens[taker], spent[taker] = nil, nil end
+        end
+    end
+    return opens
+end
+
 -- The chance either of two independent events happens: 1 - (1 - a)(1 - b). The one fold of
 -- chances: the plan's win and its counters' (winOf), a later phase's win and deaths (the
 -- lookahead's), a protected unit's deaths over the plan's (overAll).
@@ -2632,13 +2650,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.opens = {}
         for id in pairs(robbed) do st.opens[id] = keeps[id] or 0 end
-        -- a holder whose Trade hands away its last chest opener (bot.lua tradeAct's `spends`)
-        -- opens no chest after it, whatever the thief does (ADR 0485)
-        for _, a in ipairs(st.acts) do
-            if a.act == "trade" and a.spends then
-                st.opens[a.gives and a.unitId or a.targetId] = 0
-            end
-        end
+        M.opensAfterTrades(st.acts, st.opens)
         st.goalWorth = {}
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)

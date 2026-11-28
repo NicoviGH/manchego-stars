@@ -6413,10 +6413,12 @@ end
 -- steals 0x6B from whoever holds it. To T the Lockpick opens nothing: no hand-off is offered.
 -- To a T it opens for, the hand-off is offered, and spends H's last chest opener.
 do
-    local H = blue(0x02, 1, 5, 5, { minRange = false, items = { { id = 0x6B, uses = 5 } } })
     local T = blue(0x03, 2, 5, 7, { minRange = false, items = {} })
     local X = red(0x81, 9, 9, { minRange = false })
-    local function plan(takerOpens)
+    local function plan(takerOpens, picks)
+        local items = {}
+        for i = 1, picks or 1 do items[i] = { id = 0x6B, uses = 5 } end
+        local H = blue(0x02, 1, 5, 5, { minRange = false, items = items })
         local o = {
             reach = { [0x02] = tiles({ 5, 5 }), [0x03] = tiles({ 5, 7 }, { 5, 6 }, { 6, 7 }) },
             explorable = { { x = 5, y = 2, kind = "chest" } },
@@ -6449,8 +6451,20 @@ do
     check(trades(thief) > 0, true, "hand-off: a key goes to a unit it opens for")
     check(a and a.act == "trade" and a.spends, true,
           "hand-off: the Trade of the holder's last chest opener spends it")
+    local two = plan(true, 2)
+    check(two and two.act == "trade" and two.spends, nil,
+          "hand-off: a holder with a second Lockpick keeps an opener after the Trade")
     check(goalAfter(thief, "chest:5,2"), 0,
           "hand-off: the holder that handed away its last opener opens no chest after it")
+    -- the planner's read of the plan's Trades, in act order (Planner.opensAfterTrades): a take
+    -- from the holder spends it as a give does, a Trade back restores it, and a robbed unit's
+    -- keep (set before) is left to the theft read
+    local take = { act = "trade", unitId = 3, targetId = 2, item = 0x6B, spends = true }
+    local back = { act = "trade", unitId = 3, targetId = 2, gives = true, item = 0x6B, restores = true }
+    check(Planner.opensAfterTrades({ take }, {})[2], 0, "opens: a take from the holder spends it")
+    check(Planner.opensAfterTrades({ take, back }, {})[2], nil, "opens: a Trade back restores it")
+    check(Planner.opensAfterTrades({ back }, { [2] = 0.4 })[2], 0.4,
+          "opens: a restore leaves a keep no Trade of the plan set")
 end
 
 -- test_a_thief_the_calendar_brings_is_met (ADR 0483): an earlier attempt saw the game bring a

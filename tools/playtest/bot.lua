@@ -2312,24 +2312,24 @@ do
         return it and { id = it.id, uses = it.uses } or nil
     end
 
-    -- `actor`'s Trade with `other` that moves the key `h` (a bagHolders source) to its taker: the
-    -- actor takes it from the holder, or (`gives`) the actor is the holder and hands it over. From
-    -- the safest wait tile the gate allows where the game's Trade command lists `other`
-    -- (ItemSubMenu_IsTradeAvailable: an adjacent ally, before any Canto move). The taker gives one
-    -- back only with a full bag (giveBack); nil when it would give nothing. The game returns to the
-    -- unit menu after a Trade (UNIT_ACTION_TRADED); the act ends with a Wait, which earns no Canto
-    -- (TryMakeCantoUnit), as Supply's Take does.
     -- Whether a Trade of `item` (an id) from `holder` leaves it no chest opener (sight.keyOpens,
     -- the game's check as the holder): the planner's march to a chest then reads it keyless
     -- (planner st.opens, ADR 0485). Vanilla Ch16 s4005 (`k711a` a1, turn 8): Colm's Lockpick
-    -- handed to Eirika left his walk to (3,12) counted as an opener's.
+    -- handed to Eirika left his walk to (3,12) counted as an opener's. Chests only: the
+    -- planner's per-plan opener read (st.opens) is a chest march's; a door's way is read on the
+    -- live bags (sight.locked), which no plan's Trade moves.
     local function spendsOpener(s, holder, item)
         if not s.keyOpens or not s.keyOpens(holder, item, "chests") then return false end
-        local spare = false
+        -- the one copy traded is skipped: a second Lockpick still opens (#792 review)
+        local skipped = false
         for _, it in ipairs(holder.items or {}) do
-            if it.id ~= item and s.keyOpens(holder, it.id, "chests") then spare = true end
+            if it.id == item and not skipped then
+                skipped = true
+            elseif s.keyOpens(holder, it.id, "chests") then
+                return false
+            end
         end
-        return not spare
+        return true
     end
 
     -- Whether `taker` could use `item` the way `holder` does: each lock kind it opens for the
@@ -2343,6 +2343,13 @@ do
         return true
     end
 
+    -- `actor`'s Trade with `other` that moves the key `h` (a bagHolders source) to its taker: the
+    -- actor takes it from the holder, or (`gives`) the actor is the holder and hands it over. From
+    -- the safest wait tile the gate allows where the game's Trade command lists `other`
+    -- (ItemSubMenu_IsTradeAvailable: an adjacent ally, before any Canto move). The taker gives one
+    -- back only with a full bag (giveBack); nil when it would give nothing. The game returns to the
+    -- unit menu after a Trade (UNIT_ACTION_TRADED); the act ends with a Wait, which earns no Canto
+    -- (TryMakeCantoUnit), as Supply's Take does.
     local function tradeAct(ctx, actor, other, h, gives, gate)
         local s = ctx.sight
         if not s.offers then return nil end
@@ -2358,6 +2365,7 @@ do
         local a = action(actor, best, "trade", other)
         a.item, a.uses, a.lock, a.back, a.gives = h.key.id, h.key.uses, h.lock, back, gives or nil
         a.spends = spendsOpener(s, gives and actor or other, h.key.id) or nil
+        a.restores = s.keyOpens and s.keyOpens(taker, h.key.id, "chests") or nil
         return a
     end
 
