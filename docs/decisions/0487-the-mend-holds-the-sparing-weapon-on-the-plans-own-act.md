@@ -8,9 +8,9 @@ issues: [730, 764, 510]
 
 # The mend tries a struck unit's own act holding the weapon that spares a recruit
 
-**Decided (2026-11-28, #764 fix order item 2: Ch10's Amelia; #730).** Adds one act to the mend;
-no scoring change, no new weight. It is ADR 0451's and ADR 0453's gentle acts, made for the act
-the plan chose.
+**Decided (2026-11-28, #764 fix order item 2: Ch10's Amelia; #730).** Adds one act to the mend
+and lets the mend run its later rounds while a recruit is felled; no scoring change, no new
+weight. The act is ADR 0451's and ADR 0453's gentle act, made for the act the plan chose.
 
 **The gap.** The menus offer `M.GENTLE` (2) gentle waits and 2 gentle strikes per unit, the
 cheapest by `sparingPicks`' cost. That cost reads every enemy that reaches the tile, while the
@@ -31,9 +31,14 @@ tries its own act in the plan holding the weapon whose counter spares it (`Bot.s
 its menu as before. The twin is `sparingPicks` on that one spot, with no cap: the same weapon
 test and cost as the menu's (the recruit's fall plus the unit's own death there, and a weapon the
 attack can break is never the sparing one). A plain wait and a strike from a pick are twinned. A
-gentle act (already holding a slot), a Canto wait and a wall's strike are not. The two spot
-builders are shared with the menus (`M.waitSpot`, `M.strikeSpot`). They hang off M because
-bot.lua's chunk has one free local slot.
+gentle act (already holding a slot), a Canto wait and a wall's strike are not. Nor is an act the
+planner re-listed on a board its plan changes (`needs`, menusFor): the twin is read on the
+decision's own board, as the menus' gentle acts are, and that act's re-listed menu already carries
+the gentle acts read on its own board. In a later round an earlier act may have killed a threat
+the twin's cost still counts; the cost only picks the weapon, and the judged phase decides. The
+spot builders and the strikes' grouping by spot are shared with the menus (`M.waitSpot`,
+`M.strikeSpot`, `M.strikeGroups`). They hang off M because bot.lua's chunk has one free local
+slot.
 
 **And the mend goes on past the cap while our counter may fell a recruit.** A round that brings
 the plan under the cap with a recruit still felled in it is not the last, as for a theft (ADR
@@ -50,7 +55,8 @@ plan's value (the recruit's goal chance in the goals' term), not on the forfeit 
 ADR 0451's reading, unchanged here.
 
 **Cost.** At most one more judged phase per struck unit per mend round, and up to two more mend
-rounds, only on a plan whose counter may fell a recruit.
+rounds, only on a plan whose counter may fell a recruit. A recruit no act spares costs one round
+more, no more: a round that changes nothing ends the mend (`best == base`), pinned by a test.
 
 **Proof.** `test_bot.lua` "sparing twin": with the cap at 0 the menu holds no gentle act. On main
 the plan played strikes holding slot 0 and forfeits the recruit. Now it strikes holding slot 2

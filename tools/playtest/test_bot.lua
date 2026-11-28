@@ -7780,53 +7780,76 @@ do
     check(gentleActs(board, o), "", "gentle strike: one weapon, nothing to swap to")
 end
 
--- test_the_mend_holds_the_sparing_weapon_on_the_plans_own_act (#730; vanilla Ch10 s4005 a1, turn
--- 5: Franz, 0x04, struck from (1,19) holding the Iron Lance whose counter killed Amelia, 0x12; the
--- M.GENTLE gentle strikes the menu offered were on other spots). The menus' cap is what can cut the
--- twin of the act a plan chose; at 0 it cuts every one, so the menu holds no sparing act and on
--- main every plan either forfeits R or never strikes T. The mend now tries A's own strike (and
--- wait) holding the weapon whose counter spares R: attack#2@0,2, nothing forfeited.
+-- test_the_mend_holds_the_sparing_weapon_on_the_plans_own_act (#730, ADR 0487; vanilla Ch10 s4005
+-- a1, turn 5: Franz, 0x04, struck from (1,19) holding the Iron Lance whose counter killed Amelia,
+-- 0x12; the M.GENTLE gentle strikes the menu offered were on other spots). The menus' cap is what
+-- can cut the twin of the act a plan chose; at 0 it cuts every one, so the menu holds no sparing
+-- act and on main every plan either forfeits R or never strikes T. The mend now tries A's own
+-- strike (and wait) holding the weapon whose counter spares R: attack#2@0,2, nothing forfeited.
 do
-    local cap, beam = B.GENTLE, Planner.BEAM
-    B.GENTLE, Planner.BEAM = 0, 1
-    check(gentleActs(sparingStrikeScene()), "", "sparing twin: at cap 0 the menu offers no gentle strike")
-    local board, o = sparingStrikeScene()
-    local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
-    B.GENTLE, Planner.BEAM = cap, beam
-    check(a and a.act .. "#" .. tostring(a.slot) .. "@" .. at(a), "attack#2@0,2",
-          "sparing twin: the mend plays A's own strike holding slot 2")
+    -- `fn` with the knobs set (B's GENTLE, the Planner's BEAM, FINAL, MEND_ROUNDS), restored even
+    -- when it raises
+    local function withKnobs(k, fn)
+        local was = { B.GENTLE, Planner.BEAM, Planner.FINAL, Planner.MEND_ROUNDS }
+        B.GENTLE = k.gentle or was[1]
+        Planner.BEAM, Planner.FINAL = k.beam or was[2], k.final or was[3]
+        Planner.MEND_ROUNDS = k.rounds or was[4]
+        local ok, x, y = pcall(fn)
+        B.GENTLE, Planner.BEAM, Planner.FINAL, Planner.MEND_ROUNDS = was[1], was[2], was[3], was[4]
+        if not ok then error(x, 0) end
+        return x, y
+    end
+    local function played(a) return a and a.act .. "#" .. tostring(a.slot) .. "@" .. at(a) end
+    withKnobs({ gentle = 0 }, function()
+        check(gentleActs(sparingStrikeScene()), "", "sparing twin: at cap 0 the menu offers no gentle strike")
+    end)
+    local a, plan = withKnobs({ gentle = 0, beam = 1 }, function()
+        local board, o = sparingStrikeScene()
+        return Planner.plan(B, board, sightOf(o), style("careful"))
+    end)
+    check(played(a), "attack#2@0,2", "sparing twin: the mend plays A's own strike holding slot 2")
     check(plan and #(plan.forfeited or {}), 0, "sparing twin: the plan played forfeits no recruit")
     -- ... and a round that brings the plan under the cap with the recruit still felled is not the
     -- last (replay t730a, turn 5: the first round, from the beam's over-cap plan, took it under the
     -- cap with Franz's lance strike kept, and his sword strike was tried only from that base). C
-    -- dies anywhere but (6,5); round 1 moves C, round 2 gives A its twin.
-    B.GENTLE, Planner.BEAM = 0, 1
-    local final = Planner.FINAL
-    Planner.FINAL = 1
-    board, o = sparingStrikeScene()
-    local C = blue(0x02, 1, 5, 5, { minRange = false })
-    board.units[#board.units + 1] = C
-    o.reach[0x02] = tiles({ 5, 5 }, { 4, 5 }, { 6, 5 })
-    local phase = o.enemyPhase
-    o.enemyPhase = function(p)
-        local out = phase(p)
-        for _, b in ipairs(p.blues) do
-            if b.unit.id == 0x02 and b.x ~= 6 then
-                out[#out + 1] = { target = 0x02, takenHit = 100, takenDmg = 99, takenHits = 1,
-                                  takenCrit = 0 }
+    -- dies anywhere but (6,5); round 1 moves C, round 2 gives A its twin. `weapons`: A's, when
+    -- not the scene's two. -> the plan, and how many enemy phases were judged
+    local function withC(rounds, weapons)
+        local calls = 0
+        local _, p = withKnobs({ gentle = 0, beam = 1, final = 1, rounds = rounds }, function()
+            local board, o = sparingStrikeScene()
+            if weapons then board.units[1].weapons = weapons end
+            board.units[#board.units + 1] = blue(0x02, 1, 5, 5, { minRange = false })
+            o.reach[0x02] = tiles({ 5, 5 }, { 4, 5 }, { 6, 5 })
+            local phase = o.enemyPhase
+            o.enemyPhase = function(q)
+                calls = calls + 1
+                local out = phase(q)
+                for _, x in ipairs(q.blues) do
+                    if x.unit.id == 0x02 and x.x ~= 6 then
+                        out[#out + 1] = { target = 0x02, takenHit = 100, takenDmg = 99,
+                                          takenHits = 1, takenCrit = 0 }
+                    end
+                end
+                return out
             end
-        end
-        return out
+            return Planner.plan(B, board, sightOf(o), style("careful"))
+        end)
+        return p, calls
     end
-    a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
-    B.GENTLE, Planner.BEAM, Planner.FINAL = cap, beam, final
+    plan = withC()
     local acts = {}
-    for _, x in ipairs(plan and plan.acts or {}) do
-        acts[#acts + 1] = x.act .. "#" .. tostring(x.slot) .. "@" .. at(x)
-    end
+    for _, x in ipairs(plan and plan.acts or {}) do acts[#acts + 1] = played(x) end
+    table.sort(acts)
     check(plan and plan.rank and plan.rank.admitted and #(plan.forfeited or { 1 }) == 0, true,
-          "sparing twin: the mend goes on past the cap while our counter fells the recruit ("
-          .. table.concat(acts, " ") .. ")")
+          "sparing twin: the mend goes on past the cap while our counter fells the recruit")
+    check(table.concat(acts, " "), "attack#2@0,2 wait#nil@6,5",
+          "sparing twin: and the second round's plan is A's twin with C moved")
+    -- a recruit no act spares (A holds one weapon) costs one round more, no more: the round that
+    -- changes nothing ends the mend, so three rounds judge what two do
+    local one = { { slot = 0, min = 1, max = 1 } }
+    check(select(2, withC(3, one)), select(2, withC(2, one)),
+          "sparing twin: a recruit no act spares runs no third round")
 end
 
 -- The review of PR #735 (#730 fix 4): each case below fails without the line it names.

@@ -3089,7 +3089,8 @@ function M.plan(Bot, board, sight, style, opts)
     -- whether our counter may fell a recruit in the plan: the same (ADR 0487; vanilla Ch10 s4005
     -- a1, replay t730a, turn 5: the first round, from the beam's over-cap plan, took the plan under
     -- the cap with Franz striking from Amelia's reach holding the lance that kills her, and the
-    -- strike holding his sword was tried only from the over-cap base)
+    -- strike holding his sword was tried only from the over-cap base). A recruit no act spares
+    -- costs one more round, no more: a round that changes nothing ends the mend (`best == base`)
     local function fells(st)
         for _, p in ipairs(st.predict or {}) do
             if p.recruit and p.die > M.DUST then return true end
@@ -3112,8 +3113,8 @@ function M.plan(Bot, board, sight, style, opts)
             menuOf[m.unit.id] = mine
         end
         -- the menu entries of the units `ids`, in order
-        local function entriesOf(ids)
-            local out = {}
+        local function entriesOf(ids, out)
+            out = out or {}
             for _, id in ipairs(ids) do
                 for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
             end
@@ -3135,8 +3136,7 @@ function M.plan(Bot, board, sight, style, opts)
                         out[#out + 1] = { uid = a.unitId, a = twin }
                     end
                 end
-                for _, t in ipairs(entriesOf(p.struck)) do out[#out + 1] = t end
-                return out
+                return entriesOf(p.struck, out)
             end
             if p.joined then
                 -- a recruit the plan Talks over has no act of its own in it: the talker's

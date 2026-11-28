@@ -1314,6 +1314,18 @@ local function sparingWaits(ctx, u, acts)
     return sparingPicks(ctx, u, recruit, spots)
 end
 
+-- attackOptions' `options` by spot (spotKey: one target from one tile), each spot's options one
+-- per weapon, and the spots in their first option's order. -> groups, order
+function M.strikeGroups(options)
+    local groups, order = {}, {}
+    for _, c in ipairs(options) do
+        local k = spotKey(c.target.id, c.tile.x, c.tile.y)
+        if not groups[k] then groups[k] = {}; order[#order + 1] = k end
+        table.insert(groups[k], c)
+    end
+    return groups, order
+end
+
 -- sparingPicks' spot for `u`'s strikes on one target from one tile (`here`: attackOptions'
 -- options there, one per weapon), the weapon held being `base`'s (the act kept there) or, on a
 -- tile no act took, the one betterAttack keeps. A weapon the attack can break is never the
@@ -1353,17 +1365,13 @@ end
 local function sparingStrikes(ctx, u, acts, options)
     local recruit = sparingRecruit(ctx, u)
     if not recruit then return {} end
-    local kept, groups, order = {}, {}, {}
+    local kept = {}
     for _, a in ipairs(acts) do
         if a.act == "attack" and a.targetId then
             kept[spotKey(a.targetId, a.move.x, a.move.y)] = a
         end
     end
-    for _, c in ipairs(options) do
-        local k = spotKey(c.target.id, c.tile.x, c.tile.y)
-        if not groups[k] then groups[k] = {}; order[#order + 1] = k end
-        table.insert(groups[k], c)
-    end
+    local groups, order = M.strikeGroups(options)
     local spots = {}
     for _, k in ipairs(order) do spots[#spots + 1] = M.strikeSpot(u, groups[k], kept[k]) end
     local out = sparingPicks(ctx, u, recruit, spots)
@@ -2955,17 +2963,18 @@ end
 -- reaches a tile; the judge's phase may play another, so the act the plan chose had no twin on
 -- the menu (vanilla Ch10 s4005 a1, turn 5: Franz, 0x04, struck from (1,19) holding his Iron
 -- Lance, the two gentle strikes offered were on another target, and his counter killed Amelia,
--- 0x12). ctx: M.candidates' second value.
+-- 0x12). Read on the decision's own board (ctx: M.candidates' second value), as the menus' gentle
+-- acts are: an act the planner re-listed on a board its plan changes (`needs`, menusFor) has no
+-- twin here, its own re-listed menu carries the gentle acts read on that board. In a later mend
+-- round an earlier act may have killed a threat the twin's cost still counts; the cost only picks
+-- the weapon, and the judged phase decides the plan.
 function M.sparingTwin(ctx, u, a)
     local recruit = sparingRecruit(ctx, u)
-    if not recruit then return nil end
+    if not recruit or a.needs then return nil end
     local spot = M.waitSpot(ctx, u, a)
     if not spot and a.act == "attack" and a.targetId and not a.slotKey then
-        local k, here = spotKey(a.targetId, a.move.x, a.move.y), {}
-        for _, c in ipairs(ctx.priced[u] or {}) do
-            if spotKey(c.target.id, c.tile.x, c.tile.y) == k then here[#here + 1] = c end
-        end
-        if #here > 0 then spot = M.strikeSpot(u, here, a) end
+        local here = M.strikeGroups(ctx.priced[u] or {})[spotKey(a.targetId, a.move.x, a.move.y)]
+        if here then spot = M.strikeSpot(u, here, a) end
     end
     local twin = spot and sparingPicks(ctx, u, recruit, { spot }, 1)[1]
     if not twin then return nil end
