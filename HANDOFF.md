@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-27; main is 28fdf099 + HANDOFF commits)
+## Next session starts here (2026-11-28; main is fcaf009e + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -86,7 +86,20 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
-**2026-11-27 (latest): Ch16 s4005's thefts are fixed and merged. Next: #764 fix order item 2 (Ch10's Amelia).**
+**2026-11-28 (latest): item 2's first half (Ch10's Amelia) is merged. Next: its second half, the talker's danger.**
+- **PR #794 (fcaf009e, ADR 0487):** when our counter may fell a recruit, the mend tries each struck
+  unit's own planned act holding the weapon that spares her (`Bot.sparingTwin`, uncapped), and it
+  goes on past the cap while the best plan still fells a recruit (`fells`, beside `robbed`).
+- **R5 Ch10 (`r5a10`):** Amelia was missed in 9 of 10 unclean tries: 6 by our own counters, 3 by the
+  talker's trip priced away by its route loss.
+- **Replay `t730b` (Ch10 s4005 a1):** she lives past turn 5 (R5: killed there), but is not
+  recruited. Every Talk plan was over the cap (Franz's death 0.97 on turn 9, 0.75 on turn 11), and
+  she died on turn 11, the last before the script removes her. Next is that half: why every Talk
+  is over the cap (route loss reads enemies where they stand now, `bot.lua` routeLoss/legLive;
+  also untested: which unit's death makes the over-cap Talk plans' max_die). #764 comment 7232245754.
+- **Open call for Nicolas** (on that comment): a recruit's forfeit is binary at 1e-9.
+
+**2026-11-27: Ch16 s4005's thefts are fixed and merged. Next: #764 fix order item 2 (Ch10's Amelia).**
 - **PR #792 (ADR 0485):** a theft's hand-off gives a key only to a unit it opens for, and a
   Trade of a holder's last chest opener leaves it keyless in the planner.
 - **PR #793 (ADR 0486):** the closings forecast reads a thief's Lockpick chest opening (a
