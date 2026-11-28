@@ -7780,6 +7780,55 @@ do
     check(gentleActs(board, o), "", "gentle strike: one weapon, nothing to swap to")
 end
 
+-- test_the_mend_holds_the_sparing_weapon_on_the_plans_own_act (#730; vanilla Ch10 s4005 a1, turn
+-- 5: Franz, 0x04, struck from (1,19) holding the Iron Lance whose counter killed Amelia, 0x12; the
+-- M.GENTLE gentle strikes the menu offered were on other spots). The menus' cap is what can cut the
+-- twin of the act a plan chose; at 0 it cuts every one, so the menu holds no sparing act and on
+-- main every plan either forfeits R or never strikes T. The mend now tries A's own strike (and
+-- wait) holding the weapon whose counter spares R: attack#2@0,2, nothing forfeited.
+do
+    local cap, beam = B.GENTLE, Planner.BEAM
+    B.GENTLE, Planner.BEAM = 0, 1
+    check(gentleActs(sparingStrikeScene()), "", "sparing twin: at cap 0 the menu offers no gentle strike")
+    local board, o = sparingStrikeScene()
+    local a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+    B.GENTLE, Planner.BEAM = cap, beam
+    check(a and a.act .. "#" .. tostring(a.slot) .. "@" .. at(a), "attack#2@0,2",
+          "sparing twin: the mend plays A's own strike holding slot 2")
+    check(plan and #(plan.forfeited or {}), 0, "sparing twin: the plan played forfeits no recruit")
+    -- ... and a round that brings the plan under the cap with the recruit still felled is not the
+    -- last (replay t730a, turn 5: the first round, from the beam's over-cap plan, took it under the
+    -- cap with Franz's lance strike kept, and his sword strike was tried only from that base). C
+    -- dies anywhere but (6,5); round 1 moves C, round 2 gives A its twin.
+    B.GENTLE, Planner.BEAM = 0, 1
+    local final = Planner.FINAL
+    Planner.FINAL = 1
+    board, o = sparingStrikeScene()
+    local C = blue(0x02, 1, 5, 5, { minRange = false })
+    board.units[#board.units + 1] = C
+    o.reach[0x02] = tiles({ 5, 5 }, { 4, 5 }, { 6, 5 })
+    local phase = o.enemyPhase
+    o.enemyPhase = function(p)
+        local out = phase(p)
+        for _, b in ipairs(p.blues) do
+            if b.unit.id == 0x02 and b.x ~= 6 then
+                out[#out + 1] = { target = 0x02, takenHit = 100, takenDmg = 99, takenHits = 1,
+                                  takenCrit = 0 }
+            end
+        end
+        return out
+    end
+    a, plan = Planner.plan(B, board, sightOf(o), style("careful"))
+    B.GENTLE, Planner.BEAM, Planner.FINAL = cap, beam, final
+    local acts = {}
+    for _, x in ipairs(plan and plan.acts or {}) do
+        acts[#acts + 1] = x.act .. "#" .. tostring(x.slot) .. "@" .. at(x)
+    end
+    check(plan and plan.rank and plan.rank.admitted and #(plan.forfeited or { 1 }) == 0, true,
+          "sparing twin: the mend goes on past the cap while our counter fells the recruit ("
+          .. table.concat(acts, " ") .. ")")
+end
+
 -- The review of PR #735 (#730 fix 4): each case below fails without the line it names.
 do
     -- C1: a wall's strike is an attack act with no target; it reaches sparingStrikes' `kept` and
