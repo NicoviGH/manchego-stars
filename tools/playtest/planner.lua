@@ -3533,7 +3533,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- its board turn, and `due`, whether its stage job is on: ADR 0483)
     best.releases = {}
     for _, r in ipairs(ctx.releases or {}) do
-        best.releases[#best.releases + 1] = { x = r.x, y = r.y, need = r.need, ready = r.ready,
+        best.releases[#best.releases + 1] = { key = r.key, x = r.x, y = r.y, need = r.need, ready = r.ready,
                                               talkReady = r.talkReady, staged = r.staged,
                                               arrival = r.arrival, due = r.due }
     end

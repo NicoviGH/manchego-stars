@@ -3358,6 +3358,32 @@ local function strikeGap(ctx, u, r, reach, tiles)
     return best and here + best - ctx.sight.mov(u) - reach
 end
 
+-- A release with no stake, talkers or opener (an arrival's, a Talk's): the door's shape, so the
+-- stage job and the record read it as they read a door's. M fields, not locals: bot.lua is at
+-- Lua's top-level local ceiling.
+function M.newRelease(x, y, key, need, front)
+    return { x = x, y = y, key = key, need = need, front = front,
+             stake = { tiles = {}, gone = {} }, talkers = {}, owes = {}, talkReady = true }
+end
+
+-- Each unit's strikeGap to release `r`'s front, less `slack(u)` when given (the moves it has
+-- before the release's turn), nearest first: sets and returns r.strikers and r.ready (those at
+-- 0 or less, who can strike its front in time).
+function M.markStrikers(ctx, r, slack)
+    local strikers, ready = {}, 0
+    for _, u in ipairs(ctx.actors) do
+        local g = strikeGap(ctx, u, r)
+        if g then
+            if slack then g = g - slack(u) end
+            strikers[#strikers + 1] = { u = u, gap = g }
+            if g <= 0 then ready = ready + 1 end
+        end
+    end
+    table.sort(strikers, soonestThenSlot("gap", "u"))
+    r.strikers, r.ready = strikers, ready
+    return strikers, ready
+end
+
 -- The thieves the calendar brings, as releases (ADR 0483): a red that steals (sight.steals, its
 -- class's CA_STEAL) an earlier attempt saw the game bring to a tile on a board turn still to come
 -- (Timeline.calendar; a timed arrival comes on the same turn every try). A person who lost a key
@@ -3385,9 +3411,8 @@ function M.arrivalsOf(ctx, memory, out)
             local key = "arrive:" .. tileKey(a.x, a.y) .. "@" .. a.boardTurn
             local r = byTile[key]
             if not r then
-                r = { x = a.x, y = a.y, key = key, arrival = a.boardTurn, left = left, need = 0,
-                      front = { { x = a.x, y = a.y } }, stake = { tiles = {}, gone = {} },
-                      talkers = {}, owes = {}, talkReady = true }
+                r = M.newRelease(a.x, a.y, key, 0, { { x = a.x, y = a.y } })
+                r.arrival, r.left = a.boardTurn, left
                 byTile[key], order[#order + 1] = r, key
             end
             r.need = r.need + 1
@@ -3396,17 +3421,9 @@ function M.arrivalsOf(ctx, memory, out)
     table.sort(order)
     for _, key in ipairs(order) do
         local r = byTile[key]
-        local strikers, ready = {}, 0
-        for _, u in ipairs(ctx.actors) do
-            local g = strikeGap(ctx, u, r)
-            if g then
-                g = g - (r.left - 1) * ctx.sight.mov(u)
-                strikers[#strikers + 1] = { u = u, gap = g }
-                if g <= 0 then ready = ready + 1 end
-            end
-        end
-        table.sort(strikers, soonestThenSlot("gap", "u"))
-        r.strikers, r.ready = strikers, ready
+        local strikers, ready = M.markStrikers(ctx, r, function(u)
+            return (r.left - 1) * ctx.sight.mov(u)
+        end)
         -- the need-th nearest the job may send (never a lord: sendStagers' bar) is due once a
         -- move away from the tile now would make it late: its gap is within one move of the line
         local lords, last, n = M.gameOver(ctx.sight), nil, 0
@@ -3418,6 +3435,46 @@ function M.arrivalsOf(ctx, memory, out)
         r.full = not r.due
         r.staged = ready >= r.need
         out[#out + 1] = r
+    end
+end
+
+-- A Talk as a release (#764, #730): the act turns its recruit blue where she stands, and every
+-- red that reaches her tile then strikes a player unit. The planner protects her under the cap
+-- from that phase (planner's `recruited`), so while those reds stand, every Talk reads over it
+-- and none is played; nothing sent the army to kill them first. A person kills what would
+-- strike the recruit, then Talks. One release per recruit on the field that a blue may Talk,
+-- in the door's shape, read on the board now (no memory: the reds are in sight), so the stage
+-- job (sendStagers) sends strikers to her and the record reads them as it does a door's:
+--   front: each red whose threat reaches her tile: not she, nor another recruit, nor a loose
+--     one (owed, no one may Talk her yet: still a recruit, never a foe to kill)
+--   need: the front's size, one striker each (the door rule's)
+--   strikers: each unit's strikeGap from her tile to the front; 0 or less, it can strike one
+--     this turn
+-- No stake, talkers or opener, and no forfeit (planner's `released` never matches): the cap
+-- already judges the Talk; this only brings the strikers. `full` once ready >= need, so a
+-- front the army cannot reach in full still has what it can send stay sent.
+function M.joinsOf(ctx, out)
+    if not (ctx.sight.threat and ctx.recruits) then return end
+    local loose = ctx.looseRecruits or {}
+    for _, t in ipairs(ctx.onField or {}) do
+        -- danger 0 on her tile: no red reaches it, and no threat grid need be read
+        if ctx.recruits[t.id] and t.faction == "red" and not t.fogged
+            and ctx.sight.danger(t.x, t.y) > 0 then
+            local front = {}
+            for _, e in ipairs(ctx.enemies or {}) do
+                if e.id ~= t.id and not ctx.recruits[e.id] and not loose[e.id]
+                    and reaches(ctx, e, t.x, t.y) then
+                    front[#front + 1] = { x = e.x, y = e.y }
+                end
+            end
+            if #front > 0 then
+                local r = M.newRelease(t.x, t.y, "join:" .. tostring(t.id), #front, front)
+                M.markStrikers(ctx, r)
+                r.full = r.ready >= r.need
+                r.staged = r.full
+                out[#out + 1] = r
+            end
+        end
     end
 end
 
@@ -3442,6 +3499,7 @@ end
 -- decision, on the board before anyone acts: a striker that moves in this turn has acted.
 local function releasesOf(ctx)
     local out = {}
+    M.joinsOf(ctx, out)
     local memory = ctx.style and ctx.style.memory
     if not (memory and ctx.sight.march) then return out end
     M.arrivalsOf(ctx, memory, out)
