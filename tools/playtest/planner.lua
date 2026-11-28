@@ -616,12 +616,13 @@ local function score(act, st, W, style, odds, likeliest)
         -- the plan is no act. A hand-off out of a thief's reach (act.handoff, ADR 0483) opens
         -- no way: what it is worth is the theft the judged phase no longer plays
         if not act.handoff then v = v + W.breach end
-        fx.took = "trade:" .. (act.gives and act.unitId or act.targetId) .. ":" .. act.item .. "x" .. act.uses
+        local holder, taker = M.tradeEnds(act)
+        fx.took = "trade:" .. holder .. ":" .. act.item .. "x" .. act.uses
         -- a full-bag taker's give-back (`back`) leaves its bag the same way: a second Trade
         -- that names that item, from the taker, is no act either (two hand-offs to one full
         -- teammate named its one give-back twice, and the judged phase could not stage both)
         if act.back then
-            fx.tookBack = "trade:" .. (act.gives and act.targetId or act.unitId) .. ":"
+            fx.tookBack = "trade:" .. taker .. ":"
                 .. act.back.id .. "x" .. act.back.uses
         end
         fx.blocked = st.took[fx.took] == true or (fx.tookBack ~= nil and st.took[fx.tookBack] == true)
@@ -779,6 +780,13 @@ function M.staged(st)
              joined = ph.joined, opened = ph.opened, carry = ph.carry, trades = ph.trades }
 end
 
+-- A Trade act's two ends, holder (who has the item) and taker (bot.lua tradeAct: the actor takes
+-- from its target, or gives to it with `gives`). Pure.
+function M.tradeEnds(a)
+    if a.gives then return a.unitId, a.targetId end
+    return a.targetId, a.unitId
+end
+
 -- The items a plan's Trades move, for the sandbox's bags (sight's stagePhase, ADR 0483): each
 -- Trade act as { holder, taker, item, uses, back } (bot.lua tradeAct: the actor takes from its
 -- target, or gives to it with `gives`). Pure.
@@ -786,13 +794,33 @@ function M.tradesIn(acts)
     local out = {}
     for _, a in ipairs(acts) do
         if a.act == "trade" then
-            local holder, taker = a.targetId, a.unitId
-            if a.gives then holder, taker = a.unitId, a.targetId end
+            local holder, taker = M.tradeEnds(a)
             out[#out + 1] = { holder = holder, taker = taker, item = a.item, uses = a.uses,
                               back = a.back }
         end
     end
     return out
+end
+
+-- The chest openers a plan's Trades leave (ADR 0485), into `opens` (st.opens: unit id -> the
+-- chance it keeps one): in act order, a holder whose Trade hands away its last chest opener
+-- (bot.lua tradeAct's `spends`) opens none after it, and a taker the item opens a chest for
+-- (`restores`) is given back the keep it had before an earlier Trade of the plan spent it (a
+-- theft's keep survives the round trip). A taker is never made a
+-- chest's new taker here: the goals' takers are fixed when the decision starts. Pure.
+function M.opensAfterTrades(acts, opens)
+    local spent = {}   -- unit id -> { prev = its keep before the spend (a theft's, or nil) }
+    for _, a in ipairs(acts) do
+        if a.act == "trade" then
+            local holder, taker = M.tradeEnds(a)
+            if a.spends then
+                spent[holder] = spent[holder] or { prev = opens[holder] }
+                opens[holder] = 0
+            end
+            if a.restores and spent[taker] then opens[taker], spent[taker] = spent[taker].prev, nil end
+        end
+    end
+    return opens
 end
 
 -- The chance either of two independent events happens: 1 - (1 - a)(1 - b). The one fold of
@@ -2632,6 +2660,7 @@ function M.plan(Bot, board, sight, style, opts)
         for _, p in ipairs(planned) do alive[p.unit.id] = 1 - (die[p.unit.id] or 0) end
         st.opens = {}
         for id in pairs(robbed) do st.opens[id] = keeps[id] or 0 end
+        M.opensAfterTrades(st.acts, st.opens)
         st.goalWorth = {}
         st.goalNow = goalTerm(st, alive, felled, st.goalWorth, fell)
         st.alive, st.felled = alive, felled   -- for the lookahead's later win (goalTerm again)

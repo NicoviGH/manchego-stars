@@ -65,7 +65,9 @@
 --              whose fall gives it one; without them no way runs through a key.
 --            bagKey(unit, mate, terrain) -> { id, uses, slot }|nil, bagFacts(unit, item),
 --              OPTIONAL: a teammate's key the unit could Trade for, and what a full bag gives
---              back (Bot.fullBag's facts); without them no way runs through a teammate's bag. }
+--              back (Bot.fullBag's facts); without them no way runs through a teammate's bag.
+--            keyOpens(unit, item, kind) -> bool, OPTIONAL: whether the item opens a "doors" or
+--              "chests" lock (nil: either) for the unit; without it a Trade reads no key. }
 --   Returns ONE action, for the unit that should act next, or nil when no unit can act (the
 --   caller ends the phase): { unit = charId, unitId = id, move = {x,y},
 --   act = "attack"|"wait"|"seize", target = charId|nil, targetId = id|nil, slot = n|nil }.
@@ -2310,6 +2312,37 @@ do
         return it and { id = it.id, uses = it.uses } or nil
     end
 
+    -- Whether a Trade of `item` (an id) from `holder` leaves it no chest opener (sight.keyOpens,
+    -- the game's check as the holder): the planner's march to a chest then reads it keyless
+    -- (planner st.opens, ADR 0485). Vanilla Ch16 s4005 (`k711a` a1, turn 8): Colm's Lockpick
+    -- handed to Eirika left his walk to (3,12) counted as an opener's. Chests only: the
+    -- planner's per-plan opener read (st.opens) is a chest march's; a door's way is read on the
+    -- live bags (sight.locked), which no plan's Trade moves.
+    local function spendsOpener(s, holder, item)
+        if not s.keyOpens or not s.keyOpens(holder, item, "chests") then return false end
+        -- the one copy traded is skipped: a second Lockpick still opens (#792 review)
+        local skipped = false
+        for _, it in ipairs(holder.items or {}) do
+            if it.id == item and not skipped then
+                skipped = true
+            elseif s.keyOpens(holder, it.id, "chests") then
+                return false
+            end
+        end
+        return true
+    end
+
+    -- Whether `taker` could use `item` the way `holder` does: each lock kind it opens for the
+    -- holder it opens for the taker (sight.keyOpens). A hand-off that moves a key to a unit it
+    -- opens nothing for saves it from the thief and still loses its chest (ADR 0485).
+    local function usableBy(s, holder, taker, item)
+        if not s.keyOpens then return true end
+        for _, kind in ipairs({ "doors", "chests" }) do
+            if s.keyOpens(holder, item, kind) and not s.keyOpens(taker, item, kind) then return false end
+        end
+        return true
+    end
+
     -- `actor`'s Trade with `other` that moves the key `h` (a bagHolders source) to its taker: the
     -- actor takes it from the holder, or (`gives`) the actor is the holder and hands it over. From
     -- the safest wait tile the gate allows where the game's Trade command lists `other`
@@ -2331,6 +2364,8 @@ do
         if not best then return nil end
         local a = action(actor, best, "trade", other)
         a.item, a.uses, a.lock, a.back, a.gives = h.key.id, h.key.uses, h.lock, back, gives or nil
+        a.spends = spendsOpener(s, gives and actor or other, h.key.id) or nil
+        a.restores = s.keyOpens and s.keyOpens(taker, h.key.id, "chests") or nil
         return a
     end
 
@@ -2361,7 +2396,8 @@ do
                 local h = { key = { id = it.id, uses = it.uses } }
                 for _, t in ipairs(ctx.blues or {}) do
                     local reach = math.max(s.mov(u), s.mov(t)) + 1
-                    if t.id ~= u.id and not t.dead and Board.distance(u.x, u.y, t.x, t.y) <= reach then
+                    if t.id ~= u.id and not t.dead and Board.distance(u.x, u.y, t.x, t.y) <= reach
+                        and usableBy(s, u, t, it.id) then
                         for _, a in ipairs({ tradeAct(ctx, u, t, h, true, open) or false,
                                              tradeAct(ctx, t, u, h, false, open) or false }) do
                             if a then
