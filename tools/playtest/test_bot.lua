@@ -6463,6 +6463,8 @@ do
     local back = { act = "trade", unitId = 3, targetId = 2, gives = true, item = 0x6B, restores = true }
     check(Planner.opensAfterTrades({ take }, {})[2], 0, "opens: a take from the holder spends it")
     check(Planner.opensAfterTrades({ take, back }, {})[2], nil, "opens: a Trade back restores it")
+    check(Planner.opensAfterTrades({ take, back }, { [2] = 0.4 })[2], 0.4,
+          "opens: a Trade back restores a robbed unit's theft keep, not a full one")
     check(Planner.opensAfterTrades({ back }, { [2] = 0.4 })[2], 0.4,
           "opens: a restore leaves a keep no Trade of the plan set")
 end
