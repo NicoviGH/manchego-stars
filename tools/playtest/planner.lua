@@ -182,7 +182,8 @@ M.PER_UNIT = 4     -- a unit's best acts, by their own score, that the beam trie
                    -- hold and retreat, always: the way out survives the cut)
 M.FINAL = 4        -- complete plans judged against the enemy phase
 M.MEND_ROUNDS = 3  -- the mend's rounds; past the first, only while no plan is under the cap
-                   -- or the best still forfeits a theft ("stolen:<id>", ADR 0475)
+                   -- or the best still forfeits a theft ("stolen:<id>", ADR 0475) or our
+                   -- counter may fell a recruit in it (ADR 0487)
 -- the uncertain kills the judge plays both ways (2^n enemy phases), so a protected unit's death
 -- chance is a sum over the ways the phase can go, never read off an average that keeps a
 -- likely kill gone (FR-009). Even an enemy that reaches no one is played both ways: its death
@@ -3071,7 +3072,7 @@ function M.plan(Bot, board, sight, style, opts)
     -- it tries instead the player acts that could save it, one ending beside it (a block) or
     -- striking an enemy that strikes it. A recruit our counter may kill tries the acts of the
     -- units it strikes.
-    -- With no plan under the cap, or the best still robbed (below), the mend goes again from the plan it found, up to
+    -- With no plan under the cap, or the best still robbed or felling a recruit (below), the mend goes again from the plan it found, up to
     -- M.MEND_ROUNDS rounds, so more than one unit may change (#510 PR A): one round changed one
     -- unit, and two units each over the cap where they stood stayed a fallback.
     -- whether the plan forfeits a theft the mend can try to undo ("stolen:<id>"): a round that
@@ -3085,9 +3086,22 @@ function M.plan(Bot, board, sight, style, opts)
         end
         return next(st.lockThieves or {}) ~= nil
     end
+    -- whether our counter may fell a recruit in the plan: the same (ADR 0487; vanilla Ch10 s4005
+    -- a1, replay t730a, turn 5: the first round, from the beam's over-cap plan, took the plan under
+    -- the cap with Franz striking from Amelia's reach holding the lance that kills her, and the
+    -- strike holding his sword was tried only from the over-cap base). A recruit no act spares
+    -- costs one more round, no more: a round that changes nothing ends the mend (`best == base`)
+    local function fells(st)
+        for _, p in ipairs(st.predict or {}) do
+            if p.recruit and p.die > M.DUST then return true end
+        end
+        return false
+    end
     -- (a robbed plan whose round changed nothing still stops: `best == base` below)
     for round = 1, M.MEND_ROUNDS do
-        if not best or (round > 1 and best.rank.admitted and not robbed(best)) then break end
+        if not best or (round > 1 and best.rank.admitted and not robbed(best) and not fells(best)) then
+            break
+        end
         local base, menuOf, risky = best, {}, {}
         -- the menus on the board the plan being mended leaves (menusFor): a unit at risk may
         -- try a doorway or a freed tile its plan's door or kill opens; extend's `needs` check
@@ -3099,8 +3113,8 @@ function M.plan(Bot, board, sight, style, opts)
             menuOf[m.unit.id] = mine
         end
         -- the menu entries of the units `ids`, in order
-        local function entriesOf(ids)
-            local out = {}
+        local function entriesOf(ids, out)
+            out = out or {}
             for _, id in ipairs(ids) do
                 for _, t in ipairs(menuOf[id] or {}) do out[#out + 1] = t end
             end
@@ -3108,10 +3122,21 @@ function M.plan(Bot, board, sight, style, opts)
         end
         local function tries(p)
             if p.recruit then
-                -- a recruit has no player menu: the units it strikes try theirs (out of its
-                -- reach, or waiting or striking holding a weapon whose counter spares it:
-                -- the "gentle" acts, #730)
-                return entriesOf(p.struck)
+                -- a recruit has no player menu: the units it strikes try their own act in the
+                -- plan holding the weapon whose counter spares it (Bot.sparingTwin: the menus'
+                -- "gentle" acts are capped, and the cap can cut the twin of the act the plan
+                -- chose), then their menus (out of its reach, or the gentle acts, #730)
+                local out, struck = {}, {}
+                for _, id in ipairs(p.struck) do struck[id] = true end
+                for _, a in ipairs(Bot.sparingTwin and base.acts or {}) do
+                    local u = struck[a.unitId] and byId[a.unitId]
+                    local twin = u and Bot.sparingTwin(ctx, u, a)
+                    if twin then
+                        annotate(twin, u)
+                        out[#out + 1] = { uid = a.unitId, a = twin }
+                    end
+                end
+                return entriesOf(p.struck, out)
             end
             if p.joined then
                 -- a recruit the plan Talks over has no act of its own in it: the talker's

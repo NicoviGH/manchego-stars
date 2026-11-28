@@ -1240,7 +1240,7 @@ end
 -- would fell a recruit striking `u` on (x, y) holding `slot` (nil: the first usable weapon), the
 -- same act holding another of the spot's `slots`, when the recruits' fall plus `u`'s own death
 -- there is less than with the weapon held now by more than Goals.DUST. Per spot the least wins;
--- the M.GENTLE best over all spots are offered (the cap is per menu: waits and strikes each),
+-- the M.GENTLE (or `cap`) best over all spots are offered (the cap is per menu: waits and strikes each),
 -- since each is a judged phase in the mend. A range-2 bow against a recruit's melee strike
 -- answers nothing: the no-counter choice a player has. A spot no recruit can reach is skipped
 -- before any strike is read (the cost bound: boards with no recruit near cost nothing).
@@ -1248,7 +1248,7 @@ end
 --          after = function(slot) -> the HP `u` enters the enemy phase with, the enemy a sure
 --          kill spares (an attack's: its counter taken; nil: a wait's, `u`'s HP now) }
 -- -> the acts, each labelled "gentle"
-local function sparingPicks(ctx, u, recruit, spots)
+local function sparingPicks(ctx, u, recruit, spots, cap)
     local function reached(x, y)
         for _, e in ipairs(ctx.threats) do
             if recruit(e) and reaches(ctx, e, x, y) then return true end
@@ -1282,8 +1282,19 @@ local function sparingPicks(ctx, u, recruit, spots)
         return p.i < q.i
     end)
     local out = {}
-    for i = 1, math.min(M.GENTLE, #picks) do out[i] = picks[i].a end
+    for i = 1, math.min(cap or M.GENTLE, #picks) do out[i] = picks[i].a end
     return out
+end
+
+-- (The spot builders hang off M: bot.lua's chunk is at Lua's 200-local cap.)
+-- sparingPicks' spot for `u`'s plain wait `a` (none for a wait that holds a slot or moves on by
+-- Canto): the wait holding each weapon after the first usable one.
+function M.waitSpot(ctx, u, a)
+    if a.act ~= "wait" or a.slot or a.canto then return nil end
+    local weapons, later = ctx.sight.weapons(u), {}
+    for i = 2, #weapons do later[#later + 1] = weapons[i].slot end
+    return { x = a.move.x, y = a.move.y, slots = later,
+             make = function(slot) return waitHolding(u, a.move, slot) end }
 end
 
 -- The waits of `u` that spare a recruit (#730, ADR 0451): each tile a wait of `u` already ends
@@ -1291,18 +1302,53 @@ end
 local function sparingWaits(ctx, u, acts)
     local recruit = sparingRecruit(ctx, u)
     if not recruit then return {} end
-    local weapons, spots, done = ctx.sight.weapons(u), {}, {}
-    local later = {}
-    for i = 2, #weapons do later[#later + 1] = weapons[i].slot end
+    local spots, done = {}, {}
     for _, a in ipairs(acts) do
         local k = tileKey(a.move.x, a.move.y)
-        if a.act == "wait" and not a.slot and not a.canto and not done[k] then
+        local spot = not done[k] and M.waitSpot(ctx, u, a)
+        if spot then
             done[k] = true
-            spots[#spots + 1] = { x = a.move.x, y = a.move.y, slots = later,
-                                  make = function(slot) return waitHolding(u, a.move, slot) end }
+            spots[#spots + 1] = spot
         end
     end
     return sparingPicks(ctx, u, recruit, spots)
+end
+
+-- attackOptions' `options` by spot (spotKey: one target from one tile), each spot's options one
+-- per weapon, and the spots in their first option's order. -> groups, order
+function M.strikeGroups(options)
+    local groups, order = {}, {}
+    for _, c in ipairs(options) do
+        local k = spotKey(c.target.id, c.tile.x, c.tile.y)
+        if not groups[k] then groups[k] = {}; order[#order + 1] = k end
+        table.insert(groups[k], c)
+    end
+    return groups, order
+end
+
+-- sparingPicks' spot for `u`'s strikes on one target from one tile (`here`: attackOptions'
+-- options there, one per weapon), the weapon held being `base`'s (the act kept there) or, on a
+-- tile no act took, the one betterAttack keeps. A weapon the attack can break is never the
+-- sparing one (sparingStrikes says why).
+function M.strikeSpot(u, here, base)
+    local held, byslot = base and base.slot, {}
+    for _, c in ipairs(here) do
+        byslot[c.slot] = c
+        if not base and (not held or betterAttack(c, byslot[held])) then held = c.slot end
+    end
+    local slots = {}
+    for _, c in ipairs(here) do
+        local it = u.items and u.items[c.slot + 1]
+        local breaks = it and it.uses and it.uses <= (c.f.hits or 1)
+        if c.slot ~= held and not breaks then slots[#slots + 1] = c.slot end
+    end
+    return {
+        x = here[1].tile.x, y = here[1].tile.y, slot = held, slots = slots,
+        make = function(slot) return strikeActOf(u, byslot[slot]) end,
+        after = function(slot)
+            local c = byslot[slot]
+            return u.hp - (c.spent or 0), c.sure and c.target or nil
+        end }
 end
 
 -- The attacks of `u` that spare a recruit (#730, ADR 0453): its attack on each target from each
@@ -1319,39 +1365,15 @@ end
 local function sparingStrikes(ctx, u, acts, options)
     local recruit = sparingRecruit(ctx, u)
     if not recruit then return {} end
-    local kept, groups, order = {}, {}, {}
+    local kept = {}
     for _, a in ipairs(acts) do
         if a.act == "attack" and a.targetId then
             kept[spotKey(a.targetId, a.move.x, a.move.y)] = a
         end
     end
-    for _, c in ipairs(options) do
-        local k = spotKey(c.target.id, c.tile.x, c.tile.y)
-        if not groups[k] then groups[k] = {}; order[#order + 1] = k end
-        table.insert(groups[k], c)
-    end
+    local groups, order = M.strikeGroups(options)
     local spots = {}
-    for _, k in ipairs(order) do
-        local here, base = groups[k], kept[k]
-        local held, byslot = base and base.slot, {}
-        for _, c in ipairs(here) do
-            byslot[c.slot] = c
-            if not base and (not held or betterAttack(c, byslot[held])) then held = c.slot end
-        end
-        local slots = {}
-        for _, c in ipairs(here) do
-            local it = u.items and u.items[c.slot + 1]
-            local breaks = it and it.uses and it.uses <= (c.f.hits or 1)
-            if c.slot ~= held and not breaks then slots[#slots + 1] = c.slot end
-        end
-        spots[#spots + 1] = {
-            x = here[1].tile.x, y = here[1].tile.y, slot = held, slots = slots,
-            make = function(slot) return strikeActOf(u, byslot[slot]) end,
-            after = function(slot)
-                local c = byslot[slot]
-                return u.hp - (c.spent or 0), c.sure and c.target or nil
-            end }
-    end
+    for _, k in ipairs(order) do spots[#spots + 1] = M.strikeSpot(u, groups[k], kept[k]) end
     local out = sparingPicks(ctx, u, recruit, spots)
     -- the slot is the key's too (Planner.key): another weapon, another act
     for _, a in ipairs(out) do a.slotKey = true end
@@ -2933,6 +2955,31 @@ function M.handoffsFor(ctx, u, taken)
     local out = {}
     for _, h in ipairs(M.handoffs(ctx, u, taken)) do out[#out + 1] = offeredAt(ctx, h.unit, h.a) end
     return out
+end
+
+-- The planner's mend of a recruit our counter fells (#730): `u`'s own act `a` in the plan, a plain
+-- wait or a strike, holding the weapon whose counter spares it (sparingPicks on that one spot), or
+-- nil. The menus offer M.GENTLE such acts per unit, the cheapest by a read of every enemy that
+-- reaches a tile; the judge's phase may play another, so the act the plan chose had no twin on
+-- the menu (vanilla Ch10 s4005 a1, turn 5: Franz, 0x04, struck from (1,19) holding his Iron
+-- Lance, the two gentle strikes offered were on another target, and his counter killed Amelia,
+-- 0x12). Read on the decision's own board (ctx: M.candidates' second value), as the menus' gentle
+-- acts are: an act the planner re-listed on a board its plan changes (`needs`, menusFor) has no
+-- twin here, its own re-listed menu carries the gentle acts read on that board. In a later mend
+-- round an earlier act may have killed a threat the twin's cost still counts; the cost only picks
+-- the weapon, and the judged phase decides the plan.
+function M.sparingTwin(ctx, u, a)
+    local recruit = sparingRecruit(ctx, u)
+    if not recruit or a.needs then return nil end
+    local spot = M.waitSpot(ctx, u, a)
+    if not spot and a.act == "attack" and a.targetId and not a.slotKey then
+        local here = M.strikeGroups(ctx.priced[u] or {})[spotKey(a.targetId, a.move.x, a.move.y)]
+        if here then spot = M.strikeSpot(u, here, a) end
+    end
+    local twin = spot and sparingPicks(ctx, u, recruit, { spot }, 1)[1]
+    if not twin then return nil end
+    if a.act == "attack" then twin.slotKey = true end
+    return offeredAt(ctx, u, twin)
 end
 
 -- The planner's heal swap: unit `u`'s own heal on `tile` (ctx: M.candidates' second value).
