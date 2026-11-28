@@ -13,7 +13,7 @@ and start a fresh instance; don't rely on auto-compaction.
 redesign, worked now) and the symptom groups #752, #753, #754; step 10 is #751. The day-by-day
 log that used to sit here is in this file's git history and on the issues.
 
-## Next session starts here (2026-11-27; main is ebc58b86 + HANDOFF commits)
+## Next session starts here (2026-11-27; main is 28fdf099 + HANDOFF commits)
 
 **The work is #764, the bot redesign** (Nicolas, 2026-11-24). Read its body, which is the plan.
 R1 #765 done (PR #769); R2 #766's stage job, route loss and Talk-recruit fix merged (PR #773);
@@ -86,6 +86,21 @@ A job behind a shut door read loss 0, because its field never reached the unit. 
 read along the march's own chain (`chainTo`/`breachFor` take a start). It does not save (2,18):
 replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns), chest still missed.
 
+**2026-11-27 (latest): Ch16 s4005's thefts are fixed and merged. Next: #764 fix order item 2 (Ch10's Amelia).**
+- **PR #792 (ADR 0485):** a theft's hand-off gives a key only to a unit it opens for, and a
+  Trade of a holder's last chest opener leaves it keyless in the planner.
+- **PR #793 (ADR 0486):** the closings forecast reads a thief's Lockpick chest opening (a
+  use-item act, not a pillage), so every Lockpick thief was invisible to it before.
+- **Replay `m793a` on main (28fdf099):** Ch16 s4005 won clean on attempt 1, 18 turns, 0 deaths.
+  Other Ch16 starts wait for the R6 set. Leads still open on Ch16 (#764 comment 7231819665):
+  the arrived thief's kill has no worth, the staging job can't fire on attempt 1, and the turn-8
+  forecast missed (3,12) in `p786a` a2.
+- **Diagnosis by cheap readers:** every claim went to a Sonnet reader as a hypothesis with its
+  refuting test (Nicolas, 2026-11-27: "send cheap subagents to investigate claims instead of
+  guess"). The temporary closings log is at
+  `/private/tmp/claude-501/-Users-Yonick-Projects-manchego-stars/b47e8e25-c355-4ac8-ab28-d519ee831e38/scratchpad/debug-closings.patch`
+  (PT_DEBUG_CLOSE=<file>; it trips one source-count test in test_sight.lua).
+
 **2026-11-27 (night, end): Ch16's item 1 and its keys are merged. Next: Ch16's thefts.**
 - **PR #790 merged (cea6061b, ADR 0483):** the thief answers. The mend for a key holder, a
   looter's kill keeps its chest (a remembered closer is named by `sight.keyOf`, so Ch16's two
@@ -124,7 +139,7 @@ replays `r688a`/`r688b` won in 38 turns with 0 deaths (main's `c688m`: 30 turns)
 clear-blocker jobs on top of the stage job instead.
 
 **Where the traces live:** `references/sim/vanilla/c25b145e3745/traces/<tag>-b640e-cs-s400N/`.
-Recent tags: `l764e`/`l764f` (PR #790), `k711a`/`k711b` (PR #791), `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
+Recent tags: `m793a` (PRs #792+#793 on main), `p786a`, `h785a`, `d785a` (instrumented), `l764e`/`l764f` (PR #790), `k711a`/`k711b` (PR #791), `s766r`-`s766t` (PR #782, Ch14 s4005), `q766a`-`q766f` (item 3, Ch14 s4005), `h766a`-`h766e`, `h775a`-`h775c` (Ch14), `f475a10`/`f475a16` (item 1's proofs),
 `i730b`-`i730j` (Ch16 s4005 theft replays, ADR 0475). Replay a start with `montecarlo.py resume --game vanilla --tag <tag> --campaigns
 b640e-cs-s400N --chapter 14 --last 14 --attempts 2 --scout --jobs 1`.
 
